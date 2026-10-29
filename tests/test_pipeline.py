@@ -2,7 +2,15 @@ import json
 import os
 import time
 
+import pytest
+
 from tingposten import pipeline
+
+
+@pytest.fixture(autouse=True)
+def all_dates(monkeypatch):
+    """The sample meetings are older than config.TILBAKE_DAGER; include them."""
+    monkeypatch.setattr(pipeline, "fra_dato", lambda idag=None: "2000-01-01")
 
 BASE = {"moteDato": "2026-05-20", "kategori": "Saker til behandling", "vedtakFilId": "9",
         "innstillingFilId": "8"}
@@ -235,3 +243,24 @@ def test_kjor_rewrites_a_rejected_article_once(tmp_path, monkeypatch):
                      ("artikkel", {"571424/2026-05-20/1-26": "Avvist fordi: for lang."}),
                      ("artikkelsjekk", None), ("artikkelrediger", None)]
     assert "omskriv_artikkel" in result
+
+
+def test_saker_and_kjor_only_go_back_tilbake_dager(tmp_path, monkeypatch):
+    old, new = item("1/26", moteDato="2026-01-28"), item("2/26", moteDato="2026-09-23")
+    store(tmp_path, [old, new])
+    assert [i["referansenr"] for i in pipeline.saker(tmp_path, fra="2026-07-29")] == ["2/26"]
+    seen = []
+    monkeypatch.setattr(pipeline, "fra_dato", lambda idag=None: "2026-07-29")
+    monkeypatch.setattr(pipeline, "todo", lambda step, items, data_dir: seen.extend(i["referansenr"] for i in items) or [])
+    pipeline.kjor(tmp_path, steg=("skriv",), llms={"skriv": None, "sjekk": None, "klassifiser": None})
+    assert seen == ["2/26"]
+    seen.clear()  # an explicit meeting date is always allowed
+    pipeline.kjor(tmp_path, dato="2026-01-28", steg=("skriv",), llms={"skriv": None, "sjekk": None, "klassifiser": None})
+    assert seen == ["1/26"]
+
+
+def test_fra_dato_counts_tilbake_dager(monkeypatch):
+    import datetime
+    monkeypatch.undo()  # the real fra_dato, not the autouse stand-in
+    monkeypatch.setattr(pipeline.config, "TILBAKE_DAGER", 92)
+    assert pipeline.fra_dato(datetime.date(2026, 10, 29)) == "2026-07-29"

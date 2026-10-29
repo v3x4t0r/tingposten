@@ -24,6 +24,7 @@ def main(argv: list[str] | None = None) -> int:
     urler.add_argument("--utvalg", help="utvalgId, e.g. 571424 (required without --mangler)")
     urler.add_argument("--mangler", action="store_true",
                        help="every PDF the pipeline still needs, across meetings (with --utvalg/--dato: only those)")
+    urler.add_argument("--fra", help="with --mangler: oldest meeting date (default: config.TILBAKE_DAGER back)")
     urler.add_argument("--dato", help="meeting date YYYY-MM-DD; default: the newest stored meeting")
     urler.add_argument("--all", action="store_true", help="include noise (innkalling, spørsmål, …)")
     urler.add_argument("--script", type=Path, help="also write a polite wget script to this path")
@@ -49,6 +50,7 @@ def main(argv: list[str] | None = None) -> int:
     kjorp.add_argument("--dato", help="only this meeting date YYYY-MM-DD")
     kjorp.add_argument("--steg", help="comma-separated subset of skriv,sjekk,klassifiser,rediger,artikkel,artikkelsjekk,artikkelrediger")
     kjorp.add_argument("--parallel", type=int, default=3)
+    kjorp.add_argument("--fra", help="oldest meeting date YYYY-MM-DD (default: config.TILBAKE_DAGER back)")
 
     byggp = sub.add_parser("bygg", help="build the static site into site/")
     byggp.add_argument("--idag", type=date.fromisoformat, help="pretend today is YYYY-MM-DD (for previews)")
@@ -103,7 +105,7 @@ def main(argv: list[str] | None = None) -> int:
         steg = tuple(args.steg.split(",")) if args.steg else pipeline.STEG
         if unknown := set(steg) - set(pipeline.STEG):
             parser.error(f"unknown steg: {', '.join(sorted(unknown))}")
-        pipeline.kjor(utvalg=args.utvalg, dato=args.dato, steg=steg, parallel=args.parallel)
+        pipeline.kjor(utvalg=args.utvalg, dato=args.dato, steg=steg, parallel=args.parallel, fra=args.fra)
     elif args.cmd == "bygg":
         from . import bygg
 
@@ -207,10 +209,11 @@ def _pdf_mangler(args) -> int:
     Writing it is not fetching: the user decides when to run it."""
     from . import pipeline
 
-    items = pipeline.saker(config.DATA_DIR, args.utvalg, args.dato)
+    fra = None if args.dato else (args.fra or pipeline.fra_dato())
+    items = pipeline.saker(config.DATA_DIR, args.utvalg, args.dato, fra)
     targets = [t for t in pdf.targets(items) if not (config.DATA_DIR / "pdf" / t["filename"]).exists()]
     meetings = sorted({t["filename"].rsplit("/", 1)[0] for t in targets})
-    logging.info("%d PDF(s) missing across %d meeting(s)", len(targets), len(meetings))
+    logging.info("%d PDF(s) missing across %d meeting(s)%s", len(targets), len(meetings), f" since {fra}" if fra else "")
     for t in targets:
         print(f"{t['url']}\t{t['filename']}")
     if args.script:

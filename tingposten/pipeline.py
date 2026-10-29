@@ -21,6 +21,7 @@ import json
 import logging
 import math
 from collections import defaultdict
+from datetime import date, timedelta
 from pathlib import Path
 
 from . import config, faktasjekker, klassifiserer, pdf, redaktor, score, skribent
@@ -32,8 +33,14 @@ STEG = ("skriv", "sjekk", "klassifiser", "rediger", "artikkel", "artikkelsjekk",
 MAKS_OMSKRIVINGER = 1
 
 
-def saker(data_dir: Path = config.DATA_DIR, utvalg: str | None = None, dato: str | None = None) -> list[dict]:
-    """Decided, non-noise saker from the deciding Tier 1 organs."""
+def fra_dato(idag: date | None = None) -> str:
+    """The oldest meeting date new cards and PDFs are made for (config.TILBAKE_DAGER)."""
+    return ((idag or date.today()) - timedelta(days=config.TILBAKE_DAGER)).isoformat()
+
+
+def saker(data_dir: Path = config.DATA_DIR, utvalg: str | None = None, dato: str | None = None,
+          fra: str | None = None) -> list[dict]:
+    """Decided, non-noise saker from the deciding Tier 1 organs (meetings on or after `fra`)."""
     out = []
     for uid in config.TIER1:
         if uid in config.INNSTILLENDE or (utvalg and uid != utvalg):
@@ -44,6 +51,7 @@ def saker(data_dir: Path = config.DATA_DIR, utvalg: str | None = None, dato: str
         out += [
             i for i in json.loads(path.read_text()).values()
             if i.get("vedtakFilId") and not pdf.is_noise(i) and (not dato or i.get("moteDato") == dato)
+            and (not fra or (i.get("moteDato") or "") >= fra)
         ]
     return sorted(out, key=lambda i: (i["utvalgId"], i["moteDato"], i.get("seq") or 0))
 
@@ -148,9 +156,10 @@ def mangler_pdf(items: list[dict], data_dir: Path = config.DATA_DIR) -> list[dic
 
 
 def kjor(data_dir: Path = config.DATA_DIR, utvalg: str | None = None, dato: str | None = None,
-         steg: tuple[str, ...] = STEG, parallel: int = 3, llms: dict | None = None) -> dict:
-    """Run the steps in order; returns per-step counts."""
-    items = saker(data_dir, utvalg, dato)
+         steg: tuple[str, ...] = STEG, parallel: int = 3, llms: dict | None = None, fra: str | None = None) -> dict:
+    """Run the steps in order; returns per-step counts. Without `dato`, only
+    meetings on or after `fra` (default: config.TILBAKE_DAGER back)."""
+    items = saker(data_dir, utvalg, dato, None if dato else (fra or fra_dato()))
     if missing := mangler_pdf(items, data_dir):
         hint = "" if config.ALLOW_PDF_FETCH else " (automatic download is off; see `tingposten pdf-urler`)"
         log.info("%d of %d saker have no protokoll on disk yet%s", len(missing), len(items), hint)

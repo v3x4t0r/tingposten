@@ -19,7 +19,7 @@ def test_pdf_urler_mangler_writes_one_script_for_what_is_missing(tmp_path, monke
         f.parent.mkdir(parents=True, exist_ok=True)
         f.write_bytes(b"%PDF")
     script = tmp_path / "last-ned-mangler.sh"
-    assert cli.main(["pdf-urler", "--mangler", "--script", str(script)]) == 0
+    assert cli.main(["pdf-urler", "--mangler", "--fra", "2026-01-01", "--script", str(script)]) == 0
     out = capsys.readouterr().out.splitlines()
     assert [line.split("\t")[1] for line in out] == ["571424/2026-10-27/2-26_saksframlegg.pdf",
                                                     "571424/2026-10-27/2-26_protokoll.pdf"]
@@ -28,7 +28,7 @@ def test_pdf_urler_mangler_writes_one_script_for_what_is_missing(tmp_path, monke
     (tmp_path / "pdf" / "571424/2026-10-27").mkdir(parents=True)
     for kind in ("saksframlegg", "protokoll"):
         (tmp_path / "pdf" / f"571424/2026-10-27/2-26_{kind}.pdf").write_bytes(b"%PDF")
-    assert cli.main(["pdf-urler", "--mangler", "--script", str(script)]) == 0
+    assert cli.main(["pdf-urler", "--mangler", "--fra", "2026-01-01", "--script", str(script)]) == 0
     assert not script.exists()
 
 

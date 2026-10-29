@@ -42,6 +42,10 @@ BACKOFF_S = (60, 300)  # waits before retry 1 and 2; then give up the run
 ALLOW_PDF_FETCH = False
 MAKS_PDF_PER_KJORING = 200  # cap per daily run once fetching is allowed
 
+# How far back the AI writes cards and articles, and the PDF script reaches.
+# Older meetings already written stay on the site; nothing new is made for them.
+TILBAKE_DAGER = 92
+
 # Share of each meeting's decided saker that get a background article
 # (plan: about 20–30 %; tune after more meetings are rated).
 ARTIKKEL_ANDEL = 0.25
