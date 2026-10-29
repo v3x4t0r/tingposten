@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% from "macros.html" import overskrift %}
+{% block title %}{{ mote.organ }} · {{ mote.dato_tekst }} · Tingposten{% endblock %}
+{% block main %}
+<p class="brodsmule"><a href="{{ root }}bergen/moter/">Alle møter</a></p>
+<h1>{{ mote.organ }} · {{ mote.dato_tekst }}</h1>
+<p class="sammendrag">{{ mote.saker|length }} {{ "sak" if mote.saker|length == 1 else "saker" }}, {{ mote.fremhevet }} fremhevet. Sakene står i samme rekkefølge som i møtet.</p>
+<ol class="overskrifter">
+  {% for s in mote.saker %}{{ overskrift(s, root, meta="kort", nr=True) }}{% endfor %}
+</ol>
+{% endblock %}

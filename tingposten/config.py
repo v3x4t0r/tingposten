@@ -37,6 +37,25 @@ PAGE_SIZE = 100
 TIMEOUT_S = 60
 BACKOFF_S = (60, 300)  # waits before retry 1 and 2; then give up the run
 
+# robots.txt disallows /api/fil/*. Automatic PDF downloads stay off until
+# Bystyrets kontor has said yes; until then PDFs are downloaded by hand.
+ALLOW_PDF_FETCH = False
+
+# Public site
+SITE_URL = "https://v3x4t0r.github.io/tingposten/"
+FREMHEVET_TERSKEL = 40  # score at or above this is highlighted on the front page
+MELD_FEIL = None  # None → GitHub issue on REPO, prefilled with the sak
+
+# Models, called through the subscription CLIs (no API keys): Claude writes
+# and classifies, Codex fact-checks — a different provider on purpose.
+MODELL_SKRIBENT = "opus"
+MODELL_KLASSIFISERER = "sonnet"
+MODELL_FAKTASJEKKER = None  # None → the model set in ~/.codex/config.toml
+
+# Organs whose items are recommendations to another organ, not decisions.
+# Their cases show up on the site when the deciding organ has decided.
+INNSTILLENDE = {"900101"}
+
 # Tier 1: the organs whose decisions are final or go straight to bystyret.
 TIER1 = {
     "571424": "Bergen bystyre",

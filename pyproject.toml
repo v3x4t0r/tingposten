@@ -5,6 +5,7 @@ description = "Hva Bergen kommune faktisk vedtar – hver sak i samme format, me
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "jinja2>=3.1.6",
     "pymupdf>=2.0",
     "requests>=2.31",
 ]

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Tingposten{% endblock %}</title>
+<meta name="description" content="{% block description %}Hva Bergen kommune faktisk vedtar – hver sak i samme format, med lenke til kilden.{% endblock %}">
+<link rel="stylesheet" href="{{ root }}static/style.css">
+<link rel="alternate" type="application/rss+xml" title="Tingposten Bergen" href="{{ root }}bergen/rss.xml">
+</head>
+<body class="side-{{ side }}">
+<a class="hopp" href="#innhold">Hopp til innholdet</a>
+{% set meny %}
+<nav class="meny" aria-label="Hovedmeny">
+  <a href="{{ root }}bergen/"{% if side == "forside" %} aria-current="page"{% endif %}>Forside</a>
+  <a href="{{ root }}bergen/moter/"{% if side in ("moter", "mote") %} aria-current="page"{% endif %}>Møter</a>
+  <a href="{{ root }}om/"{% if side == "om" %} aria-current="page"{% endif %}>Om</a>
+</nav>
+{% endset %}
+{% if side == "forside" and idag_tekst is defined %}
+<header class="masthead">
+  <div class="bred">
+    <p class="masthead-navn"><a href="{{ root }}bergen/">Tingposten <span aria-hidden="true">·</span> <span class="sted">Bergen</span></a></p>
+    <p class="masthead-linje"><span>{{ idag_tekst }}</span><span>Hva kommunen faktisk vedtar</span></p>
+    {{ meny }}
+  </div>
+</header>
+{% else %}
+<header class="topp">
+  <div class="bred">
+    <a class="logo" href="{{ root }}bergen/">Tingposten <span aria-hidden="true">·</span> <span class="sted">Bergen</span></a>
+    {{ meny }}
+  </div>
+</header>
+{% endif %}
+<main id="innhold" class="{% block bredde %}lesebredde{% endblock %}">
+{% block main %}{% endblock %}
+</main>
+<footer class="bunn">
+  <div class="bred">
+    <p>Tingposten viser hva Bergen kommune vedtar. Hver setning bygger på kommunens egne dokumenter, og hver sak lenker til dem.</p>
+    <p><a href="{{ root }}om/">Om Tingposten og rangeringen</a> · <a href="{{ root }}bergen/rss.xml">RSS</a> · <a href="https://github.com/{{ repo }}">Åpen kildekode</a></p>
+  </div>
+</footer>
+</body>
+</html>

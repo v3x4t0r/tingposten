@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+<channel>
+  <title>Tingposten · Bergen</title>
+  <link>{{ site_url }}bergen/</link>
+  <description>Vedtak i Bergen kommune, med lenke til kildene.</description>
+  <language>nb</language>
+  <lastBuildDate>{{ bygget }}</lastBuildDate>
+  {% for s in saker %}
+  <item>
+    <title>{{ s.overskrift }}</title>
+    <link>{{ site_url }}{{ s.side }}</link>
+    <guid isPermaLink="true">{{ site_url }}{{ s.side }}</guid>
+    <pubDate>{{ s.dato|rfc822 }}</pubDate>
+    <category>{{ s.organ }}</category>
+    <description>{% if s.dek %}{{ s.dek }}{% else %}{{ s.tittel }}. Sammendrag kommer.{% endif %}</description>
+  </item>
+  {% endfor %}
+</channel>
+</rss>

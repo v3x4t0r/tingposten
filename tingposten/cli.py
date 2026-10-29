@@ -31,6 +31,29 @@ def main(argv: list[str] | None = None) -> int:
     arkp.add_argument("--dato", required=True, help="meeting date YYYY-MM-DD")
     arkp.add_argument("--out", type=Path, help="default: data/bergen/ark/<utvalg>-<dato>.csv")
 
+    scorep = sub.add_parser("score", help="rank a downloaded meeting by impact score")
+    scorep.add_argument("--utvalg", required=True, help="utvalgId, e.g. 571424")
+    scorep.add_argument("--dato", required=True, help="meeting date YYYY-MM-DD")
+    scorep.add_argument("--sammenlign", action="store_true", help="compare with the hand ratings from `vurder`")
+
+    sub.add_parser("rediger", help="delete-only editor: fact-checked drafts → publishable cards")
+
+    kjorp = sub.add_parser("kjor", help="write, fact-check, classify and edit every decided sak with PDFs on disk")
+    kjorp.add_argument("--utvalg", help="only this utvalgId")
+    kjorp.add_argument("--dato", help="only this meeting date YYYY-MM-DD")
+    kjorp.add_argument("--steg", help="comma-separated subset of skriv,sjekk,klassifiser,rediger")
+    kjorp.add_argument("--parallel", type=int, default=3)
+
+    byggp = sub.add_parser("bygg", help="build the static site into site/")
+    byggp.add_argument("--idag", type=date.fromisoformat, help="pretend today is YYYY-MM-DD (for previews)")
+    byggp.add_argument("--til", type=Path, help="build into this directory instead of site/")
+
+    vurd = sub.add_parser("vurder", help="local web page for sorting a meeting's draft cards")
+    vurd.add_argument("--utvalg", required=True, help="utvalgId, e.g. 571424")
+    vurd.add_argument("--dato", required=True, help="meeting date YYYY-MM-DD")
+    vurd.add_argument("--port", type=int, default=8765)
+    vurd.add_argument("--apne", action="store_true", help="open the page in the browser")
+
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
@@ -53,6 +76,64 @@ def main(argv: list[str] | None = None) -> int:
         return _pdf_urler(args)
     elif args.cmd == "ark":
         return _ark(args)
+    elif args.cmd == "vurder":
+        return _vurder(args)
+    elif args.cmd == "score":
+        return _score(args)
+    elif args.cmd == "rediger":
+        from . import redaktor
+
+        items = [i for uid in config.TIER1 for i in (_load_items(uid) or [])]
+        logging.info("redaktør: %s", redaktor.run(items))
+    elif args.cmd == "kjor":
+        from . import pipeline
+
+        steg = tuple(args.steg.split(",")) if args.steg else pipeline.STEG
+        if unknown := set(steg) - set(pipeline.STEG):
+            parser.error(f"unknown steg: {', '.join(sorted(unknown))}")
+        pipeline.kjor(utvalg=args.utvalg, dato=args.dato, steg=steg, parallel=args.parallel)
+    elif args.cmd == "bygg":
+        from . import bygg
+
+        logging.info("bygg: %s", bygg.build(args.til or config.SITE_DIR, idag=args.idag))
+    return 0
+
+
+def _score(args) -> int:
+    from . import score, vurder
+
+    items = _load_items(args.utvalg)
+    if items is None:
+        return 1
+    ranked = score.rank([i for i in items if i.get("moteDato") == args.dato], config.DATA_DIR / "pdf")
+    if not args.sammenlign:
+        for r in ranked:
+            print(f"{r['score']:3}  {r['nr']:7} {' · '.join(r['grunner']):55} {r['tittel'][:60]}")
+        return 0
+    ratings_file = vurder.ratings_path(args.utvalg, args.dato)
+    if not ratings_file.exists():
+        logging.error("no ratings yet in %s — run `tingposten vurder` first", ratings_file)
+        return 1
+    print(json.dumps(score.compare(ranked, json.loads(ratings_file.read_text())), ensure_ascii=False, indent=1))
+    return 0
+
+
+def _vurder(args) -> int:
+    from . import vurder
+
+    items = _load_items(args.utvalg)
+    if items is None:
+        return 1
+    server = vurder.make_server(args.utvalg, args.dato, items, args.port)
+    url = f"http://127.0.0.1:{server.server_address[1]}/"
+    logging.info("vurdering: %s (saves to %s) — Ctrl+C to stop", url, vurder.ratings_path(args.utvalg, args.dato))
+    if args.apne:
+        import webbrowser
+        webbrowser.open(url)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
     return 0
 
 

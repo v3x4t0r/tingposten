@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Møter · Tingposten{% endblock %}
+{% block main %}
+<h1>Alle møter</h1>
+<p class="sammendrag">Hvert møte har en egen side med alle sakene som ble avgjort. Rekkefølgen på forsiden endrer aldri hva som er med.</p>
+{% if moter %}
+<ul class="moteliste">
+  {% for m in moter %}
+  <li><a href="{{ root }}bergen/mote/{{ m.slug }}/">{{ m.organ }} · {{ m.dato_tekst }}</a> – {{ m.saker|length }} {{ "sak" if m.saker|length == 1 else "saker" }}, {{ m.fremhevet }} fremhevet</li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="tomt">Ingen møter ennå.</p>
+{% endif %}
+{% endblock %}

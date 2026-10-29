@@ -2,6 +2,7 @@ from tingposten import pdf
 
 SAK = {
     "id": "a",
+    "utvalgId": "571424",
     "moteDato": "2026-09-23",
     "seq": 5,
     "kategori": "Saker til behandling",
@@ -38,7 +39,7 @@ def test_is_noise():
 def test_targets_skips_noise_and_missing_files():
     t = pdf.targets([SAK, INNKALLING])
     assert [x["kind"] for x in t] == ["saksframlegg", "protokoll"]
-    assert t[0]["filename"] == "2026-09-23/372-26_saksframlegg.pdf"
+    assert t[0]["filename"] == "571424/2026-09-23/372-26_saksframlegg.pdf"
     assert t[0]["url"].endswith("/fil/bk360/111/Framstilling-reguleringsplan")
 
 

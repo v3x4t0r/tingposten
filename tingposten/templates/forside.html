@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% from "macros.html" import lead as lead_story, sekundaer as sekundaer_story, overskrift %}
+{% block title %}Tingposten · Bergen · {{ periode }}{% endblock %}
+{% block bredde %}bred{% endblock %}
+{% block main %}
+<h1 class="skjult">Vedtak i Bergen, {{ periode|lower }}</h1>
+<nav class="faner" aria-label="Periode">
+  <a href="{{ root }}bergen/"{% if visning == "" %} aria-current="page"{% endif %}>Siste 14 dager</a>
+  <a href="{{ root }}bergen/30-dager/"{% if visning == "30-dager/" %} aria-current="page"{% endif %}>Siste 30 dager</a>
+  <a href="{{ root }}bergen/i-ar/"{% if visning == "i-ar/" %} aria-current="page"{% endif %}>I år</a>
+</nav>
+{% if not lead %}
+<p class="tomt">Ingen vedtak i perioden. Se <a href="{{ root }}bergen/moter/">alle møter</a>.</p>
+{% else %}
+{{ lead_story(lead, root) }}
+{% if sekundaer %}
+<section class="grid" aria-label="Flere fremhevede saker">
+  {% for s in sekundaer %}{{ sekundaer_story(s, root) }}{% endfor %}
+</section>
+{% endif %}
+{% if flere %}
+<section class="seksjon" aria-labelledby="flere">
+  <h2 class="seksjonstittel" id="flere">Flere vedtak</h2>
+  <ul class="overskrifter">
+    {% for s in flere %}{{ overskrift(s, root, flagg=False) }}{% endfor %}
+  </ul>
+</section>
+{% endif %}
+<p class="andre-lenke">
+  <a href="{{ root }}bergen/{{ visning }}alle/">{% if andre %}og {{ andre }} andre vedtak i perioden{% else %}Alle {{ antall }} vedtak i perioden, samlet per møte{% endif %}</a>
+</p>
+{% endif %}
+{% endblock %}

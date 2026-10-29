@@ -4,6 +4,7 @@ from tingposten import ark
 
 ITEM = {
     "id": "a",
+    "utvalgId": "571424",
     "moteDato": "2026-09-23",
     "seq": 5,
     "kategori": "Saker til behandling",
@@ -67,8 +68,8 @@ def test_row_prefills_signals():
 
 
 def test_build_skips_noise_and_tolerates_missing_or_broken_files(tmp_path):
-    (tmp_path / "2026-09-23").mkdir()
-    (tmp_path / "2026-09-23" / "258-26_protokoll.pdf").write_bytes(b"%PDF")
+    (tmp_path / "571424" / "2026-09-23").mkdir(parents=True)
+    (tmp_path / "571424" / "2026-09-23" / "258-26_protokoll.pdf").write_bytes(b"%PDF")
     # saksframlegg missing on disk; protokoll parser raises → empty signals, no crash
     def broken(path):
         raise ValueError("bad pdf")

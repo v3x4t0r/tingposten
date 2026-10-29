@@ -46,10 +46,20 @@ def _safe(text: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]+", "-", text).strip("-") or "sak"
 
 
+def tag(item: dict) -> str:
+    """Filesystem-safe id of a sak within its meeting, e.g. '238-26'."""
+    return _safe(item.get("referansenr") or item.get("saksnr") or item["id"])
+
+
+def key(item: dict) -> str:
+    """'<utvalgId>/<moteDato>/<tag>': where a sak's files live under each step's
+    directory (pdf/, kort/, sjekk/, …). Case numbers are only unique per organ."""
+    return f"{item.get('utvalgId', 'ukjent')}/{item.get('moteDato', 'udatert')}/{tag(item)}"
+
+
 def filename(item: dict, kind: str) -> str:
     """Local path of an item's PDF, relative to the pdf/ directory."""
-    tag = _safe(item.get("referansenr") or item.get("saksnr") or item["id"])
-    return f"{item.get('moteDato', 'udatert')}/{tag}_{kind}.pdf"
+    return f"{key(item)}_{kind}.pdf"
 
 
 def url(item: dict, kind: str) -> str | None:

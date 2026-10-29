@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% from "macros.html" import status, grunner, figur, overskrift %}
+{% block title %}{{ s.overskrift }} · Tingposten{% endblock %}
+{% block description %}{{ s.dek or s.tittel }}{% endblock %}
+{% block main %}
+<nav class="brodsmule" aria-label="Brødsmuler">
+  <a href="{{ root }}bergen/">Bergen</a> <span aria-hidden="true">›</span>
+  <a href="{{ root }}bergen/mote/{{ s.mote }}/">{{ s.organ_kort }} {{ s.dato_tekst }}</a>
+</nav>
+<article class="artikkel">
+  <header class="artikkel-topp">
+    <p class="kicker">{{ s.organ }} · <time datetime="{{ s.dato.isoformat() }}">{{ s.dato_tekst }}</time> · sak {{ s.nr }}</p>
+    <h1 class="artikkel-tittel">{{ s.overskrift }}</h1>
+    {% if s.dek %}
+    <p class="dek">{{ s.dek }}{% for k in s.dek_kilder %} <a class="kilde" href="{{ k.href }}">{{ k.dok }} s.&nbsp;{{ k.side }}</a>{% endfor %}</p>
+    {% endif %}
+    <div class="blokk-meta">{{ status(s) }}{% if s.fremhevet %}<span class="flagg">Fremhevet</span>{% endif %}{{ grunner(s) }}</div>
+    {% if s.har_sammendrag and s.overskrift != s.tittel %}<p class="tittel">Sakens tittel: {{ s.tittel }}</p>{% endif %}
+  </header>
+
+  {% for f in s.figurer %}{{ figur(f) }}{% endfor %}
+
+  {% if s.har_sammendrag %}
+  <div class="brodtekst">
+    {% for f in s.felt %}
+    <h2 class="mellomtittel">{{ f.label }}</h2>
+    <p>{{ f.tekst }}{% for k in f.kilder %} <a class="kilde" href="{{ k.href }}">{{ k.dok }} s.&nbsp;{{ k.side }}</a>{% endfor %}</p>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="kommer">Sammendrag kommer.</p>
+  {% endif %}
+  {% if s.modell %}<p class="modell">Maskinvurdering: {{ s.modell }}</p>{% endif %}
+
+  <aside class="kildeboks" aria-labelledby="kilder">
+    <h2 class="seksjonstittel" id="kilder">Kilder</h2>
+    <p>Alt på denne siden bygger på Bergen kommunes egne dokumenter:</p>
+    <ul>
+      {% for dok, href in s.pdf.items() %}<li><a href="{{ href }}">{{ dok|capitalize }}</a></li>{% endfor %}
+    </ul>
+    <p>Ser du en feil? <a href="{{ s.meld_feil }}">Meld feil</a>.</p>
+  </aside>
+</article>
+
+{% if relaterte %}
+<section class="seksjon" aria-labelledby="relaterte">
+  <h2 class="seksjonstittel" id="relaterte">Flere saker fra samme møte</h2>
+  <ul class="overskrifter">
+    {% for r in relaterte %}{{ overskrift(r, root, meta="kort") }}{% endfor %}
+  </ul>
+  <p class="andre-lenke"><a href="{{ root }}bergen/mote/{{ mote.slug }}/">Alle {{ mote.saker|length }} saker fra møtet</a></p>
+</section>
+{% endif %}
+{% endblock %}

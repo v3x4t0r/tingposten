@@ -1,0 +1,57 @@
+{# Story building blocks. One link per story: the headline. A CSS overlay on
+   that link makes the whole block clickable without nesting links. #}
+
+{% macro status(s) %}
+{% if s.status_tekst %}<span class="status{% if s.status_klasse %} status-{{ s.status_klasse }}{% endif %}">{{ s.status_tekst }}</span>{% endif %}
+{% endmacro %}
+
+{% macro grunner(s) %}
+{% if s.grunner %}
+<ul class="grunner" aria-label="Hvorfor saken er rangert slik">
+  {% for g in s.grunner %}<li>{{ g }}</li>{% endfor %}
+</ul>
+{% endif %}
+{% endmacro %}
+
+{% macro kicker(s) %}
+<p class="kicker">{{ s.organ_kort }} · <time datetime="{{ s.dato.isoformat() }}">{{ s.dato_tekst }}</time></p>
+{% endmacro %}
+
+{% macro figur(f, liten=False) %}
+<figure class="figur figur-{{ f.type|default('annen') }}{% if liten %} figur-liten{% endif %}">
+  {{ f.svg|safe }}
+  {% if f.kilde %}<figcaption>{{ f.kilde }}</figcaption>{% endif %}
+</figure>
+{% endmacro %}
+
+{% macro lead(s, root) %}
+<article class="blokk lead">
+  {{ kicker(s) }}
+  <h2 class="lead-tittel"><a class="blokklenke" href="{{ root }}{{ s.side }}">{{ s.overskrift }}</a></h2>
+  {% if s.dek %}<p class="dek">{{ s.dek }}</p>{% elif not s.har_sammendrag %}<p class="dek kommer">Sammendrag kommer.</p>{% endif %}
+  <div class="blokk-meta">{{ status(s) }}{{ grunner(s) }}</div>
+  {% set f = front_figure(s) %}
+  {% if f %}{{ figur(f, liten=True) }}{% endif %}
+</article>
+{% endmacro %}
+
+{% macro sekundaer(s, root) %}
+<article class="blokk sekundaer">
+  {{ kicker(s) }}
+  <h3 class="sekundaer-tittel"><a class="blokklenke" href="{{ root }}{{ s.side }}">{{ s.overskrift }}</a></h3>
+  {% if s.dek %}<p class="dek">{{ s.dek }}</p>{% endif %}
+  <div class="blokk-meta">{{ status(s) }}</div>
+  {% set f = front_figure(s) %}
+  {% if f %}{{ figur(f, liten=True) }}{% endif %}
+</article>
+{% endmacro %}
+
+{# A headline in a list. meta: "full" shows organ and date, "kort" only the status. #}
+{% macro overskrift(s, root, meta="full", nr=False, flagg=True) %}
+<li class="overskrift{% if s.fremhevet %} er-fremhevet{% endif %}">
+  <a href="{{ root }}{{ s.side }}">{% if nr %}<span class="nr">{{ s.nr }}</span> {% endif %}{{ s.overskrift }}</a>
+  <span class="linje-meta">
+    {% if meta == "full" %}{{ s.organ_kort }} · {{ s.dato_tekst }}{% if s.status_tekst %} · {% endif %}{% endif %}{{ s.status_tekst }}{% if flagg and s.fremhevet %}<span class="flagg">Fremhevet</span>{% endif %}
+  </span>
+</li>
+{% endmacro %}

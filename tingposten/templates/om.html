@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Om Tingposten{% endblock %}
+{% block main %}
+<h1>Om Tingposten</h1>
+
+<section aria-labelledby="erklaering">
+  <h2 id="erklaering">Redaksjonell erklæring</h2>
+  {% include "erklaering.html" %}
+</section>
+
+<section aria-labelledby="rangering">
+  <h2 id="rangering">Slik rangerer vi</h2>
+  <p>Alle sakene er med. Poengsummen (0–100) bestemmer bare rekkefølgen. Saker med minst {{ terskel }} poeng blir fremhevet på forsiden. De tre viktigste grunnene står som små merker på hvert kort, slik at du kan se hvorfor en sak er rangert der den er, og være uenig.</p>
+  <div class="tabellramme">
+  <table>
+    <caption>Signaler og vekter</caption>
+    <thead><tr><th scope="col">Signal</th><th scope="col">Poeng</th><th scope="col">Andel</th><th scope="col">Hva det måler</th></tr></thead>
+    <tbody>
+      {% for v in signaler %}
+      <tr><th scope="row">{{ v.navn }}</th><td>{{ v.poeng }}</td><td>{{ v.andel }}&nbsp;%</td><td>{{ v.forklaring }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p>Mangler et signal for en sak, regnes poengsummen ut fra de andre. Vektene justeres for hånd, og endringer står i kildekoden.</p>
+</section>
+
+<section aria-labelledby="kilder">
+  <h2 id="kilder">Kilder og feil</h2>
+  <p>Alt kommer fra Bergen kommunes egne saksframlegg og protokoller. Hver setning på et kort lenker til siden i dokumentet den bygger på. Finner du en feil, bruk «Meld feil» på kortet.</p>
+</section>
+{% endblock %}
