@@ -87,25 +87,32 @@ def targets(items: list[dict], drop_noise: bool = True) -> list[dict]:
     return out
 
 
-def build_script(targets: list[dict]) -> str:
-    """A polite bash script the USER runs to download one meeting's PDFs."""
+def build_script(targets: list[dict], dest: str = "pdf") -> str:
+    """A polite bash script the USER runs to download PDFs.
+
+    One file at a time, 5 s apart, identifiable User-Agent. Files already on
+    disk are skipped, so an interrupted run can simply be started again, and
+    the first refused download stops the whole script."""
+    n = len(targets)
     lines = [
         "#!/usr/bin/env bash",
-        "# Last ned PDF-ene for ETT møte. Kjør dette selv, fra din egen",
-        "# tilkobling, når sperringen mot bergen.kommune.no er borte.",
-        "# Én fil om gangen, 5 s mellom, identifiserbar User-Agent.",
+        f"# Last ned {n} PDF-er fra bergen.kommune.no. Kjør dette selv, fra din egen",
+        "# tilkobling. Én fil om gangen, 5 s mellom, identifiserbar User-Agent.",
+        "# Filer som alt finnes hoppes over, så et avbrutt løp kan startes på nytt.",
         "set -euo pipefail",
         f'UA={config.USER_AGENT!r}',
-        'DEST="${1:-pdf}"',
+        f'DEST="${{1:-{dest}}}"',
+        "trap 'echo \"Stoppet: serveren svarte ikke som ventet. Vent til i morgen og kjør igjen.\" >&2' ERR",
+        "hent() {  # nr url fil",
+        '  if [ -s "$DEST/$3" ]; then return; fi',
+        f'  echo "[$1/{n}] $3"',
+        '  mkdir -p "$(dirname "$DEST/$3")"',
+        '  wget --quiet --user-agent="$UA" --tries=2 --timeout=60 -O "$DEST/$3.part" "$2"',
+        '  mv "$DEST/$3.part" "$DEST/$3"',
+        "  sleep 5",
+        "}",
         "",
     ]
-    for t in targets:
-        path = f'$DEST/{t["filename"]}'
-        lines += [
-            f'# {t["kind"]}: {t["tittel"]}',
-            f'mkdir -p "$(dirname "{path}")"',
-            f'wget --user-agent="$UA" --tries=2 --timeout=60 -O "{path}" {t["url"]!r}',
-            "sleep 5",
-            "",
-        ]
-    return "\n".join(lines)
+    for nr, t in enumerate(targets, start=1):
+        lines += [f'# {t["kind"]}: {t["tittel"]}', f'hent {nr} {t["url"]!r} {t["filename"]!r}']
+    return "\n".join(lines) + "\n"

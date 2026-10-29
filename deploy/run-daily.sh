@@ -49,6 +49,10 @@ if [ "$rc" -eq 2 ]; then
 elif [ "$rc" -ne 0 ]; then
   log "warning: last-ned failed (exit $rc); carrying on with the PDFs we have"
 fi
+# Until then: keep a ready script for the PDFs still missing, which a person
+# runs by hand (bash data/bergen/last-ned-mangler.sh). Nothing is fetched here.
+run pdf-urler --mangler --script data/bergen/last-ned-mangler.sh >/dev/null \
+  || log "warning: could not write the manual download script"
 
 # 3. Writer → fact-checker → classifier → editor. Uses the Claude and Codex
 # subscription CLIs; a session limit leaves some saker unfinished, and the

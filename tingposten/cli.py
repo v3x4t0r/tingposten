@@ -21,7 +21,9 @@ def main(argv: list[str] | None = None) -> int:
     publiser.add_argument("--placeholder", action="store_true", help="build the 'kommer snart' page first")
 
     urler = sub.add_parser("pdf-urler", help="build PDF download URLs for a meeting (fetches nothing)")
-    urler.add_argument("--utvalg", required=True, help="utvalgId, e.g. 571424")
+    urler.add_argument("--utvalg", help="utvalgId, e.g. 571424 (required without --mangler)")
+    urler.add_argument("--mangler", action="store_true",
+                       help="every PDF the pipeline still needs, across meetings (with --utvalg/--dato: only those)")
     urler.add_argument("--dato", help="meeting date YYYY-MM-DD; default: the newest stored meeting")
     urler.add_argument("--all", action="store_true", help="include noise (innkalling, spørsmål, …)")
     urler.add_argument("--script", type=Path, help="also write a polite wget script to this path")
@@ -172,6 +174,11 @@ def _ark(args) -> int:
 
 
 def _pdf_urler(args) -> int:
+    if args.mangler:
+        return _pdf_mangler(args)
+    if not args.utvalg:
+        logging.error("--utvalg is required (or use --mangler)")
+        return 1
     items = _load_items(args.utvalg)
     if items is None:
         return 1
@@ -191,6 +198,31 @@ def _pdf_urler(args) -> int:
         args.script.write_text(pdf.build_script(targets))
         args.script.chmod(0o755)
         logging.info("wrote download script to %s (run it yourself when unblocked)", args.script)
+    return 0
+
+
+
+def _pdf_mangler(args) -> int:
+    """One polite script for every saksframlegg/protokoll the pipeline lacks.
+    Writing it is not fetching: the user decides when to run it."""
+    from . import pipeline
+
+    items = pipeline.saker(config.DATA_DIR, args.utvalg, args.dato)
+    targets = [t for t in pdf.targets(items) if not (config.DATA_DIR / "pdf" / t["filename"]).exists()]
+    meetings = sorted({t["filename"].rsplit("/", 1)[0] for t in targets})
+    logging.info("%d PDF(s) missing across %d meeting(s)", len(targets), len(meetings))
+    for t in targets:
+        print(f"{t['url']}\t{t['filename']}")
+    if args.script:
+        if targets:
+            args.script.parent.mkdir(parents=True, exist_ok=True)
+            args.script.write_text(pdf.build_script(targets, dest=str(config.DATA_DIR / "pdf")))
+            args.script.chmod(0o755)
+            minutes = round(len(targets) * 6 / 60)
+            logging.info("wrote %s (about %d min at the polite pace) — run it yourself: bash %s",
+                         args.script, minutes, args.script)
+        elif args.script.exists():
+            args.script.unlink()  # a stale script would fetch nothing anyway; don't leave it lying around
     return 0
 
 

@@ -10,9 +10,22 @@ Docker er allerede installert på Pi-en, så en container er et alternativ hvis 
 
 1. **hent** – nye og endrede agendapunkter fra Bergen kommune. Nekter serveren oss, stopper kjøringen for i dag (exit 2).
 2. **last-ned** – manglende saksframlegg og protokoller. **Gjør ingenting** før `ALLOW_PDF_FETCH` er slått på i `tingposten/config.py`, fordi robots.txt sier nei til automatisk henting av filene. Slå det på først når Bystyrets kontor har sagt ja. Da hentes høyst `MAKS_PDF_PER_KJORING` filer per kjøring, én om gangen med pause imellom.
+   Inntil da skriver steget i stedet `data/bergen/last-ned-mangler.sh`: ett skript med alle PDF-ene som mangler. Det henter ingenting selv; det er du som kjører det (se «PDF-er for hånd» under).
 3. **kjor** – skribent (Claude), faktasjekker (Codex), klassifiserer og redaktør for hver sak som har PDF-er. Går en modell tom for kvote, fortsetter kjøringen med resten, og neste kjøring tar det som mangler. Feil her er derfor bare en advarsel.
 4. **bygg** – lager siden i `site/` av det som er publiserbart. Feiler byggingen, publiseres ingenting.
 5. **publiser** – pusher `site/` til `gh-pages`, men **bare hvis filen `PUBLISER` finnes** i repo-roten. Uten den blir alt liggende lokalt.
+
+## PDF-er for hånd
+
+Så lenge automatisk henting er av, laster du ned PDF-ene selv. Det er lite: rundt 100 filer i måneden (ett bystyremøte og 4–5 byrådsmøter), altså et par minutter i uka.
+
+```sh
+bash ~/tingposten/data/bergen/last-ned-mangler.sh
+```
+
+Skriptet lages på nytt hver natt. Det henter én fil om gangen med 5 s pause og identifiserbar User-Agent. Filer som alt finnes hoppes over, så et avbrutt løp kan bare startes på nytt. Svarer serveren med feil, stopper skriptet med en gang. Kjør det fra hjemmenettet, ikke over VPN. Neste nattlige kjøring skriver kortene. Skriptet finnes bare når noe mangler.
+
+For å lage det med en gang: `uv run tingposten pdf-urler --mangler --script data/bergen/last-ned-mangler.sh`.
 
 ## Første gangs oppsett
 
