@@ -1,0 +1,21 @@
+{
+ "kilde": "Trimmet etter 28-26 (bystyret 23.09.2026). Representantnavn erstattet med [representant].",
+ "lines": [
+  {"page": 1, "x": 264, "y": 66, "size": 12, "text": "Bystyrets kontor"},
+  {"page": 1, "x": 76, "y": 141, "text": "Til"},
+  {"page": 1, "x": 326, "y": 141, "size": 14, "text": "Intern korrespondanse"},
+  {"page": 1, "x": 76, "y": 155, "text": "Seksjon for strategi, utvikling og utredning"},
+  {"page": 1, "x": 326, "y": 157, "size": 9, "text": "Vår referanse:"},
+  {"page": 1, "x": 400, "y": 157, "size": 9, "text": "2026/223922-2"},
+  {"page": 1, "x": 76, "y": 193, "text": "Fra"},
+  {"page": 1, "x": 76, "y": 206, "text": "Bystyrets kontor"},
+  {"page": 1, "x": 71, "y": 260, "bold": true, "text": "Interpellasjon nr. 28 fra [representant] (H) om forebygging av bruk av"},
+  {"page": 1, "x": 71, "y": 272.7, "bold": true, "text": "illegale rusmidler blant ungdomsskoleelever."},
+  {"page": 1, "x": 71, "y": 287, "size": 14, "bold": true, "text": "Bergen bystyre 23.09.2026"},
+  {"page": 1, "x": 71, "y": 312, "text": "Det er økende bekymring for bruk av illegale rusmidler blant ungdom i Bergen."},
+  {"page": 1, "x": 71, "y": 337, "spans": [{"text": "Spørsmål til byråden", "bold": true}, {"text": ":"}]},
+  {"page": 1, "x": 71, "y": 350, "text": "Vil byrådet ta initiativ til en forsterket innsats?"},
+  {"page": 1, "x": 71, "y": 375, "text": "Med hilsen"},
+  {"page": 1, "x": 71, "y": 387.7, "text": "Bystyrets kontor"}
+ ]
+}

@@ -25,7 +25,8 @@ _load_dotenv(ROOT / ".env")
 API_BASE = "https://www.bergen.kommune.no/politikere-utvalg/api"
 # Identifiable to Bergen kommune; contact address comes from .env on the Pi.
 _contact = os.environ.get("TINGPOSTEN_CONTACT")
-USER_AGENT = "Tingposten/0.1 (+https://github.com/midttun/tingposten" + (
+REPO = "v3x4t0r/tingposten"  # public repo; may move to its own account later
+USER_AGENT = f"Tingposten/0.1 (+https://github.com/{REPO}" + (
     f"; kontakt: {_contact})" if _contact else ")"
 )
 

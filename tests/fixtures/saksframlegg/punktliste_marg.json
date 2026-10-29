@@ -1,0 +1,160 @@
+{
+ "kilde": "Trimmet etter 289-26 (bystyret 23.09.2026): mange punktlister ved x=89, få linjer ved marg. Navn erstattet med [representant].",
+ "lines": [
+  {
+   "page": 1,
+   "x": 264,
+   "y": 72,
+   "size": 12,
+   "text": "Forretningsutvalget"
+  },
+  {
+   "page": 1,
+   "x": 307,
+   "y": 155,
+   "size": 14,
+   "bold": true,
+   "text": "Saksframstilling"
+  },
+  {
+   "page": 1,
+   "x": 307,
+   "y": 166,
+   "size": 9,
+   "text": "Vår referanse:"
+  },
+  {
+   "page": 1,
+   "x": 380,
+   "y": 166,
+   "size": 9,
+   "text": "2026/233891-1"
+  },
+  {
+   "page": 1,
+   "x": 71,
+   "y": 254,
+   "size": 12,
+   "bold": true,
+   "text": "Søknad om fritak fra verv og nyvalg - [representant] (MDG)"
+  },
+  {
+   "page": 1,
+   "x": 71,
+   "y": 280,
+   "bold": true,
+   "text": "Hva saken gjelder:"
+  },
+  {
+   "page": 1,
+   "x": 71,
+   "y": 293,
+   "text": "[representant] har i dag følgende verv:"
+  },
+  {
+   "page": 1,
+   "x": 89,
+   "y": 306,
+   "text": "• Medlem i Bergen bystyre"
+  },
+  {
+   "page": 1,
+   "x": 89,
+   "y": 319.4,
+   "text": "• Medlem i Forretningsutvalget"
+  },
+  {
+   "page": 1,
+   "x": 89,
+   "y": 332.79999999999995,
+   "text": "• Medlem i Valgstyret"
+  },
+  {
+   "page": 1,
+   "x": 89,
+   "y": 346.19999999999993,
+   "text": "• Vara i KS fylkesmøte"
+  },
+  {
+   "page": 1,
+   "x": 89,
+   "y": 359.5999999999999,
+   "text": "• Medlem i Utvalg for barnehage, skole og idrett"
+  },
+  {
+   "page": 1,
+   "x": 89,
+   "y": 372.9999999999999,
+   "text": "• Vara i Utvalg for helse og sosial"
+  },
+  {
+   "page": 1,
+   "x": 89,
+   "y": 386.39999999999986,
+   "text": "• Medlem i Takstnemnda"
+  },
+  {
+   "page": 1,
+   "x": 89,
+   "y": 399.79999999999984,
+   "text": "• Vara i Kontrollutvalget"
+  },
+  {
+   "page": 1,
+   "x": 71,
+   "y": 425.1999999999998,
+   "text": "Partiet har meldt følgende:"
+  },
+  {
+   "page": 1,
+   "x": 89,
+   "y": 438.1999999999998,
+   "text": "• De øvrige varamedlemmene rykker en plass opp."
+  },
+  {
+   "page": 1,
+   "x": 89,
+   "y": 451.5999999999998,
+   "text": "• Som nytt varamedlem velges [representant]."
+  },
+  {
+   "page": 1,
+   "x": 89,
+   "y": 464.9999999999998,
+   "text": "• Endringen gjelder fra 24. september 2026."
+  },
+  {
+   "page": 1,
+   "x": 89,
+   "y": 478.39999999999975,
+   "text": "• Ingen andre endringer."
+  },
+  {
+   "page": 1,
+   "x": 71,
+   "y": 503.7999999999997,
+   "bold": true,
+   "text": "Forslag til vedtak:"
+  },
+  {
+   "page": 1,
+   "x": 71,
+   "y": 516.7999999999997,
+   "text": "Forretningsutvalget innstiller til bystyret å frita [representant] fra vervene."
+  },
+  {
+   "page": 1,
+   "x": 71,
+   "y": 541.7999999999997,
+   "spans": [
+    {
+     "text": "Vedlegg:",
+     "bold": true
+    },
+    {
+     "text": " Epost fra partiet"
+    }
+   ]
+  }
+ ]
+}
