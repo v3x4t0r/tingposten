@@ -7,6 +7,7 @@ already in the (allowed) agenda metadata into URLs and tidy filenames.
 """
 
 import re
+import shlex
 
 from . import config
 
@@ -100,8 +101,9 @@ def build_script(targets: list[dict], dest: str = "pdf") -> str:
         "# tilkobling. Én fil om gangen, 5 s mellom, identifiserbar User-Agent.",
         "# Filer som alt finnes hoppes over, så et avbrutt løp kan startes på nytt.",
         "set -euo pipefail",
-        f'UA={config.USER_AGENT!r}',
-        f'DEST="${{1:-{dest}}}"',
+        f"UA={shlex.quote(config.USER_AGENT)}",
+        'DEST="${1:-}"',
+        f'[ -n "$DEST" ] || DEST={shlex.quote(dest)}',
         "trap 'echo \"Stoppet: serveren svarte ikke som ventet. Vent til i morgen og kjør igjen.\" >&2' ERR",
         "hent() {  # nr url fil",
         '  if [ -s "$DEST/$3" ]; then return; fi',
@@ -114,5 +116,12 @@ def build_script(targets: list[dict], dest: str = "pdf") -> str:
         "",
     ]
     for nr, t in enumerate(targets, start=1):
-        lines += [f'# {t["kind"]}: {t["tittel"]}', f'hent {nr} {t["url"]!r} {t["filename"]!r}']
+        # Titles and URLs come from the API: untrusted. Comments get one flat
+        # line; arguments are shell-quoted, never Python repr.
+        lines += [f'# {t["kind"]}: {_one_line(t["tittel"])}',
+                  f'hent {nr} {shlex.quote(t["url"])} {shlex.quote(t["filename"])}']
     return "\n".join(lines) + "\n"
+
+
+def _one_line(text: str) -> str:
+    return re.sub(r"[\x00-\x1f\x7f\u0085\u2028\u2029]+", " ", text or "").strip()

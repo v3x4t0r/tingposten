@@ -55,14 +55,14 @@ def test_build_script_is_polite_and_quotes_urls():
     assert "sleep 5" in script
     assert "--user-agent=" in script
     assert "Tingposten/0.1" in script
-    # URL passed as a quoted argument, not interpolated into flags
-    assert "'https://www.bergen.kommune.no/politikere-utvalg/api/fil/bk360/111/Framstilling-reguleringsplan'" in script
+    # URL passed as one shell-safe argument (shlex.quote leaves plain URLs bare)
+    assert "hent 1 https://www.bergen.kommune.no/politikere-utvalg/api/fil/bk360/111/Framstilling-reguleringsplan 571424/" in script
 
 
 def test_build_script_resumes_and_stops_on_refusal(tmp_path):
     import subprocess
     script = pdf.build_script(pdf.targets([SAK]), dest=str(tmp_path / "pdf"))
-    assert 'DEST="${1:-' + str(tmp_path / "pdf") + '}"' in script
+    assert f'[ -n "$DEST" ] || DEST={tmp_path / "pdf"}' in script
     assert '[ -s "$DEST/$3" ]' in script and ".part" in script and "trap " in script
     # both files already on disk → nothing is fetched (no wget on PATH is needed)
     for kind in ("saksframlegg", "protokoll"):
@@ -73,3 +73,21 @@ def test_build_script_resumes_and_stops_on_refusal(tmp_path):
     path.write_text(script)
     done = subprocess.run(["bash", str(path)], capture_output=True, text=True, env={"PATH": "/usr/bin:/bin"})
     assert done.returncode == 0 and done.stdout == ""
+
+
+def test_build_script_never_runs_text_from_the_api(tmp_path):
+    """Titles and URLs are untrusted: a newline in a title (seen in 2026) or
+    quotes and $( ) in a URL must not become shell commands."""
+    import subprocess
+    pwned = tmp_path / "pwned"
+    evil = [{"kind": "saksframlegg", "tittel": f"Forslag om digital \ntouch {pwned}\n$(touch {pwned})",
+             "filename": "571424/2026-10-27/1-26_saksframlegg.pdf",
+             "url": f"https://example.invalid/fil/1/a'b$(touch {pwned})`touch {pwned}`"}]
+    f = tmp_path / "pdf" / evil[0]["filename"]
+    f.parent.mkdir(parents=True)
+    f.write_bytes(b"%PDF")  # already there → the script only parses, never fetches
+    path = tmp_path / "s.sh"
+    path.write_text(pdf.build_script(evil, dest=str(tmp_path / "pdf")))
+    done = subprocess.run(["bash", str(path)], capture_output=True, text=True, env={"PATH": "/usr/bin:/bin"})
+    assert done.returncode == 0, done.stderr
+    assert not pwned.exists()
