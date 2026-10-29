@@ -17,14 +17,19 @@ Docker er allerede installert på Pi-en, så en container er et alternativ hvis 
 
 ## Publisering på statichost.eu
 
+Siden bygges lokalt (eller på Pi-en), og `publiser` committer den ferdige siden til grenen `gh-pages` og pusher den. statichost.eu publiserer grenen når den får beskjed fra GitHub (webhook). Koden på `main` pushes ikke.
+
 Gratisplanen (Hobby) gir ett nettsted, 10 GB trafikk og eget domene. Siden er liten (rundt 7 KB per side), så det holder lenge. Serverne står i Stockholm og eies av et europeisk selskap.
 
-1. Lag en konto på statichost.eu og et nettsted som heter `tingposten` (eller noe annet; skriv det i `STATICHOST_SITE`).
-2. Lag en API-nøkkel på https://builder.statichost.eu/account og legg den i `.env` som `STATICHOST_APIKEY`. Den skal aldri inn i repoet.
-3. Test: `uv run tingposten bygg && uv run tingposten publiser`. Siden ligger da på `https://tingposten.statichost.eu/`.
-4. Eget domene (tingposten.no) legges inn hos statichost og hos domeneregistraren; se statichost.eu/docs/domains/.
+Oppsett, én gang:
 
-Med statichost trengs ikke deploy-nøkkelen til GitHub (steg 3–4 under første gangs oppsett).
+1. **statichost:** lag nettstedet, koble det til repoet `v3x4t0r/tingposten` og velg grenen **`gh-pages`** (ikke `main`). Byggeoppsett trengs ikke: grenen har en `statichost.yml` med `public: .`, som betyr «publiser filene som de er».
+2. **GitHub:** Settings → Webhooks → Add webhook. Payload URL: `https://builder.statichost.eu/<navnet på nettstedet>`, «Just the push event».
+3. **GitHub Pages av:** Settings → Pages → slå av, ellers ligger siden ute to steder.
+4. Test: `uv run tingposten bygg && uv run tingposten publiser`. Siden ligger da på `https://<navnet>.statichost.eu/`.
+5. Eget domene (tingposten.no) legges inn hos statichost og hos domeneregistraren; se statichost.eu/docs/domains/.
+
+Vil du heller laste opp direkte uten git, sett `PUBLISER_TIL = "statichost-upload"` i `tingposten/config.py` og legg en API-nøkkel i `.env` (`STATICHOST_APIKEY`).
 
 ## PDF-er for hånd
 

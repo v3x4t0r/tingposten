@@ -50,15 +50,18 @@ TILBAKE_DAGER = 92
 # (plan: about 20–30 %; tune after more meetings are rated).
 ARTIKKEL_ANDEL = 0.25
 
-# Where `publiser` puts the built site: "statichost" (statichost.eu: EU-owned
-# hosting in Stockholm, free Hobby plan = 1 site, 10 GB traffic, custom domain)
-# or "github" (the gh-pages branch). statichost needs STATICHOST_APIKEY in .env.
-PUBLISER_TIL = "statichost"
+# Where `publiser` puts the built site. statichost.eu = EU-owned hosting in
+# Stockholm; free Hobby plan = 1 site, 10 GB traffic, custom domain.
+# - "statichost-git": commit site/ to PAGES_BRANCH and push; statichost deploys
+#   that branch on the push (webhook), as-is (statichost.yml: public: .).
+# - "statichost-upload": upload a zip straight to statichost (STATICHOST_APIKEY in .env).
+# - "github-pages": push PAGES_BRANCH and let GitHub Pages serve it.
+PUBLISER_TIL = "statichost-git"
 STATICHOST_SITE = os.environ.get("STATICHOST_SITE", "tingposten")  # → https://<site>.statichost.eu/
 STATICHOST_BUILDER = "https://builder.statichost.eu"
 
 # Public site
-SITE_URL = (f"https://{STATICHOST_SITE}.statichost.eu/" if PUBLISER_TIL == "statichost"
+SITE_URL = (f"https://{STATICHOST_SITE}.statichost.eu/" if PUBLISER_TIL.startswith("statichost")
             else "https://v3x4t0r.github.io/tingposten/")
 FREMHEVET_TERSKEL = 40  # score at or above this is highlighted on the front page
 MELD_FEIL = None  # None → GitHub issue on REPO, prefilled with the sak

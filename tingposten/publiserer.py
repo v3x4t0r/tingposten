@@ -1,11 +1,13 @@
 """Publiserer: put the built site online.
 
-Two targets (config.PUBLISER_TIL):
-- "statichost": zip site/ and upload it to statichost.eu (direct upload, the
-  same request as their shcli script). The API key comes from .env only.
-- "github": mirror site/ into the gh-pages branch and push it. The branch
-  lives in its own worktree under data/ (ignored by git), so the main working
-  tree and the main branch are never touched.
+Targets (config.PUBLISER_TIL):
+- "statichost-git" / "github-pages": mirror site/ into the gh-pages branch and
+  push it; statichost.eu (webhook) or GitHub Pages serves that branch. For
+  statichost the branch also gets statichost.yml ("public: ." = no build).
+  The branch lives in its own worktree under data/ (ignored by git), so the
+  main working tree and the main branch are never touched or pushed.
+- "statichost-upload": zip site/ and upload it to statichost.eu (direct
+  upload, the same request as their shcli script). The key comes from .env.
 
 A file named STOP in the repo root is the kill switch for both: nothing is
 uploaded, committed or pushed.
@@ -69,9 +71,9 @@ def build_placeholder(site_dir: Path = config.SITE_DIR) -> None:
 
 def publiser(message: str = "Publiser") -> bool:
     """Publish site/ to the configured target. False if the kill switch stopped it."""
-    if config.PUBLISER_TIL == "statichost":
+    if config.PUBLISER_TIL == "statichost-upload":
         return publish_statichost()
-    return publish(message=message)
+    return publish(message=message, statichost=config.PUBLISER_TIL == "statichost-git")
 
 
 def publish_statichost(
@@ -119,6 +121,7 @@ def publish(
     repo_dir: Path = config.ROOT,
     branch: str = config.PAGES_BRANCH,
     message: str = "Publiser",
+    statichost: bool = False,
 ) -> bool:
     """Commit site_dir to `branch` and push it. False if the kill switch stopped it."""
     if (repo_dir / "STOP").exists():
@@ -133,6 +136,9 @@ def publish(
     worktree = repo_dir / "data" / ".gh-pages"
     _ensure_worktree(repo_dir, worktree, branch)
     _mirror(site_dir, worktree)
+    if statichost:
+        # statichost.eu reads this from the branch root: publish the files as-is, no build.
+        (worktree / "statichost.yml").write_text("public: .\n")
 
     _git(worktree, "add", "-A")
     if _git(worktree, "diff", "--cached", "--quiet", check=False).returncode == 0:

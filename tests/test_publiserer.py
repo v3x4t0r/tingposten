@@ -158,3 +158,14 @@ def test_statichost_stop_missing_key_and_errors(tmp_path, monkeypatch):
     (tmp_path / "STOP").write_text("")
     s = FakeSession()
     assert publiserer.publish_statichost(site, tmp_path, apikey="k", session=s) is False and s.calls == []
+
+
+
+def test_statichost_git_branch_gets_no_build_config(repo, origin, site):
+    publish(site, repo, BRANCH, message="Publiser", statichost=True)
+    files = subprocess.run(["git", "-C", str(origin), "ls-tree", "--name-only", BRANCH],
+                           capture_output=True, text=True, check=True).stdout.split()
+    assert "statichost.yml" in files and "index.html" in files
+    shown = subprocess.run(["git", "-C", str(origin), "show", f"{BRANCH}:statichost.yml"],
+                           capture_output=True, text=True, check=True).stdout
+    assert shown == "public: .\n"
