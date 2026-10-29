@@ -25,7 +25,7 @@ import re
 from html import escape
 from pathlib import Path
 
-from .saksframlegg import find_amounts
+from .saksframlegg import find_amounts, saksbydeler
 
 W = 320  # viewBox width; readable at 320 px
 MAP_W = 240  # the locator map needs less room than the bars
@@ -51,11 +51,9 @@ _NUDGE = {"Bergenhus": (0, -4), "Årstad": (4, 3), "Fyllingsdalen": (-2, 2), "La
 
 
 def figurer(item: dict, protokoll: dict, saksframlegg: dict) -> list[dict]:
-    named = set(saksframlegg.get("bydeler") or [])
-    named |= {b for b in BYDELER if re.search(rf"(?<!\w){b}(?!\w)", item.get("tittel", ""))}
     out = [
         stemmediagram(protokoll),
-        bydelskart(sorted(named)),
+        bydelskart(*saksbydeler(item, saksframlegg)),
         belop_i_kontekst(protokoll, saksframlegg),
     ]
     return [f for f in out if f]
@@ -178,7 +176,7 @@ def _bar(x: float, y: float, w: float, h: float, r: float = 4) -> str:
 
 # --- bydel map ----------------------------------------------------------------
 
-def bydelskart(bydeler: list[str]) -> dict | None:
+def bydelskart(bydeler: list[str], grunnlag: str = "saksframlegg") -> dict | None:
     named = [b for b in BYDELER if b in set(bydeler)]
     if not named:
         return None
@@ -207,10 +205,14 @@ def bydelskart(bydeler: list[str]) -> dict | None:
         dx, dy = _NUDGE.get(name, (0, 0))
         labels.append(_text(cx + dx, cy + dy, name, anchor="middle", weight=700,
                              size=11 if len(named) <= 4 else 9.5, halo=True))
-    alt = (f"Kart over Bergens åtte bydeler der {_join(named)} er uthevet, fordi "
-           f"{'de' if len(named) > 1 else 'den'} er nevnt i sakens dokumenter.")
+    pron = "de" if len(named) > 1 else "den"
+    if grunnlag == "tittel":
+        why, kilde = f"sakens tittel nevner {'dem' if len(named) > 1 else 'den'}", "Bydel fra sakens tittel."
+    else:
+        why, kilde = f"{pron} er nevnt flere ganger i saksframlegget", "Bydeler nevnt flere ganger i saksframlegget."
+    alt = f"Kart over Bergens åtte bydeler der {_join(named)} er uthevet, fordi {why}."
     return {"svg": _svg("Bydeler nevnt i saken", alt, shapes + labels, h, width=MAP_W),
-            "alt": alt, "kilde": "Kart: © OpenStreetMap-bidragsytere (ODbL). Bydeler nevnt i saksframlegget."}
+            "alt": alt, "kilde": f"Kart: © OpenStreetMap-bidragsytere (ODbL). {kilde}"}
 
 
 def _centroid(ring: list[tuple[float, float]]) -> tuple[float, float]:

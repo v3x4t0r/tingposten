@@ -21,6 +21,30 @@ log = logging.getLogger(__name__)
 
 BYDELER = ("Arna", "Bergenhus", "Fana", "Fyllingsdalen", "Laksevåg", "Ytrebygda", "Årstad", "Åsane")
 
+# Showing a bydel (map, badge) says "this is where it happens", so a passing mention is not enough
+# (e.g. "klassedeling i Arna" as one line in a city-wide school budget).
+MIN_TREFF = 3
+WHOLE_CITY = re.compile(r"hele byen|hele bergen|alle bydeler|byomfattende|bergensskolen", re.I)
+
+
+def saksbydeler(item: dict, saksframlegg: dict) -> tuple[list[str], str]:
+    """(bydeler, grunnlag) a reader is shown for the sak. A bydel in the title (plan saker always
+    start with one) decides alone. Otherwise a bydel must be named at least
+    MIN_TREFF times in the saksframlegg; city-wide saker, or ones where most
+    bydeler qualify, get no map."""
+    tittel = item.get("tittel", "")
+    in_title = [b for b in BYDELER if re.search(rf"(?<!\w){b}(?!\w)", tittel)]
+    if in_title:
+        return in_title, "tittel"
+    if WHOLE_CITY.search(tittel):
+        return [], ""
+    treff = saksframlegg.get("bydel_treff") or {}
+    many = [b for b in BYDELER if treff.get(b, 0) >= MIN_TREFF]
+    if len(many) > len(BYDELER) // 2:
+        return [], ""
+    return many, "saksframlegg"
+
+
 _HEADER_WORDS = re.compile(r"^(Byrådssak|Bystyresak|Saksframstilling|Intern korrespondanse)\b")
 _BULLET = re.compile(r"^(?:[•▪◦·\-–]\s*|\d{1,2}[.)]\s+|[a-h][.)]\s+)")
 _SYMBOL_BULLET = re.compile(r"^[•▪◦·\-–]")
@@ -153,7 +177,9 @@ def parse_lines(lines: list[Line], pages: int) -> dict:
     result["belop"] = [a for p, text in sorted(full.items()) for a in find_amounts(text, p)]
     result["hjemler"] = _dedupe(a for p, text in sorted(full.items()) for a in find_hjemler(text, p))
     all_text = " ".join(full.values())
-    result["bydeler"] = sorted(b for b in BYDELER if re.search(rf"\b{b}s?\b", all_text))
+    treff = {b: len(re.findall(rf"\b{b}s?\b", all_text)) for b in BYDELER}
+    result["bydeler"] = sorted(b for b, n in treff.items() if n)
+    result["bydel_treff"] = {b: n for b, n in treff.items() if n}
     return result
 
 
@@ -169,6 +195,7 @@ def _empty(pages: int) -> dict:
         "belop": [],
         "hjemler": [],
         "bydeler": [],
+        "bydel_treff": {},
         "vedlegg": [],
     }
 

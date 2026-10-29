@@ -18,7 +18,7 @@ import re
 from pathlib import Path
 
 from . import config, pdf
-from .saksframlegg import find_amounts
+from .saksframlegg import find_amounts, saksbydeler
 from .status import IKKE_AVGJORT, vedtaksstatus
 
 # Points each signal can give at full strength. Signals that are missing
@@ -117,9 +117,10 @@ def signals(item: dict, protokoll: dict, saksframlegg: dict, modell: dict | None
     amounts = find_amounts(re.sub(r"\([^()]*\)", " ", vedtak)) if decided else []
     belop = max(amounts, key=lambda b: b["kroner"], default=None)
 
-    bydeler = [b for b in BYDELER if b in saksframlegg.get("bydeler", [])]
+    bydeler = saksbydeler(item, saksframlegg)[0] if saksframlegg.get("bydel_treff") is not None else \
+        [b for b in BYDELER if b in saksframlegg.get("bydeler", [])]
     hele_byen = decided and (
-        len(bydeler) == len(BYDELER)
+        len(saksframlegg.get("bydeler") or []) == len(BYDELER)
         or bool(WHOLE_CITY.search(tittel))
         or label == "budsjett/forskrift"
         or "økonomiske perspektiver" in tittel.lower()

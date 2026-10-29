@@ -122,6 +122,22 @@ def test_map_highlights_and_labels_only_named_bydeler():
     assert "Fana og Årstad" in f["alt"]
 
 
+def test_map_bydeler_title_decides_and_passing_mentions_are_ignored():
+    pick = grafikk.saksbydeler
+    # plan sak: the title decides, other bydeler in the text don't count
+    assert pick({"tittel": "Bergenhus, Gnr. 168, Områdereguleringsplan"},
+                {"bydel_treff": {"Bergenhus": 3, "Åsane": 3}}) == (["Bergenhus"], "tittel")
+    # one passing mention in a city-wide sak (255/26) → no map
+    assert pick({"tittel": "Prinsipper for ny fordelingsmodell for bergensskolen"}, {"bydel_treff": {"Arna": 5}}) == ([], "")
+    assert pick({"tittel": "Statusmelding for legetjenesten"}, {"bydel_treff": {"Fana": 1, "Åsane": 2}}) == ([], "saksframlegg")
+    # named repeatedly without being in the title → shown
+    assert pick({"tittel": "Alvøen idrettshall. Sluttmelding"}, {"bydel_treff": {"Laksevåg": 3}}) == (["Laksevåg"], "saksframlegg")
+    # most of the city named repeatedly → it's about the whole city, no map
+    assert pick({"tittel": "Tilskudd"}, {"bydel_treff": dict.fromkeys(grafikk.BYDELER, 3)}) == ([], "")
+    assert "sakens tittel nevner den" in grafikk.bydelskart(["Fana"], "tittel")["alt"]
+    assert "flere ganger i saksframlegget" in grafikk.bydelskart(["Fana"])["kilde"]
+
+
 def test_map_none_without_named_bydel():
     assert grafikk.bydelskart([]) is None
     assert grafikk.bydelskart(["Oslo"]) is None
