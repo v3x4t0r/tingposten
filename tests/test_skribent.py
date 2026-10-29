@@ -146,6 +146,17 @@ def test_run_passes_feedback_by_key(tmp_path, sources):
     assert sum("Rett dette." in p for p in fake.prompts) == 1
 
 
+def test_article_rewrite_with_feedback(tmp_path, sources):
+    skribent.skriv_artikkel(ITEM, CARD, tmp_path, FakeLLM([dict(ARTICLE)]))
+    fake = FakeLLM([dict(ARTICLE)])
+    status = skribent.skriv_artikkel(ITEM, CARD, tmp_path, fake, force=True,
+                                     feedback="Avvist fordi: artikkelen har 262 ord (maks 250).")
+    assert status == "omskrevet"
+    assert "REJECTED THE PREVIOUS DRAFT OF THIS ARTICLE" in fake.prompts[0] and "262 ord" in fake.prompts[0]
+    saved = json.loads((tmp_path / "artikler" / "571424" / "2026-09-23" / "238-26.json").read_text())
+    assert saved["meta"]["omskrevet"] == 1
+
+
 def test_run_artikkel_writes_against_the_edited_card(tmp_path, sources):
     from tingposten.llm import write_json
     write_json(tmp_path / "redigert" / "571424" / "2026-09-23" / "238-26.json", {

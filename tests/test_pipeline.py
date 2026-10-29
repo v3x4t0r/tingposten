@@ -69,7 +69,7 @@ def test_kjor_runs_steps_in_order_with_given_backends(tmp_path, monkeypatch):
     monkeypatch.setattr(pipeline.redaktor, "run_artikler", lambda items, data_dir: calls.append(("redaktor.run_artikler", None, None)) or {"ok": 1})
     monkeypatch.setattr(pipeline, "todo", lambda step, items, data_dir: items)
     monkeypatch.setattr(pipeline, "velg_artikler", lambda items, data_dir: items)
-    monkeypatch.setattr(pipeline, "omskriv_kandidater", lambda items, data_dir: {})
+    monkeypatch.setattr(pipeline, "omskriv_kandidater", lambda items, data_dir, **kw: {})
     pipeline.kjor(tmp_path, llms={"skriv": "W", "sjekk": "C", "klassifiser": "K"})
     assert calls == [("skribent.run", "W", True), ("faktasjekker.run", "C", True), ("klassifiserer.run", "K", True),
                      ("redaktor.run", None, None),
@@ -196,3 +196,42 @@ def test_kjor_rewrites_a_rejected_card_once_end_to_end(tmp_path, monkeypatch):
     # a second run finds nothing to rewrite (and no model calls are left)
     again = pipeline.kjor(tmp_path, steg=("skriv", "sjekk", "rediger"), llms={"skriv": writer, "sjekk": checker, "klassifiser": None})
     assert "omskriv" not in again and again["skriv"] == {} and again["sjekk"] == {}
+
+
+def test_omskriv_kandidater_for_articles(tmp_path):
+    lang, privat, igjen, kort_avvist = item("1/26"), item("2/26"), item("3/26"), item("4/26")
+    path = lambda step, it: tmp_path / step / f"571424/2026-05-20/{it['referansenr'].replace('/', '-')}.json"
+    for it, koder, omskrevet in ((lang, ["for_lang"], None), (privat, ["personvern", "for_lang"], None),
+                                 (igjen, ["for_lite_nytt"], 1), (kort_avvist, ["ikke_sjekket"], None)):
+        path("artikler-redigert", it).parent.mkdir(parents=True, exist_ok=True)
+        path("artikler-redigert", it).write_text(json.dumps({
+            "avvist": True, "koder": koder, "grunn": "artikkelen har 262 ord (maks 250)",
+            "slettet": [{"avsnitt": 2, "setning": "Feil tall.", "grunn": "ikke støttet av kilden"}]}))
+        path("artikler", it).parent.mkdir(parents=True, exist_ok=True)
+        meta = {"omskrevet": omskrevet} if omskrevet else {}
+        path("artikler", it).write_text(json.dumps({"avsnitt": [], "meta": meta}))
+    fb = pipeline.omskriv_kandidater([lang, privat, igjen, kort_avvist], tmp_path, artikler=True)
+    assert list(fb) == ["571424/2026-05-20/1-26"]
+    assert "262 ord" in fb["571424/2026-05-20/1-26"] and "Slettet fra avsnitt 2: «Feil tall.»" in fb["571424/2026-05-20/1-26"]
+    # the card rules don't apply to articles and vice versa
+    assert pipeline.omskriv_kandidater([lang], tmp_path) == {}
+
+
+def test_kjor_rewrites_a_rejected_article_once(tmp_path, monkeypatch):
+    store(tmp_path, [item("1/26")])
+    calls = []
+    monkeypatch.setattr(pipeline, "todo", lambda step, items, data_dir: items)
+    monkeypatch.setattr(pipeline, "velg_artikler", lambda items, data_dir: items)
+    monkeypatch.setattr(pipeline.skribent, "run_artikkel",
+                        lambda items, data_dir, llm, force, parallel, **kw: calls.append(("artikkel", kw.get("feedback"))) or {})
+    monkeypatch.setattr(pipeline.faktasjekker, "run_artikkel",
+                        lambda items, data_dir, llm, force, parallel: calls.append(("artikkelsjekk", None)) or {})
+    monkeypatch.setattr(pipeline.redaktor, "run_artikler", lambda items, data_dir: calls.append(("artikkelrediger", None)) or {})
+    rounds = iter([{"571424/2026-05-20/1-26": "Avvist fordi: for lang."}, {}])
+    monkeypatch.setattr(pipeline, "omskriv_kandidater",
+                        lambda items, data_dir, artikler=False: next(rounds) if artikler else {})
+    result = pipeline.kjor(tmp_path, steg=("artikkel", "artikkelsjekk", "artikkelrediger"), llms={"skriv": "W", "sjekk": "C"})
+    assert calls == [("artikkel", None), ("artikkelsjekk", None), ("artikkelrediger", None),
+                     ("artikkel", {"571424/2026-05-20/1-26": "Avvist fordi: for lang."}),
+                     ("artikkelsjekk", None), ("artikkelrediger", None)]
+    assert "omskriv_artikkel" in result

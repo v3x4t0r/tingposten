@@ -148,8 +148,10 @@ def skriv(item: dict, data_dir: Path = config.DATA_DIR, llm=None, force: bool = 
     return ("omskrevet" if feedback else "skrevet") + (" (over grensen)" if grenser(card) else "")
 
 
-def skriv_artikkel(item: dict, card: dict, data_dir: Path = config.DATA_DIR, llm=None, force: bool = False) -> str:
-    """Write the article for one sak whose card already exists."""
+def skriv_artikkel(item: dict, card: dict, data_dir: Path = config.DATA_DIR, llm=None, force: bool = False,
+                   feedback: str | None = None) -> str:
+    """Write the article for one sak whose card already exists. `feedback`
+    works as for skriv(): a rewrite from scratch, meta["omskrevet"] + 1."""
     out = data_dir / "artikler" / f"{pdf.key(item)}.json"
     if out.exists() and not force:
         return "finnes"
@@ -164,6 +166,11 @@ def skriv_artikkel(item: dict, card: dict, data_dir: Path = config.DATA_DIR, llm
         fence("SAKSFRAMLEGG", kilder["saksframlegg"] or "(mangler)"),
         fence("PROTOKOLL", kilder["protokoll"]),
     ])
+    meta_extra = {}
+    if feedback:
+        prompt += _rejected(feedback, "article")
+        previous = (read_json(out) or {}).get("meta") or {}
+        meta_extra["omskrevet"] = int(previous.get("omskrevet", 0)) + 1
     answer = llm.ask(prompt, ARTICLE_SCHEMA)
     if answer["blocked"].strip():
         return f"blocked: {answer['blocked'].strip()}"
@@ -171,8 +178,8 @@ def skriv_artikkel(item: dict, card: dict, data_dir: Path = config.DATA_DIR, llm
         answer = llm.ask(prompt + _feedback(problems), ARTICLE_SCHEMA)
         if answer["blocked"].strip():
             return f"blocked: {answer['blocked'].strip()}"
-    write_json(out, {"nr": _nr(item), "avsnitt": answer["avsnitt"], "meta": _meta(llm)})
-    return "skrevet" + (" (over grensen)" if artikkel_grenser(answer) else "")
+    write_json(out, {"nr": _nr(item), "avsnitt": answer["avsnitt"], "meta": {**_meta(llm), **meta_extra}})
+    return ("omskrevet" if feedback else "skrevet") + (" (over grensen)" if artikkel_grenser(answer) else "")
 
 
 def run(items: list[dict], data_dir: Path = config.DATA_DIR, llm=None, force: bool = False, parallel: int = 3,
@@ -183,13 +190,15 @@ def run(items: list[dict], data_dir: Path = config.DATA_DIR, llm=None, force: bo
 
 
 def run_artikkel(items: list[dict], data_dir: Path = config.DATA_DIR, llm=None, force: bool = False,
-                 parallel: int = 3) -> dict:
+                 parallel: int = 3, feedback: dict[str, str] | None = None) -> dict:
     """Write articles for these saker against their edited cards."""
+    feedback = feedback or {}
+
     def one(item):
         card = redigert_kort(item, data_dir)
         if card is None:
             return "mangler redigert kort"
-        return skriv_artikkel(item, card, data_dir, llm, force)
+        return skriv_artikkel(item, card, data_dir, llm, force, feedback.get(pdf.key(item)))
     return run_parallel(one, items, parallel)
 
 
@@ -279,9 +288,9 @@ def _sak_meta(item: dict) -> str:
     }, ensure_ascii=False, indent=1)
 
 
-def _rejected(feedback: str) -> str:
-    return ("\n\nTHE EDITOR REJECTED THE PREVIOUS DRAFT OF THIS CARD. Write a new card from scratch, from the "
-            "documents, that fixes every point below and keeps all the rules above:\n" + feedback)
+def _rejected(feedback: str, what: str = "card") -> str:
+    return (f"\n\nTHE EDITOR REJECTED THE PREVIOUS DRAFT OF THIS {what.upper()}. Write a new {what} from scratch, "
+            "from the documents, that fixes every point below and keeps all the rules above:\n" + feedback)
 
 
 def _feedback(problems: list[str]) -> str:

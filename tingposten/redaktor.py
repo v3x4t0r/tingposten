@@ -33,6 +33,7 @@ MIN_ARTICLE_WORDS = 40
 # problems (missing, blocked, bad split) are not the writer's to fix.
 OMSKRIVBARE = {"overskrift_lang", "overskrift_ustottet", "overskrift_forbudsliste",
                "for_mange_setninger", "tom_hva_endres"}
+OMSKRIVBARE_ARTIKKEL = {"for_lang", "for_lite_nytt"}
 
 # Forbudsliste (plan: "Redaksjonelle regler mot oppblåst tekst", rule 4).
 # A sentence matching any of these is deleted, never reworded.
@@ -103,6 +104,7 @@ def _segment(text: str, sentences: list[str]) -> list[str] | None:
     cover the text exactly (only whitespace may sit between them)."""
     pos, out = 0, []
     for s in sentences:
+        s = s.strip()
         i = text.find(s, pos) if s else -1
         if i < 0 or text[pos:i].strip():
             return None
@@ -148,11 +150,12 @@ def _check_gate(check: dict | None, reasons: _Reasons) -> bool:
     return check is not None and not blocked.strip()
 
 
-def omskrivbar(result: dict) -> bool:
-    """A rejected card the writer may fix on its own: only limit and headline
-    problems, and never when there is a privacy finding."""
+def omskrivbar(result: dict, tillatt: set[str] = OMSKRIVBARE) -> bool:
+    """A rejected card (or, with tillatt=OMSKRIVBARE_ARTIKKEL, article) the
+    writer may fix on its own: only limit and headline problems, and never
+    when there is a privacy finding."""
     koder = set(result.get("koder") or [])
-    return bool(result.get("avvist")) and "personvern" not in koder and bool(koder & OMSKRIVBARE)
+    return bool(result.get("avvist")) and "personvern" not in koder and bool(koder & tillatt)
 
 
 def edit(card: dict, check: dict | None) -> dict:

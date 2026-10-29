@@ -10,7 +10,8 @@ the site are separate commands.
 
 A card the redaktør rejects for limit or headline problems is rewritten
 once, automatically, with the rejection as feedback, and goes through check
-and edit again in the same run. Privacy rejections wait for a human.
+and edit again in the same run; so is an article rejected for length or for
+too little new. Privacy rejections wait for a human.
 
 PDFs are fetched only when config.ALLOW_PDF_FETCH is set (robots.txt; see
 config). Until then missing PDFs are reported, not downloaded.
@@ -116,15 +117,17 @@ def velg_artikler(items: list[dict], data_dir: Path = config.DATA_DIR, andel: fl
     return chosen
 
 
-def omskriv_kandidater(items: list[dict], data_dir: Path) -> dict[str, str]:
-    """Rejected cards the writer may fix itself (once): key → feedback."""
+def omskriv_kandidater(items: list[dict], data_dir: Path, artikler: bool = False) -> dict[str, str]:
+    """Rejected cards (or articles) the writer may fix itself, once: key → feedback."""
+    edited, draft = ("artikler-redigert", "artikler") if artikler else ("redigert", "kort")
+    tillatt = redaktor.OMSKRIVBARE_ARTIKKEL if artikler else redaktor.OMSKRIVBARE
     out = {}
     for i in items:
-        r = read_json(_file(data_dir, "redigert", i))
-        card = read_json(_file(data_dir, "kort", i))
-        if not r or not card or not redaktor.omskrivbar(r):
+        r = read_json(_file(data_dir, edited, i))
+        utkast = read_json(_file(data_dir, draft, i))
+        if not r or not utkast or not redaktor.omskrivbar(r, tillatt):
             continue
-        if int((card.get("meta") or {}).get("omskrevet", 0)) >= MAKS_OMSKRIVINGER:
+        if int((utkast.get("meta") or {}).get("omskrevet", 0)) >= MAKS_OMSKRIVINGER:
             continue
         out[pdf.key(i)] = tilbakemelding(r)
     return out
@@ -135,7 +138,8 @@ def tilbakemelding(redigert: dict) -> str:
     the editor deleted, with why."""
     lines = ["Avvist fordi: " + (redigert.get("grunn") or "ukjent grunn") + "."]
     for s in redigert.get("slettet", []):
-        lines.append(f"- Slettet fra {s.get('felt', 'kortet')}: «{s.get('setning', '')}» — {s.get('grunn', '')}")
+        hvor = f"avsnitt {s['avsnitt']}" if "avsnitt" in s else s.get("felt", "kortet")
+        lines.append(f"- Slettet fra {hvor}: «{s.get('setning', '')}» — {s.get('grunn', '')}")
     return "\n".join(lines)
 
 
@@ -191,4 +195,16 @@ def kjor(data_dir: Path = config.DATA_DIR, utvalg: str | None = None, dato: str 
                     if s in steg:
                         result[f"omskriv/{s}"] = step_run(s, todo(s, again, data_dir))
                 log.info("omskriv: %s", {k: v for k, v in result.items() if k.startswith("omskriv")})
+
+        if step == "artikkelrediger" and "artikkel" in steg:
+            feedback = omskriv_kandidater(items, data_dir, artikler=True)
+            if feedback:
+                again = [i for i in items if pdf.key(i) in feedback]
+                log.info("omskriv artikkel: %d avviste artikler skrives på nytt", len(again))
+                result["omskriv_artikkel"] = step_run("artikkel", again, feedback=feedback)
+                for s in ("artikkelsjekk", "artikkelrediger"):
+                    if s in steg:
+                        result[f"omskriv_artikkel/{s}"] = step_run(s, todo(s, again, data_dir))
+                log.info("omskriv artikkel: %s",
+                         {k: v for k, v in result.items() if k.startswith("omskriv_artikkel")})
     return result

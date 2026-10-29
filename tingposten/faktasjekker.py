@@ -119,6 +119,8 @@ def _cover(label: str, text: str, parts: list[str]) -> list[str]:
         return [f"{label} er ikke sjekket"]
     pos = 0
     for part in parts:
+        # Whitespace around a sentence is not content (checkers sometimes keep the space after a full stop).
+        part = part.strip()
         while pos < len(text) and text[pos].isspace():
             pos += 1
         if not part or not text.startswith(part, pos):

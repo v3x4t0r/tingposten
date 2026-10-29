@@ -48,6 +48,11 @@ def test_dekning_accepts_exact_cover():
     assert faktasjekker.dekning(CARD, GOOD["setninger"]) == []
 
 
+def test_dekning_ignores_whitespace_around_sentences():
+    padded = [{**x, "setning": " " + x["setning"] + " "} for x in GOOD["setninger"]]
+    assert faktasjekker.dekning(CARD, padded) == []
+
+
 def test_dekning_catches_rewording_gaps_and_order():
     reworded = [x if x["felt"] != "status" else s("status", "Vedtatt uten stemmer mot.") for x in GOOD["setninger"]]
     assert any("status" in e for e in faktasjekker.dekning(CARD, reworded))
