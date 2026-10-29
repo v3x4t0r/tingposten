@@ -218,7 +218,7 @@ def _pdf_mangler(args) -> int:
     if oppdater:
         logging.info("%d protokoll(er) mangler møtets vedtak og hentes på nytt", len(oppdater))
     meetings = sorted({t["filename"].rsplit("/", 1)[0] for t in targets})
-    logging.info("%d PDF(s) missing across %d meeting(s)%s", len(targets), len(meetings), f" since {fra}" if fra else "")
+    logging.info("%d PDF(s) to fetch across %d meeting(s)%s", len(targets), len(meetings), f" since {fra}" if fra else "")
     for t in targets:
         print(f"{t['url']}\t{t['filename']}")
     if args.script:
