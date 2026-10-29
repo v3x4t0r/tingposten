@@ -1,0 +1,17 @@
+# Secrets live on the Pi, never in the repo
+.env
+
+# Local store: raw API data, PDFs and text extracts can contain names of
+# private persons. Only cleaned, built HTML leaves the machine (gh-pages).
+data/
+
+# Built site is pushed to gh-pages, not committed to main
+site/
+
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Internal drafts / correspondence, not for the public repo
+docs/utkast-*.md

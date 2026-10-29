@@ -1,0 +1,19 @@
+[project]
+name = "tingposten"
+version = "0.1.0"
+description = "Hva Bergen kommune faktisk vedtar – hver sak i samme format, med kilde."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.31",
+]
+
+[project.scripts]
+tingposten = "tingposten.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

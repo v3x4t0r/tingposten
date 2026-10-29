@@ -1,0 +1,21 @@
+# Tingposten, daily run on the Pi.
+# Install with `crontab -e` and paste the lines below; replace <user> with
+# the Pi user and adjust the path if the repo is not in ~/tingposten.
+# (setup-pi.sh prints these lines with your real paths filled in.)
+#
+# 06:00 is a placeholder until the run time is confirmed.
+#
+# Time zone: Debian's cron (Raspberry Pi OS) runs jobs in the system time
+# zone and may ignore CRON_TZ. Make sure the system is on Europe/Oslo:
+#   timedatectl                      # shows "Time zone: Europe/Oslo"
+#   sudo timedatectl set-timezone Europe/Oslo
+# Then 06:00 follows summer/winter time by itself. CRON_TZ is kept for
+# crons that support it (cronie) and is harmless elsewhere.
+CRON_TZ=Europe/Oslo
+
+# cron does not expand $HOME in variable lines, so spell the path out.
+# run-daily.sh also adds ~/.local/bin (where the uv installer puts uv).
+PATH=/home/<user>/.local/bin:/usr/local/bin:/usr/bin:/bin
+
+# Output goes to data/logs/YYYY-MM-DD.log.
+0 6 * * * /home/<user>/tingposten/deploy/run-daily.sh
