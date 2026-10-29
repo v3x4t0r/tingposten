@@ -13,19 +13,19 @@ Docker er allerede installert på Pi-en, så en container er et alternativ hvis 
    Inntil da skriver steget i stedet `data/bergen/last-ned-mangler.sh`: ett skript med alle PDF-ene som mangler. Det henter ingenting selv; det er du som kjører det (se «PDF-er for hånd» under).
 3. **kjor** – skribent (Claude), faktasjekker (Codex), klassifiserer og redaktør for hver sak som har PDF-er. Går en modell tom for kvote, fortsetter kjøringen med resten, og neste kjøring tar det som mangler. Feil her er derfor bare en advarsel.
 4. **bygg** – lager siden i `site/` av det som er publiserbart. Feiler byggingen, publiseres ingenting.
-5. **publiser** – laster `site/` opp til statichost.eu (eller pusher til `gh-pages`, se `PUBLISER_TIL` i `tingposten/config.py`), men **bare hvis filen `PUBLISER` finnes** i repo-roten. Uten den blir alt liggende lokalt.
+5. **publiser** – committer `site/` til grenen `nettside` og pusher den, og statichost.eu publiserer den (se `PUBLISER_TIL` i `tingposten/config.py`), men **bare hvis filen `PUBLISER` finnes** i repo-roten. Uten den blir alt liggende lokalt.
 
 ## Publisering på statichost.eu
 
-Siden bygges lokalt (eller på Pi-en), og `publiser` committer den ferdige siden til grenen `gh-pages` og pusher den. statichost.eu publiserer grenen når den får beskjed fra GitHub (webhook). Koden på `main` pushes ikke.
+Siden bygges lokalt (eller på Pi-en), og `publiser` committer den ferdige siden til grenen `nettside` og pusher den. statichost.eu publiserer grenen når den får beskjed fra GitHub (webhook). Koden på `main` pushes ikke.
 
 Gratisplanen (Hobby) gir ett nettsted, 10 GB trafikk og eget domene. Siden er liten (rundt 7 KB per side), så det holder lenge. Serverne står i Stockholm og eies av et europeisk selskap.
 
 Oppsett, én gang:
 
-1. **statichost:** lag nettstedet, koble det til repoet `v3x4t0r/tingposten` og velg grenen **`gh-pages`** (ikke `main`). Byggeoppsett trengs ikke: grenen har en `statichost.yml` med `public: .`, som betyr «publiser filene som de er».
+1. **statichost:** lag nettstedet, koble det til repoet `v3x4t0r/tingposten` og velg grenen **`nettside`** (ikke `main`). Byggeoppsett trengs ikke: grenen har en `statichost.yml` med `public: .`, som betyr «publiser filene som de er».
 2. **GitHub:** Settings → Webhooks → Add webhook. Payload URL: `https://builder.statichost.eu/<navnet på nettstedet>`, «Just the push event».
-3. **GitHub Pages av:** Settings → Pages → slå av, ellers ligger siden ute to steder.
+3. Grenen heter `nettside`, ikke `gh-pages`: så lenge det finnes en `gh-pages`-gren, holder GitHub Pages siden ute, og da ligger den ute to steder.
 4. Test: `uv run tingposten bygg && uv run tingposten publiser`. Siden ligger da på `https://<navnet>.statichost.eu/`.
 5. Eget domene (tingposten.no) legges inn hos statichost og hos domeneregistraren; se statichost.eu/docs/domains/.
 

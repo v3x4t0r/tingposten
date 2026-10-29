@@ -4,7 +4,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "data" / "bergen"
 SITE_DIR = ROOT / "site"
-PAGES_BRANCH = "gh-pages"
+# The branch that holds the built site. Not "gh-pages": GitHub keeps Pages
+# switched on while a branch with that name exists (seen 2026-10-29).
+PAGES_BRANCH = "nettside"
 # Custom domain for GitHub Pages. Leave None until DNS for tingposten.no
 # points at Pages — a CNAME file without matching DNS makes the site
 # unreachable (Pages serves the custom domain, not the github.io URL).
@@ -55,7 +57,7 @@ ARTIKKEL_ANDEL = 0.25
 # - "statichost-git": commit site/ to PAGES_BRANCH and push; statichost deploys
 #   that branch on the push (webhook), as-is (statichost.yml: public: .).
 # - "statichost-upload": upload a zip straight to statichost (STATICHOST_APIKEY in .env).
-# - "github-pages": push PAGES_BRANCH and let GitHub Pages serve it.
+# - "github-pages": push PAGES_BRANCH and let GitHub Pages serve it (set Pages to that branch).
 PUBLISER_TIL = "statichost-git"
 STATICHOST_SITE = os.environ.get("STATICHOST_SITE", "tingposten")  # → https://<site>.statichost.eu/
 STATICHOST_BUILDER = "https://builder.statichost.eu"

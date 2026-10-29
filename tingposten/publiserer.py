@@ -1,7 +1,7 @@
 """Publiserer: put the built site online.
 
 Targets (config.PUBLISER_TIL):
-- "statichost-git" / "github-pages": mirror site/ into the gh-pages branch and
+- "statichost-git" / "github-pages": mirror site/ into PAGES_BRANCH and
   push it; statichost.eu (webhook) or GitHub Pages serves that branch. For
   statichost the branch also gets statichost.yml ("public: ." = no build).
   The branch lives in its own worktree under data/ (ignored by git), so the
@@ -133,7 +133,7 @@ def publish(
         # Fails harmlessly when the branch doesn't exist on origin yet.
         _git(repo_dir, "fetch", "-q", "origin", f"+refs/heads/{branch}:refs/remotes/origin/{branch}", check=False)
 
-    worktree = repo_dir / "data" / ".gh-pages"
+    worktree = repo_dir / "data" / f".{branch}"  # one worktree per branch
     _ensure_worktree(repo_dir, worktree, branch)
     _mirror(site_dir, worktree)
     if statichost:

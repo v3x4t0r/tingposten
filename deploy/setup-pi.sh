@@ -135,7 +135,7 @@ cat <<EOF
    Test it (should greet $GITHUB_REPO):
      ssh -T git@$SSH_ALIAS
 
-5. Name the commits the Pi makes to gh-pages:
+5. Name the commits the Pi makes to the nettside branch:
      git -C $INSTALL_DIR config user.name "Tingposten"
      git -C $INSTALL_DIR config user.email "<address>"
 
