@@ -5,11 +5,12 @@
 {% block main %}
 <nav class="brodsmule" aria-label="Brødsmuler">
   <a href="{{ root }}bergen/">Bergen</a> <span aria-hidden="true">›</span>
+  {% if s.tema_side %}<a href="{{ root }}{{ s.tema_side }}">{{ s.tema_navn }}</a>{% else %}{{ s.tema_navn }}{% endif %} <span aria-hidden="true">›</span>
   <a href="{{ root }}bergen/mote/{{ s.mote }}/">{{ s.organ_kort }} {{ s.dato_tekst }}</a>
 </nav>
 <article class="artikkel">
   <header class="artikkel-topp">
-    <p class="kicker">{{ s.organ }} · <time datetime="{{ s.dato.isoformat() }}">{{ s.dato_tekst }}</time> · sak {{ s.nr }}</p>
+    <p class="kicker"><span class="kicker-tema">{{ s.tema_navn }}</span> · {{ s.organ }} · <time datetime="{{ s.dato.isoformat() }}">{{ s.dato_tekst }}</time> · sak {{ s.nr }}</p>
     <h1 class="artikkel-tittel">{{ s.overskrift }}</h1>
     {% if s.dek %}
     <p class="dek">{{ s.dek }}{% for k in s.dek_kilder %} <a class="kilde" href="{{ k.href }}">{{ k.dok }} s.&nbsp;{{ k.side }}</a>{% endfor %}</p>
@@ -29,6 +30,15 @@
   </div>
   {% else %}
   <p class="kommer">Sammendrag kommer.</p>
+  {% endif %}
+
+  {% if s.artikkel %}
+  <section class="bakgrunn" aria-labelledby="bakgrunn">
+    <h2 class="seksjonstittel" id="bakgrunn">Bakgrunn</h2>
+    {% for a in s.artikkel %}
+    <p>{{ a.tekst }}{% for k in a.kilder %} <a class="kilde" href="{{ k.href }}">{{ k.dok }} s.&nbsp;{{ k.side }}</a>{% endfor %}</p>
+    {% endfor %}
+  </section>
   {% endif %}
   {% if s.modell %}<p class="modell">Maskinvurdering: {{ s.modell }}</p>{% endif %}
 

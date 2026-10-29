@@ -40,6 +40,11 @@ BACKOFF_S = (60, 300)  # waits before retry 1 and 2; then give up the run
 # robots.txt disallows /api/fil/*. Automatic PDF downloads stay off until
 # Bystyrets kontor has said yes; until then PDFs are downloaded by hand.
 ALLOW_PDF_FETCH = False
+MAKS_PDF_PER_KJORING = 200  # cap per daily run once fetching is allowed
+
+# Share of each meeting's decided saker that get a background article
+# (plan: about 20–30 %; tune after more meetings are rated).
+ARTIKKEL_ANDEL = 0.25
 
 # Public site
 SITE_URL = "https://v3x4t0r.github.io/tingposten/"

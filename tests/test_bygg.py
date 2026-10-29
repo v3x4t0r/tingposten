@@ -52,6 +52,14 @@ CARD = {
 }
 ONE_SENTENCE = {**CARD, "nr": "239/26", "overskrift": "Skolen rehabiliteres",
                 "felt": {**CARD["felt"], "hva_endres": "Skolen rehabiliteres for 876 millioner kroner."}}
+ARTICLE = {
+    "nr": "238/26",
+    "avsnitt": [
+        {"tekst": "Hallen har vært planlagt siden 2019. <b>fet</b>", "kilder": [{"dok": "saksframlegg", "side": 2}]},
+        {"tekst": "Byggestart er satt til våren 2027.", "kilder": [{"dok": "protokoll", "side": 1}, {"dok": "bilag", "side": 9}]},
+    ],
+    "slettet": [], "avvist": False, "grunn": "", "ord": 14,
+}
 SCORES = {"238/26": 70, "239/26": 55, "240/26": 10, "241/26": 45, "243/26": 90, "10/26": 60}
 
 
@@ -66,6 +74,15 @@ def data_dir(tmp_path):
     (red / "239-26.json").write_text(json.dumps(ONE_SENTENCE))
     (red / "241-26.json").write_text(json.dumps({**CARD, "nr": "241/26", "avvist": True, "overskrift": "UTKAST SOM IKKE SKAL VISES"}))
     (red / "240-26.json").write_text(json.dumps({**CARD, "nr": "240/26", "overskrift": "Bofellesskapet blir dyrere"}))
+    # The classifier's tema wins over the title fallback (bofellesskap → helse).
+    sig = d / "signaler" / BYSTYRET / "2026-09-23"
+    sig.mkdir(parents=True)
+    (sig / "240-26.json").write_text(json.dumps({"tema": "okonomi", "tema_begrunnelse": "Investeringsramme."}))
+    art = d / "artikler-redigert" / BYSTYRET / "2026-09-23"
+    art.mkdir(parents=True)
+    (art / "238-26.json").write_text(json.dumps(ARTICLE))
+    (art / "239-26.json").write_text(json.dumps({**ARTICLE, "nr": "239/26", "avvist": True,
+                                                  "avsnitt": [{"tekst": "AVVIST ARTIKKEL", "kilder": []}]}))
     return d
 
 
@@ -158,13 +175,13 @@ def test_lead_is_highest_score_with_a_summary(site):
     lead = re.search(r'<article class="blokk lead">(.*?)</article>', forside, re.S).group(1)
     # 243/26 scores 90 but has no card, so the lead is 238/26 (70)
     assert "Klarsignal til å bygge Eksempelhallen" in lead
-    assert "Sak med høy score men uten kort" in forside  # still listed under "Flere vedtak"
+    assert "Sak med høy score men uten kort" in forside  # still listed, in its tema section
     secondary = re.findall(r'<article class="blokk sekundaer">(.*?)</article>', forside, re.S)
     assert len(secondary) == 1 and "Skolen rehabiliteres" in secondary[0]
-    flere = re.search(r'id="flere">.*?</section>', forside, re.S).group(0)
+    annet = re.search(r'id="tema-annet">.*?</section>', forside, re.S).group(0)
     # fremhevede without a summary: 243 (90, no card) before 241 (45, avvist)
-    assert flere.index("Sak med høy score men uten kort") < flere.index("Sak som ble avvist av redaktøren")
-    assert "og 1 andre vedtak i perioden" in forside  # 240, score 10
+    assert annet.index("Sak med høy score men uten kort") < annet.index("Sak som ble avvist av redaktøren")
+    assert "Alle 5 vedtak i perioden" in forside  # 240 (score 10) is in its section, so nothing is left over
 
 
 def test_front_page_order_and_window(site):
@@ -298,3 +315,65 @@ def test_meld_feil_template(monkeypatch):
     from tingposten import config
     monkeypatch.setattr(config, "MELD_FEIL", "mailto:feil@example.org?subject=Feil%20i%20sak%20{nr}", raising=False)
     assert bygg.meld_feil("238/26", "T", "https://x") == "mailto:feil@example.org?subject=Feil%20i%20sak%20238%2F26"
+
+
+def test_tema_sections_pages_and_breadcrumb(site):
+    site, _ = site
+    forside = (site / "bergen/index.html").read_text()
+    # sections ordered by best score: annet (243: 90) before okonomi (240: 10)
+    assert forside.index('id="tema-annet"') < forside.index('id="tema-okonomi"')
+    assert "Flere vedtak" not in forside
+    annet = re.search(r'id="tema-annet">.*?</section>', forside, re.S).group(0)
+    assert 'href="../bergen/tema/annet/">Flere saker (3)</a>' in annet  # 238 is the lead, so 3 > 2 shown
+    okonomi = re.search(r'id="tema-okonomi">.*?</section>', forside, re.S).group(0)
+    assert "Bofellesskapet blir dyrere" in okonomi and "Flere saker" not in okonomi
+    page = (site / "bergen/tema/okonomi/index.html").read_text()
+    assert "<h1>Økonomi</h1>" in page and "Bofellesskapet blir dyrere" in page and "Andre temaer" in page
+    assert (site / "bergen/i-ar/tema/annet/index.html").exists() and (site / "bergen/30-dager/tema/skole/index.html").exists()
+    assert "Gammel sak fra januar" in (site / "bergen/i-ar/tema/annet/index.html").read_text()
+    sak = sak_page(site, "238/26").read_text()
+    assert 'href="../../../../../bergen/i-ar/tema/annet/">Annet</a>' in sak
+    assert '<span class="kicker-tema">Annet</span>' in sak
+    assert '<span class="kicker-tema">Økonomi</span>' in sak_page(site, "240/26").read_text()
+
+
+def test_article_rendering_and_cue(site):
+    site, _ = site
+    page = sak_page(site, "238/26").read_text()
+    bakgrunn = re.search(r'<section class="bakgrunn".*?</section>', page, re.S).group(0)
+    assert ">Bakgrunn<" in bakgrunn
+    assert "Hallen har vært planlagt siden 2019. &lt;b&gt;fet&lt;/b&gt;" in bakgrunn  # escaped
+    assert "/fil/bk360/111/Framstilling-x#page=2" in bakgrunn and "/fil/bk360/222/Protokoll-x#page=1" in bakgrunn
+    assert "bilag" not in bakgrunn  # only the two known documents become links
+    assert bakgrunn.index("Hallen har vært") < bakgrunn.index("Byggestart")
+    assert page.index('class="brodtekst"') < page.index('class="bakgrunn"')
+    assert "AVVIST ARTIKKEL" not in sak_page(site, "239/26").read_text()
+    assert 'class="bakgrunn"' not in sak_page(site, "240/26").read_text()
+    forside = (site / "bergen/index.html").read_text()
+    lead = re.search(r'<article class="blokk lead">(.*?)</article>', forside, re.S).group(1)
+    assert '<span class="cue">Les bakgrunn</span>' in lead
+    sekundaer = re.search(r'<article class="blokk sekundaer">(.*?)</article>', forside, re.S).group(1)
+    assert "Les bakgrunn" not in sekundaer
+
+
+def test_rss_has_tema_category(site):
+    site, _ = site
+    root = ET.parse(site / "bergen" / "rss.xml").getroot()
+    cats = {c.text for c in root.iter("category")}
+    assert {"Annet", "Økonomi", "Skole og barnehage"} <= cats
+
+
+@pytest.mark.parametrize("tittel,tema", [
+    ("Søknad om fritak fra verv og nyvalg i Utvalg for barnehage", "styring"),
+    ("Storetveit skole - Totalrehabilitering", "skole"),
+    ("E39 Fløyfjelltunnelen - tunnelramper", "samferdsel"),
+    ("Høringsuttalelse til NOU 2026:4 Kjernekraft i Norge", "miljo"),
+    ("Fana, Gnr. 13, Bnr. 644 mfl., Stavkirkevegen, boliger", "byutvikling"),
+    ("Kommunal forkjøpsrett - Gnr 159 Bnr 706 Rogagaten 33", "byutvikling"),
+    ("Eierskapskontroll av Eviny AS", "okonomi"),
+    ("Alvøen idrettshall I0420. Sluttmelding", "kultur"),
+    ("Rehabilitering først. Strategi for rehabilitering", "helse"),
+    ("Noe helt annet", "annet"),
+])
+def test_tema_fra_tittel(tittel, tema):
+    assert bygg.tema_fra_tittel(tittel) == tema

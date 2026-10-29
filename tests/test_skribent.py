@@ -124,3 +124,36 @@ def test_artikkel_grenser_and_rewrite(tmp_path, sources):
     fake = FakeLLM([long, dict(ARTICLE)])
     assert skribent.skriv_artikkel(ITEM, CARD, tmp_path, fake) == "skrevet"
     assert "artikkelen har 360 ord" in fake.prompts[1]
+
+
+def test_rewrite_with_feedback_counts_and_tells_the_writer(tmp_path, sources):
+    skribent.skriv(ITEM, tmp_path, FakeLLM([dict(CARD)]))
+    assert "omskrevet" not in json.loads(card_path(tmp_path).read_text())["meta"]
+    fake = FakeLLM([dict(CARD)])
+    status = skribent.skriv(ITEM, tmp_path, fake, force=True, feedback="Avvist fordi: status har 3 setninger (maks 2).")
+    assert status == "omskrevet"
+    assert "THE EDITOR REJECTED THE PREVIOUS DRAFT" in fake.prompts[0] and "status har 3 setninger" in fake.prompts[0]
+    assert json.loads(card_path(tmp_path).read_text())["meta"]["omskrevet"] == 1
+    skribent.skriv(ITEM, tmp_path, FakeLLM([dict(CARD)]), force=True, feedback="igjen")
+    assert json.loads(card_path(tmp_path).read_text())["meta"]["omskrevet"] == 2
+
+
+def test_run_passes_feedback_by_key(tmp_path, sources):
+    other = {**ITEM, "id": "b", "referansenr": "239/26"}
+    fake = FakeLLM([dict(CARD), dict(CARD)])
+    result = skribent.run([ITEM, other], tmp_path, fake, parallel=1, feedback={"571424/2026-09-23/238-26": "Rett dette."})
+    assert result["antall"] == {"omskrevet": 1, "skrevet": 1}
+    assert sum("Rett dette." in p for p in fake.prompts) == 1
+
+
+def test_run_artikkel_writes_against_the_edited_card(tmp_path, sources):
+    from tingposten.llm import write_json
+    write_json(tmp_path / "redigert" / "571424" / "2026-09-23" / "238-26.json", {
+        "nr": "238/26", "overskrift": "Klarsignal", "avvist": False,
+        "felt": {"hva_endres": "Kun det som overlevde redigeringen.", "hvem_pavirkes": "", "hvorfor": "",
+                 "status": "Vedtatt.", "nar_og_hvor": ""}})
+    fake = FakeLLM([dict(ARTICLE)])
+    other = {**ITEM, "id": "b", "referansenr": "239/26"}  # no edited card
+    result = skribent.run_artikkel([ITEM, other], tmp_path, fake, parallel=1)
+    assert result["antall"] == {"skrevet": 1, "mangler redigert kort": 1}
+    assert "Kun det som overlevde redigeringen." in fake.prompts[0]

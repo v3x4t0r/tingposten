@@ -14,7 +14,9 @@
 CRON_TZ=Europe/Oslo
 
 # cron does not expand $HOME in variable lines, so spell the path out.
-# run-daily.sh also adds ~/.local/bin (where the uv installer puts uv).
+# run-daily.sh also adds ~/.local/bin (where the uv and Claude installers put
+# uv and claude). codex must be on this PATH too: /usr/local/bin after a
+# global npm install, or ~/.local/bin for the release binary.
 PATH=/home/<user>/.local/bin:/usr/local/bin:/usr/bin:/bin
 
 # Output goes to data/logs/YYYY-MM-DD.log.

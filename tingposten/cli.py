@@ -38,10 +38,14 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("rediger", help="delete-only editor: fact-checked drafts → publishable cards")
 
+    lastp = sub.add_parser("last-ned", help="download missing PDFs (only when config.ALLOW_PDF_FETCH is on)")
+    lastp.add_argument("--utvalg", help="only this utvalgId")
+    lastp.add_argument("--dato", help="only this meeting date YYYY-MM-DD")
+
     kjorp = sub.add_parser("kjor", help="write, fact-check, classify and edit every decided sak with PDFs on disk")
     kjorp.add_argument("--utvalg", help="only this utvalgId")
     kjorp.add_argument("--dato", help="only this meeting date YYYY-MM-DD")
-    kjorp.add_argument("--steg", help="comma-separated subset of skriv,sjekk,klassifiser,rediger")
+    kjorp.add_argument("--steg", help="comma-separated subset of skriv,sjekk,klassifiser,rediger,artikkel,artikkelsjekk,artikkelrediger")
     kjorp.add_argument("--parallel", type=int, default=3)
 
     byggp = sub.add_parser("bygg", help="build the static site into site/")
@@ -85,6 +89,12 @@ def main(argv: list[str] | None = None) -> int:
 
         items = [i for uid in config.TIER1 for i in (_load_items(uid) or [])]
         logging.info("redaktør: %s", redaktor.run(items))
+    elif args.cmd == "last-ned":
+        from . import nedlaster, pipeline
+
+        counts = nedlaster.last_ned(pipeline.saker(config.DATA_DIR, args.utvalg, args.dato))
+        logging.info("last-ned: %s", counts)
+        return 2 if counts.get("blokkert") else 0
     elif args.cmd == "kjor":
         from . import pipeline
 

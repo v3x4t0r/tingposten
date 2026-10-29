@@ -75,7 +75,7 @@ def test_sjekk_retries_bad_split_then_blocks(data_dir):
     bad = {**GOOD, "setninger": GOOD["setninger"][:2]}
     fake = FakeLLM([bad, json.loads(json.dumps(GOOD))])
     assert faktasjekker.sjekk(ITEM, data_dir, fake) == "sjekket (1 uten støtte)"
-    assert "DID NOT SPLIT THE CARD CORRECTLY" in fake.prompts[1]
+    assert "DID NOT SPLIT THE TEXT CORRECTLY" in fake.prompts[1]
     status = faktasjekker.sjekk(ITEM, data_dir, FakeLLM([bad, bad]), force=True)
     assert status.startswith("blocked: setningene dekker ikke kortet")
     assert saved(data_dir)["blocked"].startswith("setningene dekker ikke kortet")
@@ -105,3 +105,88 @@ def test_schema_is_strict_for_codex():
         if "items" in schema:
             walk(schema["items"])
     walk(faktasjekker.SCHEMA)
+
+
+# --- articles -------------------------------------------------------------------
+
+REDIGERT = {"nr": "238/26", "overskrift": "Klarsignal til Eksempelhallen",
+            "felt": {"hva_endres": "Bystyret ga klarsignal.", "hvem_pavirkes": "", "hvorfor": "",
+                     "status": "Vedtatt enstemmig.", "nar_og_hvor": ""},
+            "kilder": [], "slettet": [], "avvist": False, "grunn": "", "ord": 7, "setninger": 3}
+ARTIKKEL = {"nr": "238/26", "meta": {"modell": "fake:opus", "merknad": "HEMMELIG SKRIBENTNOTAT"},
+            "avsnitt": [{"tekst": "Saken ble utsatt i juni. Bystyret ga klarsignal.", "kilder": [{"dok": "protokoll", "side": 2}]},
+                        {"tekst": "SV ville ha en mindre hall.", "kilder": [{"dok": "protokoll", "side": 3}]}]}
+
+
+def a(avsnitt, setning, stottet=True, gjentar=False):
+    return {"avsnitt": avsnitt, "setning": setning, "stottet": stottet, "gjentar_kortet": gjentar,
+            "kilde": None, "begrunnelse": ""}
+
+
+ART_GOOD = {"setninger": [a(1, "Saken ble utsatt i juni."), a(1, "Bystyret ga klarsignal.", gjentar=True),
+                          a(2, "SV ville ha en mindre hall.", stottet=False)], "personvern": [], "blocked": ""}
+
+
+@pytest.fixture
+def art_dir(data_dir):
+    write_json(data_dir / "redigert" / "571424" / "2026-09-23" / "238-26.json", REDIGERT)
+    write_json(data_dir / "artikler" / "571424" / "2026-09-23" / "238-26.json", ARTIKKEL)
+    return data_dir
+
+
+def art_saved(data_dir):
+    return json.loads((data_dir / "artikkelsjekk" / "571424" / "2026-09-23" / "238-26.json").read_text())
+
+
+def test_artikkel_check_sees_edited_card_and_article_but_not_writer_meta(art_dir):
+    fake = FakeLLM([json.loads(json.dumps(ART_GOOD))], name="fake:codex")
+    assert faktasjekker.sjekk_artikkel(ITEM, art_dir, fake) == "sjekket (1 uten støtte, 1 gjentar kortet)"
+    prompt = fake.prompts[0]
+    assert "HEMMELIG" not in prompt and "<<<ARTIKKEL" in prompt and "<<<KORT" in prompt
+    assert '"hva_endres": "Bystyret ga klarsignal."' in prompt  # the edited card, flattened
+    assert '"avsnitt": 2' in prompt  # paragraphs are numbered from 1
+    out = art_saved(art_dir)
+    assert out["setninger"] == ART_GOOD["setninger"] and out["meta"]["prompt_versjon"] == faktasjekker.ARTIKKEL_PROMPT_VERSJON
+
+
+def test_dekning_artikkel():
+    paragraphs = [p["tekst"] for p in ARTIKKEL["avsnitt"]]
+    assert faktasjekker.dekning_artikkel(paragraphs, ART_GOOD["setninger"]) == []
+    assert "avsnitt 2 er ikke sjekket" in faktasjekker.dekning_artikkel(paragraphs, ART_GOOD["setninger"][:2])
+    assert "avsnitt 3 finnes ikke" in faktasjekker.dekning_artikkel(paragraphs, ART_GOOD["setninger"] + [a(3, "x")])
+    reworded = [a(1, "Saken ble utsatt."), *ART_GOOD["setninger"][1:]]
+    assert any("avsnitt 1" in e for e in faktasjekker.dekning_artikkel(paragraphs, reworded))
+
+
+def test_artikkel_check_retries_bad_split_then_blocks(art_dir):
+    bad = {**ART_GOOD, "setninger": ART_GOOD["setninger"][:1]}
+    fake = FakeLLM([bad, json.loads(json.dumps(ART_GOOD))])
+    assert faktasjekker.sjekk_artikkel(ITEM, art_dir, fake).startswith("sjekket")
+    assert "DID NOT SPLIT THE TEXT CORRECTLY" in fake.prompts[1]
+    assert faktasjekker.sjekk_artikkel(ITEM, art_dir, FakeLLM([bad, bad]), force=True).startswith(
+        "blocked: setningene dekker ikke artikkelen")
+
+
+def test_empty_article_needs_no_model(art_dir):
+    write_json(art_dir / "artikler" / "571424" / "2026-09-23" / "238-26.json", {"nr": "238/26", "avsnitt": []})
+    assert faktasjekker.sjekk_artikkel(ITEM, art_dir, FakeLLM([])) == "tom artikkel"
+    assert art_saved(art_dir)["setninger"] == [] and art_saved(art_dir)["meta"]["tom"] is True
+
+
+def test_artikkel_check_needs_article_and_edited_card(data_dir):
+    assert faktasjekker.sjekk_artikkel(ITEM, data_dir, FakeLLM([])) == "mangler artikkel"
+    write_json(data_dir / "artikler" / "571424" / "2026-09-23" / "238-26.json", ARTIKKEL)
+    assert faktasjekker.sjekk_artikkel(ITEM, data_dir, FakeLLM([])) == "mangler redigert kort"
+
+
+def test_artikkel_schema_is_strict_for_codex():
+    def walk(schema):
+        if schema.get("type") == "object":
+            assert schema["additionalProperties"] is False and set(schema["required"]) == set(schema["properties"])
+            for p in schema["properties"].values():
+                walk(p)
+        for opt in schema.get("anyOf", []):
+            walk(opt)
+        if "items" in schema:
+            walk(schema["items"])
+    walk(faktasjekker.ARTIKKEL_SCHEMA)

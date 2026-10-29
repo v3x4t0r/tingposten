@@ -13,6 +13,7 @@
     <guid isPermaLink="true">{{ site_url }}{{ s.side }}</guid>
     <pubDate>{{ s.dato|rfc822 }}</pubDate>
     <category>{{ s.organ }}</category>
+    <category>{{ s.tema_navn }}</category>
     <description>{% if s.dek %}{{ s.dek }}{% else %}{{ s.tittel }}. Sammendrag kommer.{% endif %}</description>
   </item>
   {% endfor %}

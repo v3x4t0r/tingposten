@@ -6,6 +6,12 @@ reliably than instructions. The script checks the plan's hard limits and
 asks for one rewrite when the draft breaks them; the redaktør rejects what
 is still over. Output: data/bergen/kort/<key>.json, the card schema the
 fact-checker, redaktør and review page read.
+
+When the redaktør rejects a card for limit or headline problems, the
+pipeline calls skriv() once more with the rejection as feedback; the card's
+meta counts these rewrites ("omskrevet") so it happens at most once.
+Articles are written against the EDITED card (redigert/), the text readers
+actually see, so the writer knows what not to repeat.
 """
 
 import json
@@ -112,8 +118,12 @@ return an empty "avsnitt" list. "blocked": "" normally; if you cannot do the tas
 """
 
 
-def skriv(item: dict, data_dir: Path = config.DATA_DIR, llm=None, force: bool = False) -> str:
-    """Write the card for one sak. Returns a short status."""
+def skriv(item: dict, data_dir: Path = config.DATA_DIR, llm=None, force: bool = False,
+          feedback: str | None = None) -> str:
+    """Write the card for one sak. Returns a short status.
+
+    `feedback`: why the editor rejected the previous draft; the new card is
+    written from scratch with it, and meta["omskrevet"] goes up by one."""
     out = data_dir / "kort" / f"{pdf.key(item)}.json"
     if out.exists() and not force:
         return "finnes"
@@ -121,6 +131,11 @@ def skriv(item: dict, data_dir: Path = config.DATA_DIR, llm=None, force: bool = 
     if not kilder["protokoll"]:
         return "mangler kilde: protokoll"
     prompt = _card_prompt(item, kilder)
+    meta_extra = {}
+    if feedback:
+        prompt += _rejected(feedback)
+        previous = (read_json(out) or {}).get("meta") or {}
+        meta_extra["omskrevet"] = int(previous.get("omskrevet", 0)) + 1
     card = llm.ask(prompt, CARD_SCHEMA)
     if card["blocked"].strip():
         return f"blocked: {card['blocked'].strip()}"
@@ -129,8 +144,8 @@ def skriv(item: dict, data_dir: Path = config.DATA_DIR, llm=None, force: bool = 
         if card["blocked"].strip():
             return f"blocked: {card['blocked'].strip()}"
     card.pop("blocked")
-    write_json(out, {"nr": _nr(item), **card, "meta": _meta(llm)})
-    return "skrevet" + (" (over grensen)" if grenser(card) else "")
+    write_json(out, {"nr": _nr(item), **card, "meta": {**_meta(llm), **meta_extra}})
+    return ("omskrevet" if feedback else "skrevet") + (" (over grensen)" if grenser(card) else "")
 
 
 def skriv_artikkel(item: dict, card: dict, data_dir: Path = config.DATA_DIR, llm=None, force: bool = False) -> str:
@@ -160,8 +175,30 @@ def skriv_artikkel(item: dict, card: dict, data_dir: Path = config.DATA_DIR, llm
     return "skrevet" + (" (over grensen)" if artikkel_grenser(answer) else "")
 
 
-def run(items: list[dict], data_dir: Path = config.DATA_DIR, llm=None, force: bool = False, parallel: int = 3) -> dict:
-    return run_parallel(lambda item: skriv(item, data_dir, llm, force), items, parallel)
+def run(items: list[dict], data_dir: Path = config.DATA_DIR, llm=None, force: bool = False, parallel: int = 3,
+        feedback: dict[str, str] | None = None) -> dict:
+    """`feedback` maps pdf.key(item) → why the previous draft was rejected."""
+    feedback = feedback or {}
+    return run_parallel(lambda item: skriv(item, data_dir, llm, force, feedback.get(pdf.key(item))), items, parallel)
+
+
+def run_artikkel(items: list[dict], data_dir: Path = config.DATA_DIR, llm=None, force: bool = False,
+                 parallel: int = 3) -> dict:
+    """Write articles for these saker against their edited cards."""
+    def one(item):
+        card = redigert_kort(item, data_dir)
+        if card is None:
+            return "mangler redigert kort"
+        return skriv_artikkel(item, card, data_dir, llm, force)
+    return run_parallel(one, items, parallel)
+
+
+def redigert_kort(item: dict, data_dir: Path = config.DATA_DIR) -> dict | None:
+    """The edited card as a flat card dict (the shape skriv_artikkel takes)."""
+    r = read_json(data_dir / "redigert" / f"{pdf.key(item)}.json")
+    if r is None:
+        return None
+    return {"nr": r.get("nr", ""), "overskrift": r.get("overskrift", ""), **{f: (r.get("felt") or {}).get(f, "") for f in FIELDS}}
 
 
 def grenser(card: dict) -> list[str]:
@@ -240,6 +277,11 @@ def _sak_meta(item: dict) -> str:
         "tittel": item.get("tittel"),
         "kategori": item.get("kategori"),
     }, ensure_ascii=False, indent=1)
+
+
+def _rejected(feedback: str) -> str:
+    return ("\n\nTHE EDITOR REJECTED THE PREVIOUS DRAFT OF THIS CARD. Write a new card from scratch, from the "
+            "documents, that fixes every point below and keeps all the rules above:\n" + feedback)
 
 
 def _feedback(problems: list[str]) -> str:

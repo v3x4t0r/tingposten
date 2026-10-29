@@ -7,8 +7,9 @@ so the same files work under v3x4t0r.github.io/tingposten/ and at the root
 of tingposten.no. Source links go to Bergen kommune's own PDFs.
 
 Laid out like a newspaper: front pages with a lead story, a few secondary
-stories and headline lists; one page per sak with the full card. Every
-sentence shown is from the edited card; the dek is its first sentence.
+stories and sections by topic (tema); one page per sak with the full card
+and, for the top saker, a background article. Every sentence shown is from
+the edited card or the edited article; the dek is the card's first sentence.
 """
 
 import json
@@ -24,6 +25,7 @@ from urllib.parse import quote, urlencode
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 
 from . import config, grafikk, pdf, score
+from .klassifiserer import TEMA
 from .status import IKKE_AVGJORT
 
 log = logging.getLogger(__name__)
@@ -40,6 +42,7 @@ MONTHS = ("januar", "februar", "mars", "april", "mai", "juni", "juli",
           "august", "september", "oktober", "november", "desember")
 WEEKDAYS = ("mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag", "søndag")
 SECONDARY = 4       # stories in the grid under the lead
+SEKSJON = 4         # headlines per tema section on a front page
 RELATED = 6         # "Flere saker fra samme møte" on a sak page
 # Short organ names for kickers and breadcrumbs.
 ORGAN_KORT = {"571424": "Bystyret", "900101": "Byrådet (innstilling)", "900102": "Byrådet"}
@@ -49,6 +52,26 @@ VIEWS = {           # front-page views: path, days back (None = this year), labe
     "30-dager/": (30, "Siste 30 dager"),
     "i-ar/": (None, "I år"),
 }
+# Fallback when the classifier hasn't given a sak a tema yet: first match on the
+# title wins, so the more specific topics come first.
+TEMA_ORD = (
+    ("styring", ("fritak fra verv", "valg av", "nyvalg", "uttreden", "lovlighetskontroll", "kontrollutvalg",
+                 "byrådet", "byrådsmodell", "styreform", "representantforslag", "eventuelt", "konstituering")),
+    ("skole", ("skole", "barnehage", "elev", "lærer")),
+    ("helse", ("helse", "eldre", "omsorg", "rehabilitering", "sykehjem", "bofellesskap", "legevakt", "rus",
+               "psykisk", "sosial")),
+    # Not "vei"/"vegen": street names end that way in most planning titles.
+    ("samferdsel", ("bybane", "tunnel", "bompenge", "bomstasjon", "kollektiv", "sykkel", "havn", "e39", "e16",
+                    "vossebanen", "jernbane", "trasé", "parkering")),
+    ("miljo", ("klima", "energi", "kjernekraft", "miljø", "natur", "avfall", "avløp", "påslipp", "vannforsyning")),
+    ("kultur", ("kultur", "idrett", "kino", "musikk", "bibliotek", "frivillig", "museum")),
+    ("byutvikling", ("regulering", "områdeplan", "gnr", "bnr", "bolig", "eiendom", "forkjøpsrett", "byggesak",
+                     "utbygging", "tomt")),
+    ("okonomi", ("budsjett", "økonomi", "eierskap", "tilskudd", "revisjon", "investering", "bevilgning",
+                 "regnskap", "selskap", " as ", "opsjonsavtale")),
+    ("styring", ("høring", "interpellasjon")),
+)
+
 # Words that end with a full stop without ending the sentence.
 ABBREVIATIONS = {"ca", "mill", "mrd", "nr", "kr", "jf", "pkt", "bl.a", "f.eks", "dvs", "mv", "osv",
                  "m.fl", "m.m", "inkl", "ekskl", "evt", "St", "gnr", "bnr", "kap", "jfr", "tlf", "Fv", "fv"}
@@ -99,6 +122,16 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
               idag_tekst=nb_weekday_date(idag), **front)
         write(f"bergen/{slug}alle/index.html", "alle.html", side="forside", visning=slug, periode=label,
               moter=_meetings(window), antall=len(window))
+        temaer = tema_counts(window)
+        for t in temaer:
+            in_tema = [s_ for s_ in window if s_["tema"] == t["tema"]]
+            write(f"bergen/{slug}tema/{t['tema']}/index.html", "tema.html", side="forside", visning=slug,
+                  periode=label, tema=t["tema"], navn=t["navn"], moter=_meetings(in_tema), antall=len(in_tema),
+                  temaer=[x for x in temaer if x["tema"] != t["tema"]])
+        if slug == "i-ar/":
+            # A sak page's breadcrumb links to its tema for the year, when the sak is in it.
+            for s_ in window:
+                s_["tema_side"] = f"bergen/i-ar/tema/{s_['tema']}/"
     write("bergen/moter/index.html", "moter.html", side="moter", moter=moter)
     for m in moter:
         write(f"bergen/mote/{m['slug']}/index.html", "mote.html", side="mote", mote=m)
@@ -226,6 +259,7 @@ def _sak(item: dict, ranked: dict, data_dir: Path, parsers: "_Parsers | None" = 
     felt = _fields(item, card) if usable else []
     dek, dek_kilder, felt = _dek(felt)
     side = f"bergen/sak/{pdf.key(item)}/"
+    tema = _tema(item, data_dir)
     sak = {
         "nr": _nr(item),
         "tittel": item.get("tittel", ""),
@@ -245,6 +279,10 @@ def _sak(item: dict, ranked: dict, data_dir: Path, parsers: "_Parsers | None" = 
         "dek": dek,
         "dek_kilder": dek_kilder,
         "har_sammendrag": bool(dek or felt),
+        "tema": tema,
+        "tema_navn": TEMA[tema],
+        "tema_side": None,
+        "artikkel": _article(item, data_dir) if usable else [],
         "figurer": (_figures(item, data_dir, parsers or _Parsers()) or list(card.get("figurer", []))) if usable else [],
         "pdf": {k: u for k, _, _ in pdf.KINDS if (u := pdf.url(item, k))},
         "mote": slug,
@@ -252,9 +290,52 @@ def _sak(item: dict, ranked: dict, data_dir: Path, parsers: "_Parsers | None" = 
         "side": side,
         "lenke": side,
     }
+    sak["har_artikkel"] = bool(sak["artikkel"])
     sak["fremhevet"] = sak["score"] >= _terskel()
     sak["meld_feil"] = meld_feil(sak["nr"], sak["tittel"], _site_url() + sak["lenke"])
     return sak
+
+
+def _read_json(path: Path) -> dict | None:
+    try:
+        return json.loads(path.read_text()) if path.exists() else None
+    except (OSError, json.JSONDecodeError):
+        log.exception("could not read %s", path)
+        return None
+
+
+def _tema(item: dict, data_dir: Path) -> str:
+    signaler = _read_json(data_dir / "signaler" / f"{pdf.key(item)}.json") or {}
+    if signaler.get("tema") in TEMA:
+        return signaler["tema"]
+    return tema_fra_tittel(item.get("tittel", ""))
+
+
+def tema_fra_tittel(tittel: str) -> str:
+    text = f" {tittel.lower()} "
+    for tema, words in TEMA_ORD:
+        if any(w in text for w in words):
+            return tema
+    return "annet"
+
+
+def _article(item: dict, data_dir: Path) -> list[dict]:
+    """The edited background article's paragraphs, with links to the cited pages."""
+    art = _read_json(data_dir / "artikler-redigert" / f"{pdf.key(item)}.json")
+    if not art or art.get("avvist"):
+        return []
+    out = []
+    for a in art.get("avsnitt") or []:
+        text = " ".join((a.get("tekst") or "").split())
+        if not text:
+            continue
+        sources = []
+        for k in a.get("kilder") or []:
+            base = pdf.url(item, k.get("dok", "")) if k.get("dok") in ("saksframlegg", "protokoll") else None
+            if base and isinstance(k.get("side"), int):
+                sources.append({"dok": k["dok"], "side": k["side"], "href": f"{base}#page={k['side']}"})
+        out.append({"tekst": text, "kilder": _dedupe(sources)})
+    return out
 
 
 def _fields(item: dict, card: dict) -> list[dict]:
@@ -313,11 +394,13 @@ def split_first_sentence(text: str) -> tuple[str, str]:
 
 
 def front_page(window: list[dict]) -> dict:
-    """Lead, secondary stories, headline list and the rest, newest first on ties.
+    """Lead, secondary stories, sections by tema, and the rest.
 
     The lead and the grid take fremhevede saker that have a summary; a
-    fremhevet sak whose card isn't ready goes to the headline list instead of
-    leading with "Sammendrag kommer".
+    fremhevet sak whose card isn't ready goes to its tema section instead of
+    leading with "Sammendrag kommer". Each section shows its fremhevede saker
+    first, then the highest scores; sections are ordered by their best score.
+    Saker scoring 0 (valg, fritak) appear only in the full lists.
     """
     ordered = sorted(window, key=lambda s: (-s["score"], -s["dato"].toordinal(), s["seq"]))
     fremhevet = [s for s in ordered if s["fremhevet"]]
@@ -325,15 +408,35 @@ def front_page(window: list[dict]) -> dict:
     if not stories:
         stories = [s for s in ordered if s["har_sammendrag"]][:1] or ordered[:1]
     shown = stories[:1 + SECONDARY]
-    flere = [s for s in fremhevet if s not in shown]
-    andre = len(window) - len(shown) - len(flere)
+    groups = defaultdict(list)
+    for s in ordered:
+        if s not in shown and s["score"] > 0:
+            groups[s["tema"]].append(s)
+    totals = {t["tema"]: t["antall"] for t in tema_counts(window)}
+    order = list(TEMA)
+    seksjoner = []
+    for tema, items in groups.items():
+        items.sort(key=lambda s: (not s["fremhevet"], -s["score"], -s["dato"].toordinal(), s["seq"]))
+        picked = items[:SEKSJON]
+        seksjoner.append({"tema": tema, "navn": TEMA[tema], "saker": picked,
+                          "flere": totals[tema] > len(picked), "antall": totals[tema]})
+    seksjoner.sort(key=lambda x: (-x["saker"][0]["score"], order.index(x["tema"])))
+    i_seksjoner = sum(len(x["saker"]) for x in seksjoner)
     return {
         "lead": shown[0] if shown else None,
         "sekundaer": shown[1:],
-        "flere": flere,
-        "andre": andre,
+        "seksjoner": seksjoner,
+        "andre": len(window) - len(shown) - i_seksjoner,
         "antall": len(window),
     }
+
+
+def tema_counts(saker: list[dict]) -> list[dict]:
+    """Every tema present, with its number of saker, in TEMA order."""
+    counts = defaultdict(int)
+    for s in saker:
+        counts[s["tema"]] += 1
+    return [{"tema": t, "navn": TEMA[t], "antall": counts[t]} for t in TEMA if counts[t]]
 
 
 def related(sak: dict, meeting: dict) -> list[dict]:

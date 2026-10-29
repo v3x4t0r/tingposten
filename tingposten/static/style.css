@@ -168,6 +168,18 @@ h1 { font-size: clamp(1.7rem, 5vw, 2.2rem); line-height: 1.2; margin: 0 0 12px; 
 .er-fremhevet > a { font-weight: 700; }
 .andre-lenke { margin: 18px 0 0; font-weight: 600; }
 
+/* Tema sections on front pages: stacked on phones, two columns on desktop. */
+.temaseksjoner { display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 32px; }
+.seksjon.tema { min-width: 0; }
+.mer { margin: 8px 0 0; font-size: 0.9rem; }
+.kicker-tema { color: var(--accent); font-weight: 600; }
+.cue { display: inline-block; margin-left: 6px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); border: 1px solid var(--rule); border-radius: 3px; padding: 0 5px; }
+.blokk-meta .cue { margin-left: 0; }
+
+/* Tema pages: the list of other topics */
+.temaer ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.temaer .antall { color: var(--muted); font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+
 /* Sak page */
 .artikkel-topp { padding-bottom: 14px; margin-bottom: 18px; border-bottom: 1px solid var(--rule); }
 .artikkel-tittel { font-size: clamp(1.8rem, 6vw, 2.6rem); line-height: 1.15; margin: 0; letter-spacing: -0.015em; }
@@ -177,6 +189,8 @@ h1 { font-size: clamp(1.7rem, 5vw, 2.2rem); line-height: 1.2; margin: 0 0 12px; 
 .mellomtittel { font-family: var(--sans); font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 22px 0 4px; }
 .kilde { font-family: var(--sans); font-size: 0.74rem; white-space: nowrap; }
 .modell { color: var(--muted); font-size: 0.86rem; margin: 16px 0 0; }
+.bakgrunn { margin-top: 26px; padding-top: 10px; border-top: 2px solid var(--rule-strong); }
+.bakgrunn p { margin: 0 0 12px; font-family: var(--serif); font-size: 1.04rem; line-height: 1.6; }
 .kildeboks { margin-top: 28px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--rule); border-top: 2px solid var(--rule-strong); font-size: 0.92rem; }
 .kildeboks p { margin: 0 0 8px; }
 .kildeboks ul { margin: 0 0 8px; padding-left: 1.2em; }
@@ -208,6 +222,7 @@ td:nth-child(2), td:nth-child(3) { white-space: nowrap; }
 /* Desktop: two-column grid of secondary stories, lead beside its figure. */
 @media (min-width: 760px) {
   .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; }
+  .temaseksjoner { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sekundaer:nth-child(odd) { padding-right: 0; }
   .lead:has(.figur) { display: grid; grid-template-columns: minmax(0, 1fr) 300px; column-gap: 36px; }
   .lead:has(.figur) > :not(.figur) { grid-column: 1; }

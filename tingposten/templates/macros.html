@@ -14,7 +14,12 @@
 {% endmacro %}
 
 {% macro kicker(s) %}
-<p class="kicker">{{ s.organ_kort }} · <time datetime="{{ s.dato.isoformat() }}">{{ s.dato_tekst }}</time></p>
+<p class="kicker"><span class="kicker-tema">{{ s.tema_navn }}</span> · {{ s.organ_kort }} · <time datetime="{{ s.dato.isoformat() }}">{{ s.dato_tekst }}</time></p>
+{% endmacro %}
+
+{# A cue, not a link: the whole story block already links to the sak page. #}
+{% macro bakgrunn_cue(s) %}
+{% if s.har_artikkel %}<span class="cue">Les bakgrunn</span>{% endif %}
 {% endmacro %}
 
 {% macro figur(f, liten=False) %}
@@ -29,7 +34,7 @@
   {{ kicker(s) }}
   <h2 class="lead-tittel"><a class="blokklenke" href="{{ root }}{{ s.side }}">{{ s.overskrift }}</a></h2>
   {% if s.dek %}<p class="dek">{{ s.dek }}</p>{% elif not s.har_sammendrag %}<p class="dek kommer">Sammendrag kommer.</p>{% endif %}
-  <div class="blokk-meta">{{ status(s) }}{{ grunner(s) }}</div>
+  <div class="blokk-meta">{{ status(s) }}{{ grunner(s) }}{{ bakgrunn_cue(s) }}</div>
   {% set f = front_figure(s) %}
   {% if f %}{{ figur(f, liten=True) }}{% endif %}
 </article>
@@ -40,7 +45,7 @@
   {{ kicker(s) }}
   <h3 class="sekundaer-tittel"><a class="blokklenke" href="{{ root }}{{ s.side }}">{{ s.overskrift }}</a></h3>
   {% if s.dek %}<p class="dek">{{ s.dek }}</p>{% endif %}
-  <div class="blokk-meta">{{ status(s) }}</div>
+  <div class="blokk-meta">{{ status(s) }}{{ bakgrunn_cue(s) }}</div>
   {% set f = front_figure(s) %}
   {% if f %}{{ figur(f, liten=True) }}{% endif %}
 </article>
@@ -51,7 +56,7 @@
 <li class="overskrift{% if s.fremhevet %} er-fremhevet{% endif %}">
   <a href="{{ root }}{{ s.side }}">{% if nr %}<span class="nr">{{ s.nr }}</span> {% endif %}{{ s.overskrift }}</a>
   <span class="linje-meta">
-    {% if meta == "full" %}{{ s.organ_kort }} · {{ s.dato_tekst }}{% if s.status_tekst %} · {% endif %}{% endif %}{{ s.status_tekst }}{% if flagg and s.fremhevet %}<span class="flagg">Fremhevet</span>{% endif %}
+    {% if meta == "full" %}{{ s.organ_kort }} · {{ s.dato_tekst }}{% if s.status_tekst %} · {% endif %}{% endif %}{{ s.status_tekst }}{% if flagg and s.fremhevet %}<span class="flagg">Fremhevet</span>{% endif %}{% if s.har_artikkel %}<span class="cue">Bakgrunn</span>{% endif %}
   </span>
 </li>
 {% endmacro %}

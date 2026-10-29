@@ -18,13 +18,20 @@
   {% for s in sekundaer %}{{ sekundaer_story(s, root) }}{% endfor %}
 </section>
 {% endif %}
-{% if flere %}
-<section class="seksjon" aria-labelledby="flere">
-  <h2 class="seksjonstittel" id="flere">Flere vedtak</h2>
-  <ul class="overskrifter">
-    {% for s in flere %}{{ overskrift(s, root, flagg=False) }}{% endfor %}
-  </ul>
-</section>
+{% if seksjoner %}
+<div class="temaseksjoner">
+  {% for sek in seksjoner %}
+  <section class="seksjon tema" aria-labelledby="tema-{{ sek.tema }}">
+    <h2 class="seksjonstittel" id="tema-{{ sek.tema }}">{{ sek.navn }}</h2>
+    <ul class="overskrifter">
+      {% for s in sek.saker %}{{ overskrift(s, root, flagg=False) }}{% endfor %}
+    </ul>
+    {% if sek.flere %}
+    <p class="mer"><a href="{{ root }}bergen/{{ visning }}tema/{{ sek.tema }}/">{% if sek.tema == "annet" %}Flere saker{% else %}Flere saker om {{ sek.navn|lower }}{% endif %} ({{ sek.antall }})</a></p>
+    {% endif %}
+  </section>
+  {% endfor %}
+</div>
 {% endif %}
 <p class="andre-lenke">
   <a href="{{ root }}bergen/{{ visning }}alle/">{% if andre %}og {{ andre }} andre vedtak i perioden{% else %}Alle {{ antall }} vedtak i perioden, samlet per møte{% endif %}</a>

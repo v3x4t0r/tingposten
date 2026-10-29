@@ -15,3 +15,7 @@ __pycache__/
 
 # Internal drafts / correspondence, not for the public repo
 docs/utkast-*.md
+
+# Local switches: publishing opt-in and the kill switch never go into git
+PUBLISER
+STOP
