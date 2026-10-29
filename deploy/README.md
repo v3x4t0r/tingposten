@@ -13,7 +13,18 @@ Docker er allerede installert på Pi-en, så en container er et alternativ hvis 
    Inntil da skriver steget i stedet `data/bergen/last-ned-mangler.sh`: ett skript med alle PDF-ene som mangler. Det henter ingenting selv; det er du som kjører det (se «PDF-er for hånd» under).
 3. **kjor** – skribent (Claude), faktasjekker (Codex), klassifiserer og redaktør for hver sak som har PDF-er. Går en modell tom for kvote, fortsetter kjøringen med resten, og neste kjøring tar det som mangler. Feil her er derfor bare en advarsel.
 4. **bygg** – lager siden i `site/` av det som er publiserbart. Feiler byggingen, publiseres ingenting.
-5. **publiser** – pusher `site/` til `gh-pages`, men **bare hvis filen `PUBLISER` finnes** i repo-roten. Uten den blir alt liggende lokalt.
+5. **publiser** – laster `site/` opp til statichost.eu (eller pusher til `gh-pages`, se `PUBLISER_TIL` i `tingposten/config.py`), men **bare hvis filen `PUBLISER` finnes** i repo-roten. Uten den blir alt liggende lokalt.
+
+## Publisering på statichost.eu
+
+Gratisplanen (Hobby) gir ett nettsted, 10 GB trafikk og eget domene. Siden er liten (rundt 7 KB per side), så det holder lenge. Serverne står i Stockholm og eies av et europeisk selskap.
+
+1. Lag en konto på statichost.eu og et nettsted som heter `tingposten` (eller noe annet; skriv det i `STATICHOST_SITE`).
+2. Lag en API-nøkkel på https://builder.statichost.eu/account og legg den i `.env` som `STATICHOST_APIKEY`. Den skal aldri inn i repoet.
+3. Test: `uv run tingposten bygg && uv run tingposten publiser`. Siden ligger da på `https://tingposten.statichost.eu/`.
+4. Eget domene (tingposten.no) legges inn hos statichost og hos domeneregistraren; se statichost.eu/docs/domains/.
+
+Med statichost trengs ikke deploy-nøkkelen til GitHub (steg 3–4 under første gangs oppsett).
 
 ## PDF-er for hånd
 

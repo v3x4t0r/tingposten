@@ -17,7 +17,7 @@ def main(argv: list[str] | None = None) -> int:
     hent.add_argument("--year", type=int, action="append", help="default: this year (+ last year in Jan/Feb)")
     hent.add_argument("--utvalg", action="append", help="utvalgId; default: Tier 1 organs")
 
-    publiser = sub.add_parser("publiser", help="commit site/ to gh-pages and push")
+    publiser = sub.add_parser("publiser", help="put site/ online (config.PUBLISER_TIL: statichost or github)")
     publiser.add_argument("--placeholder", action="store_true", help="build the 'kommer snart' page first")
 
     urler = sub.add_parser("pdf-urler", help="build PDF download URLs for a meeting (fetches nothing)")
@@ -76,7 +76,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.placeholder:
             publiserer.build_placeholder()
         try:
-            publiserer.publish(message=f"Publiser {datetime.now():%Y-%m-%d %H:%M}")
+            publiserer.publiser(message=f"Publiser {datetime.now():%Y-%m-%d %H:%M}")
         except RuntimeError as e:
             logging.error("%s", e)
             return 1

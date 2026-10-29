@@ -2,6 +2,7 @@ import subprocess
 
 import pytest
 
+from tingposten import publiserer
 from tingposten.publiserer import build_placeholder, publish
 
 BRANCH = "gh-pages"
@@ -116,3 +117,44 @@ def test_fresh_clone_tracks_existing_remote_branch(tmp_path, repo, origin, site)
     publish(site, clone, BRANCH, "from clone")
     assert commit_count(origin, BRANCH) == 2
     assert "extra.html" in files_on(origin, BRANCH)
+
+
+
+class FakeSession:
+    def __init__(self, status=200, text="Deployed"):
+        self.calls, self.status, self.text = [], status, text
+
+    def post(self, url, data, headers, timeout):
+        self.calls.append({"url": url, "data": data, "headers": headers})
+        return type("R", (), {"status_code": self.status, "text": self.text})()
+
+
+def test_statichost_uploads_the_contents_as_a_zip(tmp_path):
+    import io
+    import zipfile
+    site = tmp_path / "site"
+    (site / "bergen").mkdir(parents=True)
+    (site / "index.html").write_text("<h1>hei</h1>")
+    (site / "bergen" / "index.html").write_text("forside")
+    s = FakeSession()
+    assert publiserer.publish_statichost(site, tmp_path, site="tingposten", apikey="hemmelig", session=s)
+    call = s.calls[0]
+    assert call["url"] == "https://builder.statichost.eu/tingposten/drop"
+    assert call["headers"]["Authorization"] == "Bearer hemmelig"
+    assert call["headers"]["Content-Type"] == "application/zip"
+    names = zipfile.ZipFile(io.BytesIO(call["data"])).namelist()
+    assert names == ["bergen/index.html", "index.html"]  # contents at the root, not site/…
+
+
+def test_statichost_stop_missing_key_and_errors(tmp_path, monkeypatch):
+    site = tmp_path / "site"
+    site.mkdir()
+    (site / "index.html").write_text("x")
+    monkeypatch.delenv("STATICHOST_APIKEY", raising=False)
+    with pytest.raises(RuntimeError, match="STATICHOST_APIKEY"):
+        publiserer.publish_statichost(site, tmp_path, session=FakeSession())
+    with pytest.raises(RuntimeError, match="401"):
+        publiserer.publish_statichost(site, tmp_path, apikey="k", session=FakeSession(401, "Unauthorized"))
+    (tmp_path / "STOP").write_text("")
+    s = FakeSession()
+    assert publiserer.publish_statichost(site, tmp_path, apikey="k", session=s) is False and s.calls == []

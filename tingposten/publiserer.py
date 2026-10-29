@@ -1,14 +1,25 @@
-"""Publiserer: mirror the built site into the gh-pages branch and push it.
+"""Publiserer: put the built site online.
 
-The branch lives in its own worktree under data/ (ignored by git), so the
-main working tree and the main branch are never touched. A file named STOP
-in the repo root is the kill switch: nothing is committed or pushed.
+Two targets (config.PUBLISER_TIL):
+- "statichost": zip site/ and upload it to statichost.eu (direct upload, the
+  same request as their shcli script). The API key comes from .env only.
+- "github": mirror site/ into the gh-pages branch and push it. The branch
+  lives in its own worktree under data/ (ignored by git), so the main working
+  tree and the main branch are never touched.
+
+A file named STOP in the repo root is the kill switch for both: nothing is
+uploaded, committed or pushed.
 """
 
+import io
 import logging
+import os
 import shutil
 import subprocess
+import zipfile
 from pathlib import Path
+
+import requests
 
 from . import config
 
@@ -54,6 +65,53 @@ def build_placeholder(site_dir: Path = config.SITE_DIR) -> None:
     (site_dir / ".nojekyll").write_text("")
     if config.CNAME:
         (site_dir / "CNAME").write_text(config.CNAME + "\n")
+
+
+def publiser(message: str = "Publiser") -> bool:
+    """Publish site/ to the configured target. False if the kill switch stopped it."""
+    if config.PUBLISER_TIL == "statichost":
+        return publish_statichost()
+    return publish(message=message)
+
+
+def publish_statichost(
+    site_dir: Path = config.SITE_DIR,
+    repo_dir: Path = config.ROOT,
+    site: str | None = None,
+    apikey: str | None = None,
+    session=None,
+) -> bool:
+    """Upload site_dir to statichost.eu. Raises RuntimeError if the upload fails."""
+    if (repo_dir / "STOP").exists():
+        log.warning("STOP file present in %s, skipping publish", repo_dir)
+        return False
+    site = site or config.STATICHOST_SITE
+    apikey = apikey or os.environ.get("STATICHOST_APIKEY", "")
+    if not apikey:
+        raise RuntimeError("STATICHOST_APIKEY mangler i .env (lag en API-nøkkel på builder.statichost.eu/account)")
+    if not (site_dir / "index.html").exists():
+        raise RuntimeError(f"{site_dir} har ingen index.html; kjør `tingposten bygg` først")
+    body = zip_site(site_dir)
+    response = (session or requests).post(
+        f"{config.STATICHOST_BUILDER}/{site}/drop",
+        data=body,
+        headers={"Authorization": f"Bearer {apikey}", "Content-Type": "application/zip",
+                 "Accept": "text/plain", "User-Agent": config.USER_AGENT},
+        timeout=300,
+    )
+    if not 200 <= response.status_code < 300:
+        raise RuntimeError(f"statichost svarte {response.status_code}: {response.text.strip()[:300]}")
+    log.info("uploaded %s (%d KB) to %s.statichost.eu: %s", site_dir, len(body) // 1024, site, response.text.strip()[:200])
+    return True
+
+
+def zip_site(site_dir: Path) -> bytes:
+    """The contents of site_dir (not the folder itself) as a zip, in a fixed order."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for path in sorted(p for p in site_dir.rglob("*") if p.is_file()):
+            z.write(path, path.relative_to(site_dir).as_posix())
+    return buf.getvalue()
 
 
 def publish(

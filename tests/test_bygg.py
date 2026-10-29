@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from tingposten import bygg, grafikk, pdf, score
+from tingposten import bygg, config, grafikk, pdf, score
 
 BYSTYRET = "571424"
 MOTE = f"{BYSTYRET}-2026-09-23"
@@ -254,7 +254,7 @@ def test_rss_links_to_sak_pages(site):
     root = ET.parse(site / "bergen/rss.xml").getroot()
     links = [i.findtext("link") for i in root.findall("./channel/item")]
     assert len(links) == 5
-    assert all(l.startswith(f"https://v3x4t0r.github.io/tingposten/bergen/sak/{BYSTYRET}/2026-09-23/") for l in links)
+    assert all(l.startswith(f"{config.SITE_URL}bergen/sak/{BYSTYRET}/2026-09-23/") for l in links)
 
 
 def test_om_page_publishes_weights(site):
