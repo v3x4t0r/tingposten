@@ -105,8 +105,8 @@ def build_script(targets: list[dict], dest: str = "pdf") -> str:
         'DEST="${1:-}"',
         f'[ -n "$DEST" ] || DEST={shlex.quote(dest)}',
         "trap 'echo \"Stoppet: serveren svarte ikke som ventet. Vent til i morgen og kjør igjen.\" >&2' ERR",
-        "hent() {  # nr url fil",
-        '  if [ -s "$DEST/$3" ]; then return; fi',
+        "hent() {  # nr url fil [ny]",
+        '  if [ "${4:-}" != ny ] && [ -s "$DEST/$3" ]; then return; fi',
         f'  echo "[$1/{n}] $3"',
         '  mkdir -p "$(dirname "$DEST/$3")"',
         '  wget --quiet --user-agent="$UA" --tries=2 --timeout=60 -O "$DEST/$3.part" "$2"',
@@ -118,8 +118,10 @@ def build_script(targets: list[dict], dest: str = "pdf") -> str:
     for nr, t in enumerate(targets, start=1):
         # Titles and URLs come from the API: untrusted. Comments get one flat
         # line; arguments are shell-quoted, never Python repr.
-        lines += [f'# {t["kind"]}: {_one_line(t["tittel"])}',
-                  f'hent {nr} {shlex.quote(t["url"])} {shlex.quote(t["filename"])}']
+        again = " ny" if t.get("oppdater") else ""
+        note = " (hentes på nytt: protokollen manglet møtets vedtak)" if again else ""
+        lines += [f'# {t["kind"]}: {_one_line(t["tittel"])}{note}',
+                  f'hent {nr} {shlex.quote(t["url"])} {shlex.quote(t["filename"])}{again}']
     return "\n".join(lines) + "\n"
 
 

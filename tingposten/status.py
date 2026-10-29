@@ -45,7 +45,18 @@ def vedtaksstatus(item: dict, protokoll: dict) -> dict:
     return _status(_kode(item, protokoll))
 
 
+def protokoll_klar(item: dict, protokoll: dict) -> bool:
+    """False while the protokoll only covers an earlier meeting than the one on
+    the agenda. Bergen updates a sak's protokoll after each meeting, so right
+    after a meeting it can still show e.g. June's postponement. Unknown dates
+    count as ready."""
+    md, dato = str(protokoll.get("motedato") or ""), item.get("moteDato") or ""
+    return not (md and dato and md < dato)
+
+
 def _kode(item: dict, p: dict) -> str:
+    if not protokoll_klar(item, p):
+        return "under_behandling"
     tittel = item.get("tittel", "")
     vedtak = " ".join((p.get("vedtak") or "").split())
     votes = p.get("voteringer") or []

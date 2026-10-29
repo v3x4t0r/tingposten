@@ -26,6 +26,7 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoes
 
 from . import config, grafikk, pdf, score
 from .klassifiserer import TEMA
+from . import status as status_mod
 from .status import IKKE_AVGJORT
 
 log = logging.getLogger(__name__)
@@ -250,7 +251,7 @@ def front_figure(sak: dict) -> dict | None:
 def _sak(item: dict, ranked: dict, data_dir: Path, parsers: "_Parsers | None" = None) -> dict:
     card_path = data_dir / "redigert" / f"{pdf.key(item)}.json"
     card = json.loads(card_path.read_text()) if card_path.exists() else None
-    usable = bool(card) and not card.get("avvist")
+    usable = bool(card) and not card.get("avvist") and _protokoll_klar(item, data_dir, parsers or _Parsers())
     dato = date.fromisoformat(item["moteDato"])
     uid = item["utvalgId"]
     slug = f"{uid}-{item['moteDato']}"
@@ -293,6 +294,13 @@ def _sak(item: dict, ranked: dict, data_dir: Path, parsers: "_Parsers | None" = 
     sak["fremhevet"] = sak["score"] >= _terskel()
     sak["meld_feil"] = meld_feil(sak["nr"], sak["tittel"], _site_url() + sak["lenke"])
     return sak
+
+
+def _protokoll_klar(item: dict, data_dir: Path, parsers: "_Parsers") -> bool:
+    """See status.protokoll_klar: until the protokoll covers the meeting, the
+    card (written from an older protokoll) waits."""
+    path = data_dir / "pdf" / pdf.filename(item, "protokoll")
+    return not path.exists() or status_mod.protokoll_klar(item, parsers.protokoll(path))
 
 
 def _read_json(path: Path) -> dict | None:

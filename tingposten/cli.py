@@ -212,6 +212,11 @@ def _pdf_mangler(args) -> int:
     fra = None if args.dato else (args.fra or pipeline.fra_dato())
     items = pipeline.saker(config.DATA_DIR, args.utvalg, args.dato, fra)
     targets = [t for t in pdf.targets(items) if not (config.DATA_DIR / "pdf" / t["filename"]).exists()]
+    # Protokoller published before the meeting's decision was added: fetch again.
+    oppdater = {pdf.filename(i, "protokoll") for i in pipeline.ufullstendige_protokoller(items)}
+    targets += [{**t, "oppdater": True} for t in pdf.targets(items) if t["filename"] in oppdater]
+    if oppdater:
+        logging.info("%d protokoll(er) mangler møtets vedtak og hentes på nytt", len(oppdater))
     meetings = sorted({t["filename"].rsplit("/", 1)[0] for t in targets})
     logging.info("%d PDF(s) missing across %d meeting(s)%s", len(targets), len(meetings), f" since {fra}" if fra else "")
     for t in targets:

@@ -94,3 +94,14 @@ def test_merknad_and_protokolltilforsel_do_not_count_as_binding():
 
 def test_every_code_has_a_label():
     assert status.IKKE_AVGJORT <= set(status.LABELS)
+
+
+def test_protokoll_from_an_earlier_meeting_is_not_the_outcome():
+    # 353/26: on the agenda 27.10, but the protokoll still only has June's postponement.
+    p = {"motedato": "2026-06-17", "vedtak": "Etter ønske fra forretningsutvalget blir representantforslaget utsatt.",
+         "voteringer": [vote("Utsettelsesforslaget", "vedtatt", enstemmig=True)]}
+    sak = item("Representantforslag om is på Festplassen", moteDato="2026-10-27")
+    assert not status.protokoll_klar(sak, p)
+    assert status.vedtaksstatus(sak, p)["kode"] == "under_behandling"
+    assert status.vedtaksstatus({**sak, "moteDato": "2026-06-17"}, p)["kode"] == "utsatt"
+    assert status.protokoll_klar(sak, {"motedato": ""})  # unknown date → trust it

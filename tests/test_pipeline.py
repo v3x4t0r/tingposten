@@ -278,3 +278,17 @@ def test_cards_from_older_writer_rules_are_rewritten(tmp_path):
     assert pipeline.todo("skriv", [a], tmp_path) == [a]
     kort.write_text(json.dumps({"overskrift": "x"}))  # from before versions were recorded
     assert pipeline.todo("skriv", [a], tmp_path) == [a]
+
+
+def test_no_card_until_the_protokoll_covers_the_meeting(tmp_path, monkeypatch):
+    import datetime
+    a = item("1/26", moteDato="2026-10-27")
+    for kind in ("protokoll", "saksframlegg"):
+        touch(tmp_path / "pdf" / f"571424/2026-10-27/1-26_{kind}.pdf", age=100)
+    monkeypatch.setattr(pipeline.protokoll, "parse_pdf", lambda path: {"motedato": "2026-06-17"})
+    assert pipeline.todo("skriv", [a], tmp_path) == []
+    assert pipeline.ufullstendige_protokoller([a], tmp_path, idag=datetime.date(2026, 10, 29)) == [a]
+    assert pipeline.ufullstendige_protokoller([a], tmp_path, idag=datetime.date(2026, 12, 29)) == []  # gave up
+    monkeypatch.setattr(pipeline.protokoll, "parse_pdf", lambda path: {"motedato": "2026-10-27"})
+    assert pipeline.todo("skriv", [a], tmp_path) == [a]
+    assert pipeline.ufullstendige_protokoller([a], tmp_path, idag=datetime.date(2026, 10, 29)) == []

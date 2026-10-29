@@ -91,3 +91,12 @@ def test_build_script_never_runs_text_from_the_api(tmp_path):
     done = subprocess.run(["bash", str(path)], capture_output=True, text=True, env={"PATH": "/usr/bin:/bin"})
     assert done.returncode == 0, done.stderr
     assert not pwned.exists()
+
+
+def test_build_script_fetches_marked_files_again(tmp_path):
+    t = pdf.targets([SAK])
+    t[1] = {**t[1], "oppdater": True}
+    script = pdf.build_script(t, dest=str(tmp_path))
+    lines = [line for line in script.splitlines() if line.startswith("hent ")]
+    assert not lines[0].endswith(" ny") and lines[1].endswith(" ny")
+    assert '[ "${4:-}" != ny ]' in script and "hentes på nytt" in script

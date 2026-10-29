@@ -24,7 +24,7 @@ from collections import defaultdict
 from datetime import date, timedelta
 from pathlib import Path
 
-from . import config, faktasjekker, klassifiserer, pdf, redaktor, score, skribent
+from . import config, faktasjekker, klassifiserer, pdf, protokoll, redaktor, score, skribent, status
 from .llm import ClaudeCLI, CodexCLI, read_json
 
 log = logging.getLogger(__name__)
@@ -71,6 +71,26 @@ def _stale(out: Path, inputs: list[Path]) -> bool:
     return any(p.exists() and p.stat().st_mtime > mtime for p in inputs)
 
 
+def protokoll_klar(item: dict, data_dir: Path = config.DATA_DIR) -> bool:
+    """The protokoll on disk covers this meeting (see status.protokoll_klar)."""
+    path = _pdf(data_dir, item, "protokoll")
+    if not path.exists():
+        return False
+    try:
+        return status.protokoll_klar(item, protokoll.parse_pdf(path))
+    except Exception:  # an unreadable PDF is the writer's problem to report
+        return True
+
+
+def ufullstendige_protokoller(items: list[dict], data_dir: Path = config.DATA_DIR, idag=None,
+                              dager: int = 30) -> list[dict]:
+    """Saker whose protokoll on disk doesn't cover their meeting yet, for
+    meetings in the last `dager` days: their protokoll should be fetched again."""
+    grense = ((idag or date.today()) - timedelta(days=dager)).isoformat()
+    return [i for i in items if (i.get("moteDato") or "") >= grense
+            and _pdf(data_dir, i, "protokoll").exists() and not protokoll_klar(i, data_dir)]
+
+
 def _old_rules(kort: Path) -> bool:
     """A card written under earlier writer rules (skribent.PROMPT_VERSJON) is redone,
     and so is a card from before cards recorded their version."""
@@ -90,7 +110,7 @@ def todo(step: str, items: list[dict], data_dir: Path) -> list[dict]:
         artikkel = _file(data_dir, "artikler", i)
         sources = [_pdf(data_dir, i, "protokoll"), _pdf(data_dir, i, "saksframlegg")]
         if step == "skriv":
-            if sources[0].exists() and (_stale(kort, sources) or _old_rules(kort)):
+            if sources[0].exists() and (_stale(kort, sources) or _old_rules(kort)) and protokoll_klar(i, data_dir):
                 out.append(i)
         elif step in ("artikkel", "artikkelsjekk", "artikkelrediger"):
             if step == "artikkel" and redigert.exists() and _stale(artikkel, [redigert]):
