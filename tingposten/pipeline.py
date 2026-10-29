@@ -71,6 +71,15 @@ def _stale(out: Path, inputs: list[Path]) -> bool:
     return any(p.exists() and p.stat().st_mtime > mtime for p in inputs)
 
 
+def _old_rules(kort: Path) -> bool:
+    """A card written under earlier writer rules (skribent.PROMPT_VERSJON) is redone,
+    and so is a card from before cards recorded their version."""
+    card = read_json(kort) or {}
+    if "overskrift" not in card:
+        return False  # nothing written yet (or not a card)
+    return (card.get("meta") or {}).get("prompt_versjon") != skribent.PROMPT_VERSJON
+
+
 def todo(step: str, items: list[dict], data_dir: Path) -> list[dict]:
     """The saker this step still has to process. ("artikkel" also needs the
     selection from velg_artikler; kjor passes only the selected saker.)"""
@@ -81,7 +90,7 @@ def todo(step: str, items: list[dict], data_dir: Path) -> list[dict]:
         artikkel = _file(data_dir, "artikler", i)
         sources = [_pdf(data_dir, i, "protokoll"), _pdf(data_dir, i, "saksframlegg")]
         if step == "skriv":
-            if sources[0].exists() and _stale(kort, sources):
+            if sources[0].exists() and (_stale(kort, sources) or _old_rules(kort)):
                 out.append(i)
         elif step in ("artikkel", "artikkelsjekk", "artikkelrediger"):
             if step == "artikkel" and redigert.exists() and _stale(artikkel, [redigert]):

@@ -180,13 +180,13 @@ def test_kjor_rewrites_a_rejected_card_once_end_to_end(tmp_path, monkeypatch):
     monkeypatch.setattr(kildetekst, "kilder_for", lambda item, data_dir: {"saksframlegg": "s", "protokoll": "p"})
 
     def card(status):
-        return {"overskrift": "Bystyret vedtok planen", "hva_endres": "Planen er vedtatt.", "hvem_pavirkes": "",
+        return {"overskrift": "Planen for parken er vedtatt", "hva_endres": "Planen er vedtatt.", "hvem_pavirkes": "",
                 "hvorfor": "", "status": status, "nar_og_hvor": "", "merknad": "", "blocked": "",
                 "kilder": [{"felt": "hva_endres", "dok": "protokoll", "side": 1}, {"felt": "status", "dok": "protokoll", "side": 1}]}
 
     def check(status_sentences):
         return {"personvern": [], "blocked": "", "setninger": [
-            {"felt": "overskrift", "setning": "Bystyret vedtok planen", "stottet": True, "kilde": None, "begrunnelse": ""},
+            {"felt": "overskrift", "setning": "Planen for parken er vedtatt", "stottet": True, "kilde": None, "begrunnelse": ""},
             {"felt": "hva_endres", "setning": "Planen er vedtatt.", "stottet": True, "kilde": None, "begrunnelse": ""},
             *({"felt": "status", "setning": x, "stottet": True, "kilde": None, "begrunnelse": ""} for x in status_sentences)]}
 
@@ -264,3 +264,17 @@ def test_fra_dato_counts_tilbake_dager(monkeypatch):
     monkeypatch.undo()  # the real fra_dato, not the autouse stand-in
     monkeypatch.setattr(pipeline.config, "TILBAKE_DAGER", 92)
     assert pipeline.fra_dato(datetime.date(2026, 10, 29)) == "2026-07-29"
+
+
+def test_cards_from_older_writer_rules_are_rewritten(tmp_path):
+    a = item("1/26")
+    for kind in ("protokoll", "saksframlegg"):
+        touch(tmp_path / "pdf" / f"571424/2026-05-20/1-26_{kind}.pdf", age=100)
+    kort = tmp_path / "kort/571424/2026-05-20/1-26.json"
+    kort.parent.mkdir(parents=True)
+    kort.write_text(json.dumps({"overskrift": "x", "meta": {"prompt_versjon": pipeline.skribent.PROMPT_VERSJON}}))
+    assert pipeline.todo("skriv", [a], tmp_path) == []
+    kort.write_text(json.dumps({"overskrift": "x", "meta": {"prompt_versjon": "skribent-0"}}))
+    assert pipeline.todo("skriv", [a], tmp_path) == [a]
+    kort.write_text(json.dumps({"overskrift": "x"}))  # from before versions were recorded
+    assert pipeline.todo("skriv", [a], tmp_path) == [a]

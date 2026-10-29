@@ -135,8 +135,8 @@ def test_hard_limits_reject_instead_of_trimming():
 
 
 def test_long_or_unsupported_headline_rejects():
-    card, check = make(BASE, headline="B" * 71)
-    assert "overskrift over 70 tegn (71)" in redaktor.edit(card, check)["grunn"]
+    card, check = make(BASE, headline="B" * 66)
+    assert "overskrift over 65 tegn (66)" in redaktor.edit(card, check)["grunn"]
     card, check = make(BASE, stottet={("overskrift", 0): False})
     r = redaktor.edit(card, check)
     assert r["avvist"] and r["grunn"].startswith("overskrift ikke støttet av kilden")

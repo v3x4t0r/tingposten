@@ -168,3 +168,8 @@ def test_run_artikkel_writes_against_the_edited_card(tmp_path, sources):
     result = skribent.run_artikkel([ITEM, other], tmp_path, fake, parallel=1)
     assert result["antall"] == {"skrevet": 1, "mangler redigert kort": 1}
     assert "Kun det som overlevde redigeringen." in fake.prompts[0]
+
+
+def test_grenser_flags_headline_starting_with_the_organ():
+    assert any("begynner med organet" in p for p in skribent.grenser({**CARD, "overskrift": "Byrådet fordelte 26 millioner"}))
+    assert not any("organet" in p for p in skribent.grenser({**CARD, "overskrift": "26 millioner til forebygging"}))

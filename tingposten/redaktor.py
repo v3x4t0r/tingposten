@@ -23,7 +23,7 @@ from . import config, pdf
 
 FIELDS = ("hva_endres", "hvem_pavirkes", "hvorfor", "status", "nar_og_hvor")
 MAX_SENTENCES = {"hva_endres": 3, "hvem_pavirkes": 3, "hvorfor": 3, "status": 2, "nar_og_hvor": 2}
-MAX_HEADLINE = 70
+MAX_HEADLINE = 65
 MAX_ARTICLE_WORDS = 250
 MAX_PARAGRAPHS = 5
 MIN_ARTICLE_WORDS = 40
