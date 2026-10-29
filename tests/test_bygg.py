@@ -224,7 +224,8 @@ def test_one_sentence_dek_takes_its_sources_and_status(site):
     assert "protokoll s.&nbsp;1" in dek  # the hva_endres source moved with it
     assert ">Hva endres<" not in page
     assert "Sendt tilbake – ikke avgjort ennå" in page and "status-apen" in page
-    assert "Maskinvurdering: Angår mange familier." in page
+    # The classifier's reasoning is not fact-checked, so it never reaches a reader.
+    assert "Angår mange familier." not in page
 
 
 def test_avvist_and_missing_cards(site):

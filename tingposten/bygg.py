@@ -274,7 +274,6 @@ def _sak(item: dict, ranked: dict, data_dir: Path, parsers: "_Parsers | None" = 
         "grunner": list(ranked.get("grunner", []))[:3],
         "status_tekst": status.get("tekst", ""),
         "status_klasse": _status_class(status),
-        "modell": _model_line(ranked.get("modell")),
         "felt": felt,
         "dek": dek,
         "dek_kilder": dek_kilder,
@@ -453,13 +452,6 @@ def _status_class(status: dict) -> str:
     if kode in ("orientering", "valg"):
         return "noytral"
     return ""
-
-
-def _model_line(modell: dict | None) -> str:
-    if not modell:
-        return ""
-    parts = [(modell.get(k) or {}).get("begrunnelse", "").strip() for k in ("angar", "konkret")]
-    return " ".join(p for p in parts if p)
 
 
 def meld_feil(nr: str, tittel: str, url: str) -> str:
