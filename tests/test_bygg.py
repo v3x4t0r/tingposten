@@ -209,11 +209,12 @@ def test_sak_page(site):
     site, _ = site
     page = sak_page(site, "238/26").read_text()
     assert '<h1 class="sak-tittel">Klarsignal til å bygge Eksempelhallen</h1>' in page
-    # dek = first sentence, abbreviation "mill." doesn't end it; body keeps the rest, nothing repeated
-    assert '<p class="sak-dek">Bystyret ga klarsignal for 69 mill. kroner til hallen.</p>' in page
-    body = page.split("<body", 1)[1]
-    assert body.count("Bystyret ga klarsignal") == 1
-    assert "Arbeidet starter i 2027." in page
+    # dek = first sentence, abbreviation "mill." doesn't end it, with its sources (no sjekk file here:
+    # the whole field's); the card keeps "Hva endres" in full, the dek is its ingress (test_sakside.py)
+    dek = re.search(r'<p class="sak-dek">(.*?)</p>', page, re.S).group(1)
+    assert dek.startswith("Bystyret ga klarsignal for 69\u00a0mill. kroner til hallen.<span class=\"kilde\">")
+    hva = re.search(r'<h3>Hva endres</h3>(.*?)</div></div>', page, re.S).group(1)
+    assert "Bystyret ga klarsignal for 69\u00a0mill. kroner til hallen. Arbeidet starter i 2027." in hva
     assert "<script>alert(1)</script>" not in page and "&lt;script&gt;" in page
     assert "https://www.bergen.kommune.no/politikere-utvalg/api/fil/bk360/222/Protokoll-x#page=1" in page
     # Kort fortalt: the same five rows in the same order; a missing field is a dash
@@ -234,13 +235,13 @@ def test_one_sentence_dek_takes_its_sources_and_status(site):
     site, _ = site
     page = sak_page(site, "239/26").read_text()
     dek = re.search(r'<p class="sak-dek">(.*?)</p>', page, re.S).group(1)
-    assert dek.startswith("Skolen rehabiliteres for 876 millioner kroner.")
-    # the hva_endres source moved with it, still a link
+    assert dek.startswith("Skolen rehabiliteres for 876\u00a0millioner kroner.")
+    # the dek carries the hva_endres source, still a link
     assert '<a href="https://www.bergen.kommune.no/politikere-utvalg/api/fil/bk360/222/Protokoll-x#page=1" aria-label="Protokoll, side 1">1</a>' in dek
-    # The row stays (same five rows on every sak) but doesn't repeat the sentence.
+    # The row stays (same five rows on every sak) with the full text and its own sources.
     hva = re.search(r'<h3>Hva endres</h3>(.*?)</div></div>', page, re.S).group(1)
-    assert "Står i ingressen over." in hva
-    assert page.split("<body", 1)[1].count("876 millioner") == 1
+    assert "Står i ingressen over." not in hva and "Skolen rehabiliteres for 876\u00a0millioner kroner." in hva
+    assert "Protokoll-x#page=1" in hva
     assert "Sendt tilbake – ikke avgjort ennå" in page and "status-apen" in page
     # The classifier's reasoning is not fact-checked, so it never reaches a reader.
     assert "Angår mange familier." not in page
@@ -250,8 +251,9 @@ def test_avvist_and_missing_cards(site):
     site, _ = site
     for nr, title in (("241/26", "Sak som ble avvist av redaktøren"), ("243/26", "Sak med høy score men uten kort")):
         page = sak_page(site, nr).read_text()
-        assert f'<h1 class="sak-tittel">{title}</h1>' in page
-        assert "Sammendrag kommer." in page
+        # no card: the kommune's title, set quieter, and one quiet line (test_sakside.py)
+        assert f'<h1 class="sak-tittel sak-tittel-raa">{title}</h1>' in page
+        assert "Ikke oppsummert ennå." in page
         assert "Protokoll-x" in page
     everything = "".join(p.read_text() for p in site.rglob("*.html"))
     assert "UTKAST SOM IKKE SKAL VISES" not in everything
@@ -374,7 +376,8 @@ def test_article_rendering_and_cue(site):
     site, _ = site
     page = sak_page(site, "238/26").read_text()
     bakgrunn = re.search(r'<section class="bakgrunn lag".*?</section>', page, re.S).group(0)
-    assert ">Bakgrunn<" in bakgrunn and ">Saken bak vedtaket<" in bakgrunn
+    assert '<h2 class="etikett etikett-strek bakgrunn-etikett" id="bakgrunn-tittel">Bakgrunn</h2>' in bakgrunn
+    assert "Saken bak vedtaket" not in bakgrunn
     assert "Bygger på saksframlegget og protokollen" in bakgrunn and "Ca. 1 minutt å lese" in bakgrunn
     assert "Hallen har vært planlagt siden 2019. &lt;b&gt;fet&lt;/b&gt;" in bakgrunn  # escaped
     # footnote numbers per paragraph, sources in the list below, every page a link

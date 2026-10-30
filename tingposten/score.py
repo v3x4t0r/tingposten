@@ -19,7 +19,7 @@ from pathlib import Path
 
 from . import config, pdf
 from .saksframlegg import find_amounts, saksbydeler
-from .status import IKKE_AVGJORT, vedtaksstatus
+from .status import IKKE_AVGJORT, UKJENT, vedtaksstatus
 
 # Points each signal can give at full strength. Signals that are missing
 # (None) are left out and the rest scaled up, so the score stays 0–100.
@@ -174,6 +174,10 @@ def score(sig: dict, weights: dict = WEIGHTS) -> tuple[int, list[str]]:
     if status in IKKE_AVGJORT:
         value *= IKKE_AVGJORT_FAKTOR
         reasons.append("ikke avgjort ennå")
+    elif status in UKJENT:
+        # No outcome read yet (status.UKJENT): held back the same way until there is one.
+        value *= IKKE_AVGJORT_FAKTOR
+        reasons.append("utfallet er ikke lest ennå")
     elif status == "orientering":
         # The user's call (29.10): taking a report to notice decides nothing
         # new, so it ranks like a sak that isn't decided yet.

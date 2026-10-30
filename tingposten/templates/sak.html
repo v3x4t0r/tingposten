@@ -1,47 +1,68 @@
 {% extends "base.html" %}
-{% from "macros.html" import ikon, kicker, kildelinje, kildegrupper_html, figur_sak, rad %}
+{% from "macros.html" import ikon, kildelinje, kildegrupper_html, figur_sak, rad %}
 {% block title %}{{ s.overskrift }} · Tingposten{% endblock %}
 {% block description %}{{ s.dek or s.tittel }}{% endblock %}
 {% block hovedklasse %}sakside{% endblock %}
 {% block main %}
 {% set FELT = (("hva_endres", "Hva endres"), ("hvem_pavirkes", "Hvem påvirkes"), ("hvorfor", "Hvorfor"), ("status", "Status"), ("nar_og_hvor", "Når og hvor")) %}
+{% set FAKTA_IKON = {"sted": "sted", "stemmer": "stemmer", "falt": "stemmer", "kr": "kr"} %}
 {% set tema_href = (root ~ s.tema_side) if s.tema_side else none %}
+{% set mote_href = root ~ "bergen/mote/" ~ s.mote ~ "/" %}
+{# The status pill and the facts under the dek: the same fakta() rule as the lists. #}
+{% set status = (s.fakta|selectattr("type", "eq", "status")|list or [none])[0] %}
+{% set fakta = s.fakta|rejectattr("type", "in", ("status", "bakgrunn"))|list %}
+{# The kommune's own title as h1 (no card) or a very long one: set quieter. #}
+{% set raa_tittel = not s.har_sammendrag or s.overskrift|length > 90 %}
 <nav class="brodsmule" aria-label="Brødsmuler"><ol>
   <li><a href="{{ root }}bergen/">Bergen</a></li>
   <li>{% if tema_href %}<a href="{{ tema_href }}">{{ s.tema_navn }}</a>{% else %}{{ s.tema_navn }}{% endif %}</li>
-  <li><a href="{{ root }}bergen/mote/{{ s.mote }}/">{{ s.organ_kort }} {{ s.dato_tekst }}</a></li>
+  <li><a href="{{ mote_href }}">{{ s.organ_kort }} {{ s.dato_tekst }}</a></li>
 </ol></nav>
 <article class="sak">
   <header class="sak-topp lag">
-    <p class="dateline"><span class="kicker">{% if tema_href %}<a href="{{ tema_href }}"><span class="kicker-tema">{{ s.tema_navn }}</span></a>{% else %}<span class="kicker-tema">{{ s.tema_navn }}</span>{% endif %}</span><span class="nb">{{ s.organ_kort }}</span><span class="nb"><time datetime="{{ s.dato.isoformat() }}">{{ s.dato_tekst }}</time></span><span class="nb">Sak {{ s.nr }}</span></p>
+    <p class="dateline"><span class="kicker">{% if tema_href %}<a href="{{ tema_href }}"><span class="kicker-tema">{{ s.tema_navn }}</span></a>{% else %}<span class="kicker-tema">{{ s.tema_navn }}</span>{% endif %}</span>
+      <span class="dateline-rad"><a class="dateline-mote" href="{{ mote_href }}"><span class="nb">{{ s.organ_kort }}</span><span class="skille" aria-hidden="true">&nbsp;· </span><span class="nb"><time datetime="{{ s.dato.isoformat() }}">{{ s.dato_tekst }}</time></span></a><span class="skille" aria-hidden="true">&nbsp;· </span><span class="nb">Sak {{ s.nr }}</span>{% if s.status_kode == "valg" %}<span class="skille" aria-hidden="true">&nbsp;· </span><span class="nb">{{ s.status_tekst }}</span>{% endif %}</span></p>
     <div>
-      {% if s.status_klasse %}<p class="sak-status"><span class="faktum-status status-{{ s.status_klasse }}"><span class="vh">Status: </span>{{ s.status_tekst }}</span></p>{% endif %}
-      <h1 class="sak-tittel">{{ s.overskrift|tittel }}</h1>
-      {% if s.dek %}<p class="sak-dek">{{ s.dek }}{{ kildelinje(s.dek_kilder, tag="span") }}</p>{% endif %}
-      {% if s.har_sammendrag and s.tittel != s.overskrift %}<p class="kommunetittel"><strong>Kommunens tittel:</strong> {{ s.tittel }}</p>{% endif %}
-      <p class="paa-siden"><span>På siden:</span><a href="#kort">Kort fortalt</a>{% if s.artikkel %}<span><a href="#bakgrunn">Bakgrunn</a>, ca. {{ s.lesetid }} min</span>{% endif %}<a href="#dokumenter">Dokumenter</a></p>
+      {% if status %}<p class="sak-status"><span class="faktum-status status-{{ s.status_klasse or 'innstilling' }}"><span class="vh">Status: </span>{{ status.verdi }}</span></p>{% endif %}
+      <h1 class="sak-tittel{% if raa_tittel %} sak-tittel-raa{% endif %}">{{ s.overskrift|tittel }}</h1>
+      {% if s.dek %}<p class="sak-dek{% if s.dek|length > 240 %} sak-dek-lang{% endif %}">{{ s.dek|typo }}{{ kildelinje(s.dek_kilder, tag="span") }}</p>{% endif %}
+      {% if fakta %}
+      <ul class="fakta sak-fakta">
+        {% for f in fakta %}<li class="faktum">{{ ikon(FAKTA_IKON[f.type]) }}{% if f.type == "falt" %}{{ f.verdi }} forslag falt{% else %}<span class="vh">{{ f.etikett }}: </span>{{ f.verdi|typo }}{% endif %}</li>{% endfor %}
+      </ul>
+      {% endif %}
+      {% if s.har_sammendrag and s.tittel != s.overskrift %}<p class="kommunetittel"><strong>Kommunens tittel:</strong> {{ s.tittel|typo }}</p>{% endif %}
+      {% if s.har_sammendrag or s.artikkel %}
+      <p class="paa-siden"><span>På siden:</span>{% if s.har_sammendrag %}<a href="#kort">Kort fortalt</a>{% endif %}{% if s.artikkel %}<span><a href="#bakgrunn">Bakgrunn</a>, ca.&nbsp;{{ s.lesetid }}&nbsp;min</span>{% endif %}<a href="#dokumenter">Dokumenter</a></p>
+      {% endif %}
     </div>
   </header>
   <div class="sak-oppsett">
+    {% if s.venter_protokoll %}
+    <section class="sak-melding sak-melding-venter lag" aria-label="Sammendrag">
+      <p class="sak-melding-tekst">Protokollen fra møtet {{ s.dato_tekst }} er ikke publisert ennå. Når den kommer, skriver vi et kort sammendrag med kilde til hver setning.</p>
+    </section>
+    {% elif s.har_sammendrag %}
     <section class="kort" id="kort" aria-labelledby="kort-tittel">
       <div class="kort-hode lag"><h2 id="kort-tittel">Kort fortalt</h2><p>De samme fem punktene for hver sak, med kilde til hvert punkt.</p></div>
-      {% if s.har_sammendrag %}
       {% for key, label in FELT %}
-      {% set f = (s.felt|selectattr("key", "eq", key)|list or [none])[0] %}
+      {% set f = (s.kort_felt|selectattr("key", "eq", key)|list or [none])[0] %}
+      {% if not f and key == "status" and s.status_rad %}{% set f = s.status_rad %}{% endif %}
       <div class="felt lag"><h3>{{ label }}</h3><div>
         {% if f %}
-        <p class="felt-tekst">{{ f.tekst }}</p>{{ kildelinje(f.kilder) }}
-        {% elif key == "hva_endres" and s.dek_kilder %}
-        <p class="felt-tom">Står i ingressen over.</p>
+        <p class="felt-tekst">{{ f.tekst|typo }}</p>{{ kildelinje(f.kilder) }}
         {% else %}
         <p class="felt-tom"><span aria-hidden="true">–</span><span class="vh">Ingen opplysning i kortet</span></p>
         {% endif %}
       </div></div>
       {% endfor %}
-      {% else %}
-      <div class="felt lag"><h3>Sammendrag</h3><div><p class="felt-tom">Sammendrag kommer. Til da finner du vedtaket i protokollen under Dokumenter.</p></div></div>
-      {% endif %}
+      <p class="meld-feil lag"><span></span><span>Ser du en feil? <a href="{{ s.meld_feil }}">Meld feil</a></span></p>
     </section>
+    {% else %}
+    <section class="sak-melding lag" aria-label="Sammendrag">
+      <p class="sak-melding-tekst">Ikke oppsummert ennå.</p>
+    </section>
+    {% endif %}
     <div class="rail">
       {% if s.figurer %}
       <div class="rail-figurer figurer-{{ s.figurer|length }}">{% for f in s.figurer %}{{ figur_sak(s, f) }}{% endfor %}</div>
@@ -49,7 +70,7 @@
       <section class="rail-dok" id="dokumenter" aria-labelledby="dok-tittel">
         <h2 id="dok-tittel">Dokumenter</h2>
         <ul class="dokliste">
-          {% for dok, href in s.pdf.items() %}<li><a href="{{ href }}">{{ ikon("dok") }}{{ dok|capitalize }}<span class="dok-type">PDF</span></a></li>{% endfor %}
+          {% for dok, href in s.pdf.items() %}<li><a href="{{ href }}">{{ ikon("dok") }}{% if dok == "protokoll" and s.venter_protokoll %}Protokoll fra en tidligere behandling{% else %}{{ dok|capitalize }}{% endif %}<span class="dok-type">PDF</span></a></li>{% endfor %}
         </ul>
         <p class="smaatekst">Alt på denne siden bygger på Bergen kommunes egne dokumenter. Ser du en feil? <a href="{{ s.meld_feil }}">Meld feil</a>.</p>
       </section>
@@ -57,13 +78,12 @@
     {% if s.artikkel %}
     {% set bygger = artikkel_dokumenter(s.artikkel) %}
     <section class="bakgrunn lag" id="bakgrunn" aria-labelledby="bakgrunn-tittel">
-      <p class="etikett etikett-strek bakgrunn-etikett">Bakgrunn</p>
+      <h2 class="etikett etikett-strek bakgrunn-etikett" id="bakgrunn-tittel">Bakgrunn</h2>
       <div>
-        <h2 class="bakgrunn-tittel" id="bakgrunn-tittel">{{ "Saken så langt" if s.status_klasse == "apen" else "Saken bak vedtaket" }}</h2>
         <p class="byline">{% if bygger %}<span>Bygger på {{ bygger }}</span>{% endif %}<span class="nb">Ca. {{ s.lesetid }} {{ "minutt" if s.lesetid == 1 else "minutter" }} å lese</span></p>
         <div class="brodtekst">
           {% for a in s.artikkel %}
-          <p id="avsnitt-{{ loop.index }}">{{ a.tekst }}{% if a.kilder %}<sup class="fn"><a href="#kilde-{{ loop.index }}" aria-label="Kilder til avsnitt {{ loop.index }}">{{ loop.index }}</a></sup>{% endif %}</p>
+          <p id="avsnitt-{{ loop.index }}">{{ a.tekst|typo }}{% if a.kilder %}<sup class="fn"><a href="#kilde-{{ loop.index }}" aria-label="Kilder til avsnitt {{ loop.index }}">{{ loop.index }}</a></sup>{% endif %}</p>
           {% endfor %}
         </div>
         <div class="fotnoter">
@@ -75,6 +95,7 @@
             {% endif %}{% endfor %}
           </ol>
         </div>
+        <p class="meld-feil">Ser du en feil? <a href="{{ s.meld_feil }}">Meld feil</a></p>
       </div>
     </section>
     {% endif %}

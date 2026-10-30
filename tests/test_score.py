@@ -227,6 +227,17 @@ def test_sent_back_is_held_back_and_says_so():
     assert value == pytest.approx(score.score(decided)[0] * score.IKKE_AVGJORT_FAKTOR, abs=1)
 
 
+def test_unknown_outcome_is_held_back_like_an_open_sak():
+    # No protokoll read (status "ukjent"), or one from an earlier meeting ("venter_protokoll").
+    s = score.signals(item("Sak"), {}, {}, {"angar": {"verdi": 5}, "konkret": {"verdi": 5}})
+    assert s["status"] == "ukjent"
+    value, reasons = score.score(s)
+    assert reasons[0] == "utfallet er ikke lest ennå"
+    assert value == pytest.approx(score.score({**s, "status": "vedtatt"})[0] * score.IKKE_AVGJORT_FAKTOR, abs=1)
+    venter = score.signals(item("Sak", moteDato="2026-10-27"), {**prot(), "motedato": "2026-06-17"}, {})
+    assert venter["status"] == "venter_protokoll" and score.score(venter)[1][0] == "utfallet er ikke lest ennå"
+
+
 def test_election_scores_zero_even_with_model_signals():
     s = sig("Søknad om fritak fra verv og valg av nytt varamedlem")
     assert s["status"] == "valg"

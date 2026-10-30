@@ -81,8 +81,22 @@ def test_elections_and_handover_by_title():
         == "overlevert"
 
 
-def test_no_protokoll_yet():
-    assert status.vedtaksstatus(item(), {})["kode"] == "under_behandling"
+def test_no_protokoll_read_is_unknown_not_a_fact_about_the_kommune():
+    # 17.6.2026: the PDFs were never fetched. That is our gap, not "Under behandling".
+    assert status.vedtaksstatus(item(), {}) == {"kode": "ukjent", "tekst": ""}
+    assert status.vedtaksstatus(item(), {"vedtak": "  ", "voteringer": []})["kode"] == "ukjent"
+
+
+def test_under_behandling_only_when_the_protokoll_says_so():
+    assert kode("Sak", "Saken ble ikke ferdigbehandlet og settes opp på neste møte.", []) == "under_behandling"
+    assert kode("Sak", "Saken er fortsatt under behandling i byrådet.", []) == "under_behandling"
+    # An adopted vote is a decision, whatever else the text mentions.
+    assert kode("Sak", "Bystyret slutter seg til planen. Saken er fortsatt under behandling i Stortinget.") == "vedtatt"
+
+
+def test_valg_is_a_kind_of_sak_with_a_plain_label():
+    s = status.vedtaksstatus(item("Fritak fra verv som varamedlem"), prot("Bystyret innvilger fritak."))
+    assert s == {"kode": "valg", "tekst": "Valg og fritak"}
 
 
 def test_merknad_and_protokolltilforsel_do_not_count_as_binding():
@@ -94,6 +108,8 @@ def test_merknad_and_protokolltilforsel_do_not_count_as_binding():
 
 def test_every_code_has_a_label():
     assert status.IKKE_AVGJORT <= set(status.LABELS)
+    assert status.UKJENT <= set(status.LABELS) and not status.UKJENT & status.IKKE_AVGJORT
+    assert status.LABELS["venter_protokoll"] == "Venter på protokoll" and status.LABELS["ukjent"] == ""
 
 
 def test_protokoll_from_an_earlier_meeting_is_not_the_outcome():
@@ -102,6 +118,6 @@ def test_protokoll_from_an_earlier_meeting_is_not_the_outcome():
          "voteringer": [vote("Utsettelsesforslaget", "vedtatt", enstemmig=True)]}
     sak = item("Representantforslag om is på Festplassen", moteDato="2026-10-27")
     assert not status.protokoll_klar(sak, p)
-    assert status.vedtaksstatus(sak, p)["kode"] == "under_behandling"
+    assert status.vedtaksstatus(sak, p) == {"kode": "venter_protokoll", "tekst": "Venter på protokoll"}
     assert status.vedtaksstatus({**sak, "moteDato": "2026-06-17"}, p)["kode"] == "utsatt"
     assert status.protokoll_klar(sak, {"motedato": ""})  # unknown date → trust it

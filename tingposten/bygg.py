@@ -34,6 +34,7 @@ from .klassifiserer import TEMA
 from .saksframlegg import saksbydeler
 from . import status as status_mod
 from .status import IKKE_AVGJORT
+from .typo import typo
 
 log = logging.getLogger(__name__)
 
@@ -248,8 +249,23 @@ def _figures(item: dict, data_dir: Path, parsers: "_Parsers") -> list[dict]:
         return []
     # The same map can appear for two saker on one front page: make SVG ids unique.
     suffix = re.sub(r"[^A-Za-z0-9-]", "-", f"{item.get('utvalgId', '')}-{pdf.tag(item)}")
-    return [{**f, "svg": re.sub(r"\b(tpf-[0-9a-f]{8})\b", rf"\1-{suffix}", f["svg"]), "type": _figure_type(f)}
+    return [{**f, "svg": re.sub(r"\b(tpf-[0-9a-f]{8})\b", rf"\1-{suffix}", f["svg"]), "type": _figure_type(f),
+             "kilder": _figur_kilder(item, f, p)}
             for f in figs]
+
+
+def _figur_kilder(item: dict, fig: dict, protokoll: dict) -> list[dict]:
+    """The page a figure is read from, as a link like the card's sources:
+    the vote from the protokoll's "Votering", an amount from the page grafikk names."""
+    kilde = fig.get("kilde", "")
+    if kilde.startswith("Protokollen, votering"):
+        dok, side = "protokoll", protokoll.get("votering_side") or protokoll.get("vedtak_side")
+    elif m := re.match(r"(Vedtak|Saksframlegg) s\. (\d+)", kilde):
+        dok, side = ("protokoll" if m[1] == "Vedtak" else "saksframlegg"), int(m[2])
+    else:
+        return []
+    base = pdf.url(item, dok)
+    return [{"dok": dok, "side": side, "href": f"{base}#page={side}"}] if base and side else []
 
 
 def _figure_type(fig: dict) -> str:
@@ -277,8 +293,8 @@ def _sak(item: dict, ranked: dict, data_dir: Path, parsers: "_Parsers | None" = 
     slug = f"{uid}-{item['moteDato']}"
     anchor = f"sak-{pdf.tag(item)}"
     status = ranked.get("status") or {}
-    felt = _fields(item, card) if usable else []
-    dek, dek_kilder, felt = _dek(felt)
+    kort_felt = _fields(item, card) if usable else []
+    dek, dek_kilder, felt = _dek(kort_felt, _setninger(item, data_dir, "hva_endres") if kort_felt else [])
     side = f"bergen/sak/{pdf.key(item)}/"
     tema = _tema(item, data_dir)
     sak = {
@@ -293,9 +309,13 @@ def _sak(item: dict, ranked: dict, data_dir: Path, parsers: "_Parsers | None" = 
         "seq": item.get("seq") or 0,
         "score": ranked.get("score", 0),
         "grunner": list(ranked.get("grunner", []))[:3],
+        "status_kode": status.get("kode", ""),
         "status_tekst": status.get("tekst", ""),
         "status_klasse": _status_class(status),
+        # Lists: "Hva endres" without its first sentence, which is the dek.
         "felt": felt,
+        # The sak page: every field in full; the dek is "Hva endres"'s first sentence, as an ingress.
+        "kort_felt": kort_felt,
         "dek": dek,
         "dek_kilder": dek_kilder,
         "har_sammendrag": bool(dek or felt),
@@ -317,7 +337,22 @@ def _sak(item: dict, ranked: dict, data_dir: Path, parsers: "_Parsers | None" = 
     sak["meld_feil"] = meld_feil(sak["nr"], sak["tittel"], _site_url() + sak["lenke"])
     sak.update(_facts(item, ranked.get("signaler") or {}, data_dir, parsers))
     sak["fakta"] = fakta(sak)
+    sak["status_rad"] = _status_rad(item, sak, data_dir, parsers)
     return sak
+
+
+def _status_rad(item: dict, sak: dict, data_dir: Path, parsers: "_Parsers") -> dict | None:
+    """The card's Status row when the card left it empty: the mechanical status
+    (status.py, read off the protokoll), sourced to the vedtak's page. Not for
+    a valg (a kind of sak, not an outcome) or an outcome we don't know."""
+    if not sak["kort_felt"] or any(f["key"] == "status" for f in sak["kort_felt"]) or not sak["status_tekst"]:
+        return None
+    if sak["status_kode"] in ("valg", *status_mod.UKJENT):
+        return None
+    p = parsers.protokoll(data_dir / "pdf" / pdf.filename(item, "protokoll"))
+    side, base = p.get("vedtak_side"), pdf.url(item, "protokoll")
+    kilder = [{"dok": "protokoll", "side": side, "href": f"{base}#page={side}"}] if side and base else []
+    return {"tekst": sak["status_tekst"] + ".", "kilder": kilder}
 
 
 def _facts(item: dict, sig: dict, data_dir: Path, parsers: "_Parsers") -> dict:
@@ -480,20 +515,47 @@ def _dedupe(sources: list[dict]) -> list[dict]:
     return out
 
 
-def _dek(felt: list[dict]) -> tuple[str, list[dict], list[dict]]:
-    """The first sentence of "Hva endres" as the dek; the body keeps the rest.
+def _dek(felt: list[dict], setninger: list[dict] = ()) -> tuple[str, list[dict], list[dict]]:
+    """The first sentence of "Hva endres" as the dek, with that sentence's
+    sources; and the fields for lists, where "Hva endres" keeps only the rest.
 
-    The text is the edited, fact-checked card: it is split, never rewritten.
+    The sentence is the fact-checker's own (`setninger`, see _setninger) when
+    the field starts with one, with the page the checker found it on;
+    otherwise split_first_sentence, with the whole field's sources. The text
+    is the edited, fact-checked card: it is split, never rewritten.
     """
     hva = next((f for f in felt if f["key"] == "hva_endres"), None)
     if not hva:
         return "", [], felt
-    first, rest = split_first_sentence(hva["tekst"])
-    if rest:
-        body = [{**f, "tekst": rest} if f is hva else f for f in felt]
-        return first, [], body
-    # One sentence only: it all moves to the dek, and so do its sources.
-    return first, hva["kilder"], [f for f in felt if f is not hva]
+    text = " ".join(hva["tekst"].split())
+    first, kilder = "", []
+    for s in setninger:
+        if s["tekst"] and (text == s["tekst"] or text.startswith(s["tekst"] + " ")):
+            first, kilder = s["tekst"], s["kilder"]
+            break
+    if not first:
+        first = split_first_sentence(text)[0]
+    rest = text[len(first):].strip()
+    body = [{**f, "tekst": rest} if f is hva else f for f in felt] if rest else [f for f in felt if f is not hva]
+    return first, kilder or hva["kilder"], body
+
+
+def _setninger(item: dict, data_dir: Path, key: str) -> list[dict]:
+    """One field's sentences as the fact-checker split them (sjekk/), each with
+    the page the checker found support on. Only supported sentences: the
+    edited card keeps no other. Used to source the dek; its text always comes
+    from the edited card."""
+    check = _read_json(data_dir / "sjekk" / f"{pdf.key(item)}.json") or {}
+    out = []
+    for s in check.get("setninger") or []:
+        if s.get("felt") != key or s.get("stottet") is not True:
+            continue
+        k = s.get("kilde") or {}
+        base = pdf.url(item, k.get("dok", "")) if k.get("dok") in ("saksframlegg", "protokoll") else None
+        kilder = [{"dok": k["dok"], "side": k["side"], "href": f"{base}#page={k['side']}"}] \
+            if base and isinstance(k.get("side"), int) else []
+        out.append({"tekst": " ".join((s.get("setning") or "").split()), "kilder": kilder})
+    return out
 
 
 def split_first_sentence(text: str, years: bool = False) -> tuple[str, str]:
@@ -590,12 +652,18 @@ def related(sak: dict, meeting: dict) -> list[dict]:
 
 
 def _status_class(status: dict) -> str:
+    """The status pill's kind; "" = no pill. A sak whose outcome we haven't
+    read gets none, and a valg is a kind of sak, not an outcome."""
     kode, tekst = status.get("kode", ""), status.get("tekst", "").lower()
+    if kode == "venter_protokoll":
+        return "venter"
+    if kode in status_mod.UKJENT or kode == "valg":
+        return ""
     if kode in IKKE_AVGJORT or "ikke avgjort" in tekst:
         return "apen"
     if kode == "falt":
         return "falt"
-    if kode in ("orientering", "valg"):
+    if kode == "orientering":
         return "noytral"
     return ""
 
@@ -673,8 +741,14 @@ def nb_date_short(d: date, year: bool = False, short: bool = True) -> str:
 
 
 def tittel_html(text: str) -> Markup:
-    """A headline, escaped, with 'Dokken–Lyngbø'-style compounds kept on one line."""
-    return Markup(re.sub(r"(\w+–\w+)", r'<span class="nb">\1</span>', str(escape(text))))
+    """A headline, escaped, with 'Dokken–Lyngbø'-style compounds kept on one
+    line and the no-break spaces of typo.typo."""
+    return Markup(re.sub(r"(\w+–\w+)", r'<span class="nb">\1</span>', str(typo(text))))
+
+
+def forste_setning_html(dek: str) -> Markup:
+    """The filter: forste_setning with the no-break spaces of typo.typo."""
+    return typo(forste_setning(dek))
 
 
 def minikart(svg: str) -> Markup:
@@ -729,7 +803,8 @@ def _env() -> Environment:
     env.filters["minikart"] = minikart
     env.filters["figur_tittel"] = figur_tittel
     env.filters["kildegrupper"] = kildegrupper
-    env.filters["forste_setning"] = forste_setning
+    env.filters["forste_setning"] = forste_setning_html
+    env.filters["typo"] = typo
     env.globals["repo"] = config.REPO
     env.globals["figur"] = figur
     env.globals["artikkel_dokumenter"] = artikkel_dokumenter
