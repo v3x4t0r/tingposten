@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "macros.html" import ikon, kildelinje, kildegrupper_html, figur_sak, rad %}
+{% from "macros.html" import ikon, kildelinje, kildegrupper_html, figur_sak, rad, meld_feil as meld_feil_lenker %}
 {% block title %}{{ s.overskrift }} · Tingposten{% endblock %}
 {% block description %}{{ s.dek or s.tittel }}{% endblock %}
 {% block hovedklasse %}sakside{% endblock %}
@@ -56,7 +56,7 @@
         {% endif %}
       </div></div>
       {% endfor %}
-      <p class="meld-feil lag"><span></span><span>Ser du en feil? <a href="{{ s.meld_feil }}">Meld feil</a></span></p>
+      <p class="meld-feil lag"><span></span><span>Ser du en feil? {{ meld_feil_lenker(s) }}</span></p>
     </section>
     {% else %}
     <section class="sak-melding lag" aria-label="Sammendrag">
@@ -72,7 +72,7 @@
         <ul class="dokliste">
           {% for dok, href in s.pdf.items() %}<li><a href="{{ href }}">{{ ikon("dok") }}{% if dok == "protokoll" and s.venter_protokoll %}Protokoll fra en tidligere behandling{% else %}{{ dok|capitalize }}{% endif %}<span class="dok-type">PDF</span></a></li>{% endfor %}
         </ul>
-        <p class="smaatekst">Alt på denne siden bygger på Bergen kommunes egne dokumenter. Ser du en feil? <a href="{{ s.meld_feil }}">Meld feil</a>.</p>
+        <p class="smaatekst">Alt på denne siden bygger på Bergen kommunes egne dokumenter. Ser du en feil? {{ meld_feil_lenker(s) }}.</p>
       </section>
     </div>
     {% if s.artikkel %}
@@ -95,7 +95,7 @@
             {% endif %}{% endfor %}
           </ol>
         </div>
-        <p class="meld-feil">Ser du en feil? <a href="{{ s.meld_feil }}">Meld feil</a></p>
+        <p class="meld-feil">Ser du en feil? {{ meld_feil_lenker(s) }}</p>
       </div>
     </section>
     {% endif %}

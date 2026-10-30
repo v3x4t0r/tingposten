@@ -178,3 +178,8 @@
   {% endif %}
 </figure>
 {% endmacro %}
+
+{# "Meld feil": e-mail (when there is an address) and the public GitHub issue. #}
+{% macro meld_feil(s) -%}
+{% if s.meld_feil_epost %}<a href="{{ s.meld_feil_epost }}">Skriv til oss</a> eller <a href="{{ s.meld_feil }}">meld feilen på GitHub</a>{% else %}<a href="{{ s.meld_feil }}">Meld feil</a>{% endif %}
+{%- endmacro %}

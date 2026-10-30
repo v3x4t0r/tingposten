@@ -82,6 +82,11 @@ GOATCOUNTER = "https://v3x4t0r.goatcounter.com/count"
 GOATCOUNTER_VIA_SIDEN = False
 FREMHEVET_TERSKEL = 40  # score at or above this is highlighted on the front page
 MELD_FEIL = None  # None → GitHub issue on REPO, prefilled with the sak
+# Who stands behind the site (shown on the Om page) and where readers write.
+# None = not shown. With KONTAKT_EPOST, "Meld feil" also offers e-mail
+# (prefilled with the sak) next to the GitHub issue.
+ANSVARLIG_REDAKTOR = None
+KONTAKT_EPOST = None
 
 # Models, called through the subscription CLIs (no API keys): Claude writes
 # and classifies, Codex fact-checks — a different provider on purpose.

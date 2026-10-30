@@ -131,3 +131,20 @@ def test_footer_and_navigation(site):
     page = (site / "bergen/index.html").read_text()
     assert '<footer class="bunn ramme">\n  <div class="bunn-innhold">' in page
     assert '<p class="bunn-lenker">' in page
+
+
+def test_editor_contact_and_email_report(tmp_path, data_dir, monkeypatch):
+    from tingposten import config
+    monkeypatch.setattr(config, "ANSVARLIG_REDAKTOR", "Ola Redaktør")
+    monkeypatch.setattr(config, "KONTAKT_EPOST", "avis@eksempel.no")
+    bygg.build(tmp_path / "med", data_dir, idag=date(2026, 10, 1))
+    om = (tmp_path / "med" / "om" / "index.html").read_text()
+    assert "Ola Redaktør, som er ansvarlig redaktør" in om and 'href="mailto:avis@eksempel.no"' in om
+    sak = next((tmp_path / "med" / "bergen" / "sak").rglob("index.html")).read_text()
+    assert 'href="mailto:avis@eksempel.no?subject=Feil%20i%20sak' in sak and "meld feilen på GitHub" in sak
+    monkeypatch.setattr(config, "ANSVARLIG_REDAKTOR", None)
+    monkeypatch.setattr(config, "KONTAKT_EPOST", None)
+    bygg.build(tmp_path / "uten", data_dir, idag=date(2026, 10, 1))
+    assert "Hvem står bak" not in (tmp_path / "uten" / "om" / "index.html").read_text()
+    sak = next((tmp_path / "uten" / "bergen" / "sak").rglob("index.html")).read_text()
+    assert "mailto:" not in sak and ">Meld feil</a>" in sak

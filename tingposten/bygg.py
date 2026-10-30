@@ -378,6 +378,7 @@ def _sak(item: dict, ranked: dict, data_dir: Path, parsers: "_Parsers | None" = 
     sak["lesetid"] = lesetid(sak["artikkel"])
     sak["fremhevet"] = sak["score"] >= _terskel()
     sak["meld_feil"] = meld_feil(sak["nr"], sak["tittel"], _site_url() + sak["lenke"])
+    sak["meld_feil_epost"] = meld_feil_epost(sak["nr"], sak["tittel"], _site_url() + sak["lenke"])
     sak.update(_facts(item, ranked.get("signaler") or {}, data_dir, parsers))
     sak["fakta"] = fakta(sak)
     sak["status_rad"] = _status_rad(item, sak, data_dir, parsers)
@@ -776,6 +777,15 @@ def meld_feil(nr: str, tittel: str, url: str) -> str:
     return f"https://github.com/{config.REPO}/issues/new?" + urlencode({"title": f"Feil i sak {nr}", "body": body})
 
 
+def meld_feil_epost(nr: str, tittel: str, url: str) -> str | None:
+    """A mailto: link to config.KONTAKT_EPOST, prefilled like the GitHub issue; None without an address."""
+    adresse = getattr(config, "KONTAKT_EPOST", None)
+    if not adresse:
+        return None
+    body = f"Sak: {nr} – {tittel}\nSide: {url}\n\nHva er feil, og hva sier kilden?\n"
+    return f"mailto:{adresse}?subject={quote(f'Feil i sak {nr}')}&body={quote(body)}"
+
+
 def _meetings(saker: list[dict]) -> list[dict]:
     groups = defaultdict(list)
     for s in saker:
@@ -916,6 +926,8 @@ def _env() -> Environment:
     env.globals["status_boks"] = status_boks
     env.tests["status_boks"] = status_boks
     env.globals["site_url"] = _site_url()
+    env.globals["redaktor"] = getattr(config, "ANSVARLIG_REDAKTOR", None)
+    env.globals["kontakt_epost"] = getattr(config, "KONTAKT_EPOST", None)
     env.globals["repo"] = config.REPO
     env.globals["figur"] = figur
     env.globals["artikkel_dokumenter"] = artikkel_dokumenter
