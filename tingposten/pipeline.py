@@ -192,6 +192,16 @@ def mangler_pdf(items: list[dict], data_dir: Path = config.DATA_DIR) -> list[dic
     return [i for i in items if not _pdf(data_dir, i, "protokoll").exists()]
 
 
+def pdf_som_mangler(items: list[dict], data_dir: Path = config.DATA_DIR) -> list[dict]:
+    """Download targets (pdf.targets) for every saksframlegg/protokoll the saker
+    still need: files not on disk, and protokoller that don't cover their meeting
+    yet (marked "oppdater": fetched again over the old file)."""
+    alle = pdf.targets(items)
+    out = [t for t in alle if not (data_dir / "pdf" / t["filename"]).exists()]
+    oppdater = {pdf.filename(i, "protokoll") for i in ufullstendige_protokoller(items, data_dir)}
+    return out + [{**t, "oppdater": True} for t in alle if t["filename"] in oppdater]
+
+
 def kjor(data_dir: Path = config.DATA_DIR, utvalg: str | None = None, dato: str | None = None,
          steg: tuple[str, ...] = STEG, parallel: int = 3, llms: dict | None = None, fra: str | None = None) -> dict:
     """Run the steps in order; returns per-step counts. Without `dato`, only

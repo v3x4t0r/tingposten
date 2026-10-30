@@ -1,12 +1,15 @@
 import argparse
 import json
 import logging
+import os
 import sys
 from datetime import date, datetime
 from pathlib import Path
 
 from . import ark, config, innhenter, pdf, publiserer
 from .bk360 import Blocked
+
+_ADMIN_PASSORD = "TINGPOSTEN_ADMIN_PASSORD"  # admin.PASSORD_ENV, without importing the panel for every command
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -87,6 +90,15 @@ def main(argv: list[str] | None = None) -> int:
     utg.add_argument("--png", type=Path, help="skriv også en PNG av hver side i denne mappen")
     utg.add_argument("--dpi", type=int, default=110, help="oppløsning for --png (standard 110)")
 
+    adm = sub.add_parser(
+        "admin", help="kontrollpanel for Pi-en: status, neste protokoll og en knapp som laster ned og publiserer",
+        description="Et lite nettpanel: hvordan siden står, hvilke møter som venter på protokoll og når den er "
+                    "ventet, og knapper som starter deploy/run-daily.sh (--manuell: last ned PDF-er, skriv, bygg og "
+                    "publiser; --sjekk: bare hent agendaen). Ingenting hentes eller publiseres før en knapp trykkes.")
+    adm.add_argument("--vert", default="127.0.0.1",
+                     help=f"adressen panelet lytter på; 0.0.0.0 = hele hjemmenettet (krever {_ADMIN_PASSORD} i .env)")
+    adm.add_argument("--port", type=int, default=8787)
+
     vurd = sub.add_parser("vurder", help="local web page for sorting a meeting's draft cards")
     vurd.add_argument("--utvalg", required=True, help="utvalgId, e.g. 571424")
     vurd.add_argument("--dato", required=True, help="meeting date YYYY-MM-DD")
@@ -117,6 +129,8 @@ def main(argv: list[str] | None = None) -> int:
         return _ark(args)
     elif args.cmd == "vurder":
         return _vurder(args)
+    elif args.cmd == "admin":
+        return _admin(args)
     elif args.cmd == "score":
         return _score(args)
     elif args.cmd == "rett":
@@ -213,6 +227,25 @@ def _vurder(args) -> int:
     return 0
 
 
+def _admin(args) -> int:
+    from . import admin
+
+    try:
+        server = admin.make_server(args.vert, args.port, os.environ.get(_ADMIN_PASSORD) or None)
+    except ValueError as e:
+        logging.error("%s", e)
+        return 1
+    import socket
+
+    host = socket.gethostname() if args.vert in ("0.0.0.0", "::") else args.vert
+    logging.info("kontrollpanel: http://%s:%d/ — Ctrl+C to stop", host, server.server_address[1])
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    return 0
+
+
 def _load_items(utvalg: str) -> list[dict] | None:
     store_path = config.DATA_DIR / "agendapunkter" / f"{utvalg}.json"
     if not store_path.exists():
@@ -273,12 +306,11 @@ def _pdf_mangler(args) -> int:
 
     fra = None if args.dato else (args.fra or pipeline.fra_dato())
     items = pipeline.saker(config.DATA_DIR, args.utvalg, args.dato, fra)
-    targets = [t for t in pdf.targets(items) if not (config.DATA_DIR / "pdf" / t["filename"]).exists()]
-    # Protokoller published before the meeting's decision was added: fetch again.
-    oppdater = {pdf.filename(i, "protokoll") for i in pipeline.ufullstendige_protokoller(items)}
-    targets += [{**t, "oppdater": True} for t in pdf.targets(items) if t["filename"] in oppdater]
-    if oppdater:
-        logging.info("%d protokoll(er) mangler møtets vedtak og hentes på nytt", len(oppdater))
+    # Protokoller published before the meeting's decision was added are fetched again.
+    targets = pipeline.pdf_som_mangler(items, config.DATA_DIR)
+    if oppdater := sum(1 for t in targets if t.get("oppdater")):
+        logging.info("%d protokoll(er) mangler møtets vedtak og hentes på nytt", oppdater)
+
     meetings = sorted({t["filename"].rsplit("/", 1)[0] for t in targets})
     logging.info("%d PDF(s) to fetch across %d meeting(s)%s", len(targets), len(meetings), f" since {fra}" if fra else "")
     for t in targets:

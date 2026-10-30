@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Tingposten · kontrollpanel</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/fonts.css">
+<style>
+/* The panel for the Pi (tingposten admin). Same tokens and fonts as the site. */
+:root {
+  color-scheme: light dark;
+  --papir: #f7f6f1; --boks: #eeebe3; --boks-kant: #ddd9ce;
+  --blekk: #141413; --blekk-2: #33322e; --dempet: #5a5852;
+  --linje: #d8d4ca; --lenke: #164a7a; --fokus: #a35c00;
+  --klar: #1f5f3a; --klar-flate: #e3eee5; --vent: #7a4d00; --vent-flate: #f4ead6; --feil: #9b1c1c;
+  --navn: "UnifrakturMaguntia", "Old English Text MT", serif;
+  --didone: "Libre Bodoni", "Bodoni 72", "Didot", Georgia, serif;
+  --serif: "Source Serif 4", Georgia, serif;
+  --sans: "Libre Franklin", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --gutter: 16px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --papir: #121211; --boks: #1c1c1a; --boks-kant: #2e2d2a;
+    --blekk: #ecebe5; --blekk-2: #d0cec6; --dempet: #a9a69d;
+    --linje: #34332f; --lenke: #9cc3ec; --fokus: #f0b85a;
+    --klar: #8fd3a8; --klar-flate: #16261c; --vent: #f0c27a; --vent-flate: #2a2214; --feil: #f19999;
+  }
+}
+@media (min-width: 720px) { :root { --gutter: 32px; } }
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--papir); color: var(--blekk); font: 17px/1.5 var(--serif); }
+a { color: var(--lenke); }
+:focus-visible { outline: 2px solid var(--fokus); outline-offset: 2px; }
+
+.topp { padding: 14px var(--gutter) 10px; border-bottom: 3px double var(--blekk); display: flex;
+  align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.topp .navn { font: 34px/1 var(--navn); margin: 0; }
+.topp .under { font: 600 12px/1.3 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--dempet); }
+.topp .lenker { font: 14px/1.4 var(--sans); display: flex; gap: 14px; flex-wrap: wrap; }
+
+main { padding: 18px var(--gutter) 40px; display: grid; gap: 18px; max-width: 1180px; margin: 0 auto; }
+@media (min-width: 960px) {
+  main { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); align-items: start; }
+  .venstre, .hoyre { display: grid; gap: 18px; }
+}
+.venstre, .hoyre { display: grid; gap: 18px; min-width: 0; }
+
+.blokk { border-top: 1px solid var(--blekk); padding-top: 10px; min-width: 0; }
+.etikett, h2 { font: 700 12px/1.3 var(--sans); letter-spacing: .08em; text-transform: uppercase; margin: 0 0 8px; color: var(--blekk-2); }
+.hoved h1 { font: 700 clamp(26px, 6vw, 38px)/1.12 var(--didone); margin: 4px 0 8px; text-wrap: balance; }
+.hoved p { margin: 0; color: var(--blekk-2); }
+.hoved.klar h1 { color: var(--klar); }
+
+.knapper { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0 6px; }
+button { font: 600 16px/1.2 var(--sans); border-radius: 4px; cursor: pointer; padding: 12px 18px; min-height: 48px; }
+button.stor { background: var(--blekk); color: var(--papir); border: 2px solid var(--blekk); flex: 1 1 260px; font-size: 18px; }
+button.stor.bekreft { background: var(--fokus); border-color: var(--fokus); color: #141413; }
+button.liten { background: transparent; color: var(--blekk); border: 1px solid var(--blekk-2); }
+button:disabled { opacity: .45; cursor: default; }
+.plan, .melding, .smaa { font: 14px/1.45 var(--sans); color: var(--dempet); margin: 6px 0; }
+.melding { color: var(--blekk); min-height: 1.45em; }
+.melding.feil { color: var(--feil); }
+.advarsel { font: 600 14px/1.4 var(--sans); background: var(--vent-flate); color: var(--vent); padding: 8px 10px; border-radius: 4px; margin: 8px 0; }
+
+ol.steg { list-style: none; padding: 0; margin: 12px 0 4px; display: grid; gap: 4px; font: 15px/1.4 var(--sans); }
+ol.steg li { display: flex; gap: 10px; align-items: center; color: var(--dempet); }
+ol.steg li::before { content: ""; width: 12px; height: 12px; border-radius: 50%; border: 2px solid currentColor; flex: none; }
+ol.steg li.ferdig { color: var(--blekk-2); }
+ol.steg li.ferdig::before { background: currentColor; }
+ol.steg li.na { color: var(--blekk); font-weight: 700; }
+ol.steg li.na::before { border-color: var(--fokus); background: var(--fokus); animation: puls 1.2s ease-in-out infinite; }
+@keyframes puls { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { ol.steg li.na::before { animation: none; } }
+
+details { margin-top: 10px; font: 14px/1.4 var(--sans); }
+summary { cursor: pointer; color: var(--blekk-2); padding: 6px 0; }
+pre.logg { background: var(--boks); border: 1px solid var(--boks-kant); padding: 10px; margin: 6px 0 0; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap; overflow-wrap: anywhere; max-height: 360px; overflow: auto; }
+
+ul.moter { list-style: none; margin: 0; padding: 0; }
+ul.moter li { padding: 9px 0; border-bottom: 1px solid var(--linje); display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; }
+.mote-navn { font: 600 15px/1.35 var(--sans); }
+.mote-tall { font: 13px/1.35 var(--sans); color: var(--dempet); grid-column: 1; }
+.mote-merknad { font: 14px/1.4 var(--serif); color: var(--blekk-2); grid-column: 1 / -1; }
+.merke { font: 700 11px/1 var(--sans); letter-spacing: .06em; text-transform: uppercase; padding: 5px 7px; border-radius: 3px;
+  align-self: start; grid-row: 1; grid-column: 2; border: 1px solid var(--boks-kant); color: var(--dempet); white-space: nowrap; }
+.merke.klar { background: var(--klar-flate); color: var(--klar); border-color: transparent; }
+.merke.venter, .merke.mangler { background: var(--vent-flate); color: var(--vent); border-color: transparent; }
+.merke.kommende { color: var(--blekk-2); }
+
+dl.fakta { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; font: 15px/1.4 var(--sans); }
+dl.fakta dt { color: var(--dempet); }
+dl.fakta dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.ok { color: var(--klar); } .nei { color: var(--feil); }
+footer { padding: 0 var(--gutter) 30px; font: 13px/1.4 var(--sans); color: var(--dempet); max-width: 1180px; margin: 0 auto; }
+</style>
+</head>
+<body>
+<header class="topp">
+  <div>
+    <p class="navn">Tingposten</p>
+    <div class="under">Kontrollpanel <span id="vert"></span></div>
+  </div>
+  <nav class="lenker" aria-label="Lenker">
+    <a id="sidelenke" href="https://tingposten.no/">Siden</a>
+    <a id="besoklenke" href="#" hidden>Besøkstall</a>
+  </nav>
+</header>
+
+<main>
+  <div class="venstre">
+    <section class="blokk hoved" id="neste" aria-live="polite">
+      <p class="etikett">Neste protokoll</p>
+      <h1 id="neste-tittel">Henter status …</h1>
+      <p id="neste-tekst"></p>
+    </section>
+
+    <section class="blokk" aria-labelledby="publiser-tittel">
+      <h2 id="publiser-tittel">Publiser</h2>
+      <p class="plan" id="plan"></p>
+      <div class="advarsel" id="stopp" hidden>STOP er satt: siden bygges, men publiseres ikke. Fjern STOP-filen for å publisere.</div>
+      <div class="knapper">
+        <button type="button" class="stor" id="kjor" disabled>Last ned og publiser</button>
+        <button type="button" class="liten" id="sjekk" disabled>Sjekk nå</button>
+      </div>
+      <p class="melding" id="melding" aria-live="polite"></p>
+      <ol class="steg" id="steg" hidden></ol>
+      <details id="loggboks">
+        <summary>Logg fra siste kjøring</summary>
+        <pre class="logg" id="logg">Ingen kjøring ennå.</pre>
+      </details>
+    </section>
+
+    <section class="blokk" aria-labelledby="moter-tittel">
+      <h2 id="moter-tittel">Møter</h2>
+      <ul class="moter" id="moter"></ul>
+      <details id="eldre" hidden>
+        <summary><span id="eldre-antall"></span>, ferdige</summary>
+        <ul class="moter" id="eldre-liste"></ul>
+      </details>
+      <p class="smaa" id="tempo-forklaring">Når protokollen er ventet, er anslått fra datoene i tidligere protokoller.</p>
+    </section>
+  </div>
+
+  <div class="hoyre">
+    <section class="blokk" aria-labelledby="side-tittel">
+      <h2 id="side-tittel">Siden</h2>
+      <dl class="fakta" id="side"></dl>
+    </section>
+    <section class="blokk" aria-labelledby="gjenstar-tittel">
+      <h2 id="gjenstar-tittel">Gjenstår</h2>
+      <dl class="fakta" id="gjenstar"></dl>
+    </section>
+    <section class="blokk" aria-labelledby="maskin-tittel">
+      <h2 id="maskin-tittel">Maskinen</h2>
+      <dl class="fakta" id="maskin"></dl>
+    </section>
+  </div>
+</main>
+<footer>Oppdatert <span id="oppdatert">–</span>. Ingenting hentes eller publiseres før du trykker på en knapp; den daglige kjøringen går som før.</footer>
+
+<script>
+"use strict";
+const STEG = {
+  manuell: [["hent", "Henter agendaen fra kommunen"], ["last-ned", "Laster ned PDF-er"],
+            ["kjor", "Skriver og faktasjekker"], ["bygg", "Bygger siden"], ["publiser", "Publiserer"]],
+  daglig: [["hent", "Henter agendaen fra kommunen"], ["last-ned", "Lager nedlastingsskript"],
+           ["kjor", "Skriver og faktasjekker"], ["bygg", "Bygger siden"], ["publiser", "Publiserer (hvis på)"]],
+  sjekk: [["hent", "Henter agendaen fra kommunen"], ["last-ned", "Teller PDF-er som mangler"]],
+};
+const MODUSNAVN = {manuell: "Last ned og publiser", daglig: "Daglig kjøring", sjekk: "Sjekk"};
+const MERKE = {klar: "Klar", venter: "Venter", mangler: "Uten protokoll", kommende: "Kommer", ferdig: "Ferdig"};
+const $ = id => document.getElementById(id);
+let data = null, timer = null, bekreftTil = 0, sender = false;
+
+function el(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) if (v != null) e.setAttribute(k, v);
+  for (const k of kids) if (k != null) e.append(k);
+  return e;
+}
+
+const MND = ["jan.", "feb.", "mars", "apr.", "mai", "juni", "juli", "aug.", "sep.", "okt.", "nov.", "des."];
+function tid(iso) {
+  if (!iso) return "–";
+  const d = new Date(iso), na = new Date();
+  const kl = d.toLocaleTimeString("nb-NO", {hour: "2-digit", minute: "2-digit"});
+  const min = Math.round((na - d) / 60000);
+  if (min >= 0 && min < 1) return "akkurat nå";
+  if (min >= 0 && min < 60) return `for ${min} min siden`;
+  const dag = x => new Date(x.getFullYear(), x.getMonth(), x.getDate());
+  const dager = Math.round((dag(na) - dag(d)) / 86400000);
+  if (dager === 0) return `i dag ${kl}`;
+  if (dager === 1) return `i går ${kl}`;
+  return `${d.getDate()}. ${MND[d.getMonth()]} ${kl}`;
+}
+function antall(n, en, flere) { return `${n} ${n === 1 ? en : flere}`; }
+const tall = x => x.toLocaleString("nb-NO");
+function varighet(fra, til) {
+  const min = Math.max(0, Math.round((new Date(til) - new Date(fra)) / 60000));
+  return min < 60 ? `${min} min` : `${Math.floor(min / 60)} t ${min % 60} min`;
+}
+
+function fakta(id, rader) {
+  $(id).replaceChildren(...rader.filter(Boolean).flatMap(([k, v, cls]) =>
+    [el("dt", {}, k), el("dd", cls ? {class: cls} : {}, v)]));
+}
+
+function tegn() {
+  const d = data, k = d.kjoring, s = k.siste;
+  $("vert").textContent = d.maskin.navn ? "· " + d.maskin.navn : "";
+  $("oppdatert").textContent = tid(d.na);
+
+  // Headline
+  $("neste").classList.toggle("klar", d.neste.type === "klar");
+  $("neste-tittel").textContent = d.neste.tittel;
+  $("neste-tekst").textContent = d.neste.tekst;
+
+  // What the button will do
+  const g = d.gjenstar;
+  const nye = g.pdf - g.pdf_pa_nytt;
+  let plan = "Henter agendaen fra Bergen kommune, ";
+  const hent = [];
+  if (nye) hent.push(`laster ned ${nye} nye PDF-er`);
+  if (g.pdf_pa_nytt) hent.push(`henter ${g.pdf_pa_nytt} protokoller på nytt (de vi har, dekker ikke møtet ennå)`);
+  plan += hent.length ? `${hent.join(" og ")}, ca. ${g.pdf_minutter} min med én fil om gangen, ` : "ser etter nye PDF-er, ";
+  plan += "skriver og faktasjekker sakene som mangler kort, bygger siden og publiserer den. Skriving og faktasjekk tar ofte 10–60 minutter.";
+  $("plan").textContent = plan;
+  $("stopp").hidden = !d.side.stopp;
+
+  // Buttons
+  const kjor = $("kjor"), sjekk = $("sjekk");
+  kjor.disabled = k.pagar || sender;
+  sjekk.disabled = k.pagar || sender || !!d.sjekk_mulig;
+  sjekk.title = d.sjekk_mulig ? `Agendaen ble hentet ${tid(d.sist_hentet)}. Ny sjekk mulig kl. ${new Date(d.sjekk_mulig).toLocaleTimeString("nb-NO", {hour: "2-digit", minute: "2-digit"})}.` : "Henter bare agendaen: er det kommet noe nytt?";
+  if (Date.now() < bekreftTil && !k.pagar) {
+    kjor.textContent = "Trykk igjen for å starte"; kjor.classList.add("bekreft");
+  } else {
+    kjor.textContent = k.pagar ? "Kjører …" : d.side.stopp ? "Last ned og bygg" : "Last ned og publiser";
+    kjor.classList.remove("bekreft");
+  }
+
+  // The run
+  const melding = $("melding");
+  if (!sender && !melding.dataset.fast) {
+    melding.classList.remove("feil");
+    if (k.pagar && s) melding.textContent = `${MODUSNAVN[s.modus] || s.modus} pågår, startet ${tid(s.startet)} (${varighet(s.startet, d.na)}).`;
+    else if (s) melding.textContent = s.ferdig
+      ? `Siste kjøring (${(MODUSNAVN[s.modus] || s.modus).toLowerCase()}) ble fullført ${tid(s.slutt || s.startet)}.`
+      : `Siste kjøring (${(MODUSNAVN[s.modus] || s.modus).toLowerCase()}) stoppet ${tid(s.slutt || s.startet)}. Se loggen.`;
+    else melding.textContent = "";
+    if (s && !k.pagar && !s.ferdig) melding.classList.add("feil");
+  }
+  const steg = $("steg");
+  if (s && (k.pagar || Date.now() - new Date(s.slutt || s.startet) < 6 * 3600e3)) {
+    const liste = STEG[s.modus] || STEG.manuell;
+    const naIdx = liste.findIndex(([key]) => key === s.steg);
+    steg.replaceChildren(...liste.map(([key, navn], i) => {
+      let cls = "";
+      if (s.ferdig || i < naIdx) cls = "ferdig";
+      else if (i === naIdx) cls = k.pagar ? "na" : "";
+      return el("li", {class: cls}, navn);
+    }));
+    steg.hidden = false;
+  } else steg.hidden = true;
+  if (s) {
+    const pre = $("logg"), nederst = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 4;
+    pre.textContent = s.logg.join("\n");
+    if (nederst) pre.scrollTop = pre.scrollHeight;
+    if (k.pagar) $("loggboks").open = true;
+  }
+
+  // Meetings: everything still open, the latest finished ones, the rest folded away.
+  const rad = m => {
+    const linje = m.status === "kommende" ? `${antall(m.saker, "sak", "saker")} på sakslisten`
+      : [antall(m.saker, "sak", "saker"), m.kort ? `${m.kort} kort` : null, m.avvist ? `${m.avvist} avvist` : null,
+         m.pdf ? `${m.pdf} PDF-er å hente` : null].filter(Boolean).join(" · ");
+    return el("li", {},
+      el("span", {class: "mote-navn"}, `${m.organ} ${m.dag}`),
+      el("span", {class: `merke ${m.status}`}, MERKE[m.status] || m.status),
+      el("span", {class: "mote-tall"}, linje),
+      m.merknad && m.status !== "ferdig" ? el("span", {class: "mote-merknad"}, m.merknad) : null);
+  };
+  let ferdige = 0;
+  const vis = [], eldre = [];
+  for (const m of d.moter) (m.status !== "ferdig" || ferdige++ < 4 ? vis : eldre).push(m);
+  $("moter").replaceChildren(...vis.map(rad));
+  if (!d.moter.length) $("moter").replaceChildren(el("li", {}, el("span", {class: "mote-tall"}, "Ingen møter i perioden.")));
+  const eldreBoks = $("eldre");
+  eldreBoks.hidden = !eldre.length;
+  $("eldre-antall").textContent = antall(eldre.length, "eldre møte", "eldre møter");
+  $("eldre-liste").replaceChildren(...eldre.map(rad));
+
+  // Site, what's left, machine
+  const sd = d.side;
+  $("sidelenke").href = sd.url;
+  if (sd.besok) { $("besoklenke").href = sd.besok; $("besoklenke").hidden = false; }
+  fakta("side", [
+    ["Adresse", el("a", {href: sd.url}, sd.url.replace(/^https?:\/\//, "").replace(/\/$/, ""))],
+    ["Synlighet", sd.skjult ? "Ute, skjult for søkemotorer" : "Ute, synlig i søk"],
+    ["Sist publisert", tid(sd.publisert)],
+    ["Sist bygget", tid(sd.bygget)],
+    ["Saker på siden", tall(sd.saker)],
+    ["Kort", `${sd.kort} klare til publisering`],
+    ["Bakgrunnsartikler", String(sd.artikler)],
+    ["Rettelser", String(sd.rettelser)],
+    ["Daglig publisering", sd.auto_publiser ? "På (PUBLISER-filen finnes)" : "Av: den daglige kjøringen bygger bare", sd.auto_publiser ? "ok" : ""],
+    sd.stopp ? ["STOP", "Satt: ingenting publiseres", "nei"] : null,
+    sd.besok ? ["Besøkstall", el("a", {href: sd.besok}, "GoatCounter")] : null,
+  ]);
+  fakta("gjenstar", [
+    ["PDF-er å laste ned", g.pdf ? `${g.pdf}${g.pdf_pa_nytt ? ` (${g.pdf_pa_nytt} på nytt)` : ""}` : "Ingen"],
+    ["Saker uten kort", String(g.uten_kort)],
+    ["Agendaen sist hentet", tid(d.sist_hentet)],
+  ]);
+  const m = d.maskin;
+  fakta("maskin", [
+    ["Ledig disk", `${tall(m.disk_ledig_gb)} GB (${m.disk_brukt} % brukt)`, m.disk_ledig_gb < 2 ? "nei" : ""],
+    ["Claude (skribent)", m.claude ? "Funnet" : "Mangler", m.claude ? "ok" : "nei"],
+    ["Codex (faktasjekk)", m.codex ? "Funnet" : "Mangler", m.codex ? "ok" : "nei"],
+    s ? ["Siste kjøring", `${MODUSNAVN[s.modus] || s.modus}, ${tid(s.startet)}`] : null,
+  ]);
+}
+
+async function last() {
+  clearTimeout(timer);
+  try {
+    const r = await fetch("/status.json", {cache: "no-store"});
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    data = await r.json();
+    tegn();
+  } catch (e) {
+    $("oppdatert").textContent = "feilet (" + e.message + "), prøver igjen";
+  }
+  timer = setTimeout(last, data && data.kjoring.pagar ? 4000 : 60000);
+}
+
+async function start(modus) {
+  const melding = $("melding");
+  sender = true; tegn();
+  try {
+    const r = await fetch("/start", {method: "POST", headers: {"Content-Type": "application/json", "X-Tingposten": "admin"},
+      body: JSON.stringify({modus})});
+    const svar = await r.json().catch(() => ({}));
+    melding.textContent = r.ok ? (modus === "sjekk" ? "Sjekker agendaen …" : "Startet. Du kan lukke siden; kjøringen fortsetter.")
+                               : (svar.melding || `Feil (HTTP ${r.status})`);
+    melding.classList.toggle("feil", !r.ok);
+    melding.dataset.fast = "1";
+    setTimeout(() => { delete melding.dataset.fast; }, 8000);
+  } catch (e) {
+    melding.textContent = "Fikk ikke kontakt med Pi-en: " + e.message;
+    melding.classList.add("feil");
+  }
+  sender = false;
+  setTimeout(last, 1500);
+}
+
+$("kjor").addEventListener("click", () => {
+  if (!data || data.kjoring.pagar) return;
+  if (Date.now() < bekreftTil) { bekreftTil = 0; start("manuell"); return; }
+  bekreftTil = Date.now() + 6000;
+  tegn();
+  setTimeout(() => data && tegn(), 6100);
+});
+$("sjekk").addEventListener("click", () => start("sjekk"));
+document.addEventListener("visibilitychange", () => { if (!document.hidden) last(); });
+last();
+</script>
+</body>
+</html>

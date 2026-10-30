@@ -59,6 +59,13 @@ fi
 if grep -q '^ANTHROPIC_API_KEY=.' .env; then
   echo "warning: ANTHROPIC_API_KEY is set in .env; claude -p will bill the API, not the subscription" >&2
 fi
+# The admin panel's password (tingposten admin; any user name in the browser).
+if ! grep -q '^TINGPOSTEN_ADMIN_PASSORD=.' .env; then
+  pw="$(head -c 48 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 20)"
+  sed -i '/^TINGPOSTEN_ADMIN_PASSORD=/d' .env
+  printf '\n# Password for the admin panel (tingposten admin; any user name)\nTINGPOSTEN_ADMIN_PASSORD=%s\n' "$pw" >> .env
+  echo "added a random TINGPOSTEN_ADMIN_PASSORD to .env"
+fi
 mkdir -p data/logs
 chmod +x deploy/*.sh
 
@@ -154,4 +161,14 @@ cat <<EOF
      CRON_TZ=Europe/Oslo
      PATH=$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin
      0 6 * * * $INSTALL_DIR/deploy/run-daily.sh
+
+10. The control panel (status, when the next protokoll is due, and a button that
+    downloads the PDFs, writes the cards and publishes), started with the Pi:
+     sed 's|/home/<user>/tingposten|$INSTALL_DIR|g; s|/home/<user>|$HOME|g; s|<user>|$(id -un)|g' \\
+       $INSTALL_DIR/deploy/tingposten-admin.service | sudo tee /etc/systemd/system/tingposten-admin.service >/dev/null
+     sudo systemctl daemon-reload && sudo systemctl enable --now tingposten-admin
+    Open http://$(hostname).local:8787/ (or the Pi's IP address) on your phone or PC at home.
+    Any user name; the password is in .env:
+     grep ADMIN_PASSORD $INSTALL_DIR/.env
+    Keep port 8787 closed on the router: the panel is for the home network only.
 EOF

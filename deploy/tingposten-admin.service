@@ -1,0 +1,24 @@
+# Tingposten's control panel on the Pi: http://<the Pi>:8787/ on the home network.
+# Password: TINGPOSTEN_ADMIN_PASSORD in .env (setup-pi.sh makes one); any user name.
+#
+# Install (setup-pi.sh prints these lines with your user and paths filled in):
+#   sed 's|<user>|pi|g' deploy/tingposten-admin.service | sudo tee /etc/systemd/system/tingposten-admin.service
+#   sudo systemctl daemon-reload && sudo systemctl enable --now tingposten-admin
+# Logs: journalctl -u tingposten-admin; runs started from the panel log to data/logs/ like cron.
+[Unit]
+Description=Tingposten kontrollpanel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=<user>
+WorkingDirectory=/home/<user>/tingposten
+# The same PATH as the cron job: uv, claude and codex.
+Environment=PATH=/home/<user>/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/<user>/.local/bin/uv run --no-sync tingposten admin --vert 0.0.0.0 --port 8787
+Restart=on-failure
+# A run started from the panel keeps going if the panel restarts.
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target

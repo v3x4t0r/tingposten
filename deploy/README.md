@@ -43,6 +43,34 @@ Skriptet lages på nytt hver natt. Det henter én fil om gangen med 5 s pause og
 
 For å lage det med en gang: `uv run tingposten pdf-urler --mangler --script data/bergen/last-ned-mangler.sh`.
 
+## Kontrollpanel
+
+`tingposten admin` er et lite nettpanel på Pi-en, til bruk fra mobil eller PC hjemme: `http://<pi-navn>.local:8787/`. Det viser
+
+- **neste protokoll**: hvilke møter som venter på protokoll, og når den er ventet. Anslaget bygger på datoene i tidligere protokoller (bystyret: 1–5 dager etter møtet; byrådet: samme dag);
+- **møtene** de siste tre månedene og hvor hvert står (kommer, venter, klar til nedlasting, ferdig);
+- **siden**: sist publisert og bygget, antall saker, kort, artikler og rettelser, om daglig publisering er på og om STOP er satt, og en lenke til besøkstallene;
+- **maskinen**: ledig disk, om `claude` og `codex` finnes, og loggen fra siste kjøring.
+
+To knapper:
+
+- **Last ned og publiser** (trykk to ganger) kjører `deploy/run-daily.sh --manuell`: henter agendaen, laster ned PDF-ene som mangler med det samme skriptet du ellers kjører for hånd (én fil om gangen, identifiserbar), skriver og faktasjekker, bygger og publiserer. Knappen trenger ikke `PUBLISER`-filen, men STOP stopper fortsatt publiseringen.
+- **Sjekk nå** kjører `run-daily.sh --sjekk`: henter bare agendaen, så panelet viser om Bergen har lagt ut noe nytt.
+
+Ingenting hentes eller publiseres før du trykker, og den daglige kjøringen går som før. Det går bare én kjøring om gangen (samme lås som cron). En kjøring startet for hånd hopper over agendahentingen hvis den ble gjort for under 30 minutter siden, så kommunens server ikke får dobbelt så mange forespørsler.
+
+Panelet krever passord når det lytter på nettverket: `TINGPOSTEN_ADMIN_PASSORD` i `.env` (`setup-pi.sh` lager et tilfeldig). Brukernavnet kan være hva som helst. Det svarer bare på lokale navn og IP-adresser. Åpne ikke port 8787 i ruteren: panelet er laget for hjemmenettet, og passordet går ukryptert over HTTP.
+
+Installer det som en tjeneste som starter med Pi-en (`setup-pi.sh` skriver ut linjene med riktige stier):
+
+```sh
+sed 's|<user>|pi|g' deploy/tingposten-admin.service | sudo tee /etc/systemd/system/tingposten-admin.service
+sudo systemctl daemon-reload && sudo systemctl enable --now tingposten-admin
+journalctl -u tingposten-admin -f     # panelets egen logg
+```
+
+Lokalt, uten passord: `uv run tingposten admin` og åpne http://127.0.0.1:8787/.
+
 ## Første gangs oppsett
 
 ```sh
