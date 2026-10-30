@@ -121,6 +121,21 @@ def test_importance_word_allowed_in_attributed_reasoning_only():
     assert len(redaktor.edit(card, check)["slettet"]) == 1
 
 
+def test_word_caps_reject_instead_of_trimming():
+    long = " ".join(["ord"] * 31) + "."
+    card, check = make({**BASE, "hvorfor": [long]})
+    r = redaktor.edit(card, check)
+    assert r["avvist"] and r["koder"] == ["for_mange_ord"] and "hvorfor har en setning på 31 ord (maks 30)" in r["grunn"]
+    assert r["felt"]["hvorfor"] == long  # nothing trimmed
+    many = ["Kort setning her ja."] * 2 + [" ".join(["ord"] * 28) + "."]  # 3 sentences, 36 words > 35 for nar_og_hvor
+    r = redaktor.edit(*make({**BASE, "nar_og_hvor": many}))
+    assert "nar_og_hvor har 36 ord (maks 35)" in r["grunn"] and "nar_og_hvor har 3 setninger (maks 2)" in r["grunn"]
+    assert redaktor.omskrivbar(r)
+    ingress = ["Hallen bygges nå.", "Den koster 69 millioner kroner."]
+    r = redaktor.edit(*make({**BASE, "ingress": ingress}))
+    assert not r["avvist"] and r["felt"]["ingress"] == " ".join(ingress)
+
+
 def test_hard_limits_reject_instead_of_trimming():
     long = {**BASE, "hva_endres": ["En.", "To.", "Tre.", "Fire."]}
     card, check = make(long)
@@ -217,13 +232,68 @@ def test_run_writes_files_and_metrics(tmp_path):
     (tmp_path / "sjekk" / "571424" / "2026-09-23").mkdir(parents=True)
     (tmp_path / "sjekk" / "571424" / "2026-09-23" / "1-26.json").write_text(json.dumps(check))
     counts = redaktor.run([item, other], tmp_path)
-    assert counts == {"redigert": 1, "publiserbar": 1, "avvist": 0, "slettet": 1, "endret": 1}
+    assert counts == {"redigert": 1, "publiserbar": 1, "avvist": 0, "slettet": 1, "endret": 1, "venter": 0}
     out = json.loads((tmp_path / "redigert" / "571424" / "2026-09-23" / "1-26.json").read_text())
     assert out["felt"]["hvorfor"] == ""
     line = json.loads((tmp_path / "metrikk.jsonl").read_text().splitlines()[0])
     assert line["key"] == "571424/2026-09-23/1-26" and line["slettet"] == 1 and line["avvist"] is False
     assert line["type"] == "kort"
     assert not (tmp_path / "redigert" / "571424" / "2026-09-23" / "2-26.json").exists()
+
+
+def test_new_draft_without_fresh_check_keeps_the_published_card(tmp_path):
+    """A writer-only run (the checker out of quota, or a prompt-version bump
+    that rewrites every card) must not knock checked cards off the site."""
+    import os
+    item = {"id": "x", "utvalgId": "571424", "moteDato": "2026-09-23", "referansenr": "1/26"}
+    card, check = make(BASE)
+    paths = {step: tmp_path / step / "571424" / "2026-09-23" / "1-26.json" for step in ("kort", "sjekk", "redigert")}
+    for p_ in paths.values():
+        p_.parent.mkdir(parents=True, exist_ok=True)
+    paths["kort"].write_text(json.dumps(card))
+    paths["sjekk"].write_text(json.dumps(check))
+    assert redaktor.run([item], tmp_path)["publiserbar"] == 1
+    published = json.loads(paths["redigert"].read_text())
+    # the writer rewrites the card; the check is now older than the draft
+    new_card, _ = make({**BASE, "hva_endres": ["Helt ny tekst om planen.", "Og mer nytt."]})
+    paths["kort"].write_text(json.dumps(new_card))
+    os.utime(paths["sjekk"], (1_000, 1_000))
+    counts = redaktor.run([item], tmp_path)
+    assert counts["venter"] == 1 and counts["redigert"] == 0
+    assert json.loads(paths["redigert"].read_text()) == published  # untouched
+    # once the new check lands (fresh), the new text goes through as usual
+    _, new_check = make({**BASE, "hva_endres": ["Helt ny tekst om planen.", "Og mer nytt."]})
+    paths["sjekk"].write_text(json.dumps(new_check))
+    counts = redaktor.run([item], tmp_path)
+    assert counts["venter"] == 0 and counts["publiserbar"] == 1
+    assert json.loads(paths["redigert"].read_text())["felt"]["hva_endres"] == "Helt ny tekst om planen. Og mer nytt."
+    # without anything published, an unchecked draft is rejected as before (never published unchecked)
+    paths["redigert"].unlink()
+    os.utime(paths["sjekk"], (1_000, 1_000))
+    counts = redaktor.run([item], tmp_path)
+    assert counts["venter"] == 0 and counts["avvist"] == 1 and json.loads(paths["redigert"].read_text())["avvist"]
+    # and a rejected published edit is not worth keeping: the draft goes through
+    counts = redaktor.run([item], tmp_path)
+    assert counts["venter"] == 0 and counts["avvist"] == 1
+
+
+def test_new_article_draft_without_fresh_check_keeps_the_published_one(tmp_path):
+    import os
+    item = {"id": "x", "utvalgId": "571424", "moteDato": "2026-09-23", "referansenr": "1/26"}
+    art, check = article(ART)
+    paths = {step: tmp_path / step / "571424" / "2026-09-23" / "1-26.json" for step in ("artikler", "artikkelsjekk", "artikler-redigert")}
+    for p_ in paths.values():
+        p_.parent.mkdir(parents=True, exist_ok=True)
+    paths["artikler"].write_text(json.dumps(art))
+    paths["artikkelsjekk"].write_text(json.dumps(check))
+    assert redaktor.run_artikler([item], tmp_path)["publiserbar"] == 1
+    published = json.loads(paths["artikler-redigert"].read_text())
+    new_art, _ = article([[WORDS, "Ny setning."]])
+    paths["artikler"].write_text(json.dumps(new_art))
+    os.utime(paths["artikkelsjekk"], (1_000, 1_000))
+    counts = redaktor.run_artikler([item], tmp_path)
+    assert counts["venter"] == 1 and counts["redigert"] == 0
+    assert json.loads(paths["artikler-redigert"].read_text()) == published
 
 
 def test_run_rewrites_only_on_change(tmp_path):
@@ -276,9 +346,10 @@ WORDS = "Bystyret behandlet saken etter en lang debatt der flere partier la fram
 def article(paragraphs: list[list[str]], stottet: dict | None = None, gjentar: dict | None = None, **extra):
     """An article and a matching check; maps (paragraph 1-based, index) → flag."""
     stottet, gjentar = stottet or {}, gjentar or {}
-    art = {"nr": "1/26", "avsnitt": [{"tekst": " ".join(p), "kilder": [{"dok": "protokoll", "side": n}]}
+    roller = extra.pop("roller_tags", None) or [""] * len(paragraphs)
+    art = {"nr": "1/26", "avsnitt": [{"rolle": roller[n - 1], "tekst": " ".join(p), "kilder": [{"dok": "protokoll", "side": n}]}
                                     for n, p in enumerate(paragraphs, start=1)]}
-    check = {"nr": "1/26", "personvern": [], "blocked": "", "setninger": [
+    check = {"nr": "1/26", "personvern": [], "blocked": "", "roller": [], "setninger": [
         {"avsnitt": n, "setning": s, "stottet": stottet.get((n, i), True), "gjentar_kortet": gjentar.get((n, i), False),
          "kilde": None, "begrunnelse": "" if stottet.get((n, i), True) else "Feil tall."}
         for n, p in enumerate(paragraphs, start=1) for i, s in enumerate(p)]}
@@ -299,14 +370,25 @@ def test_clean_article_passes():
 
 def test_article_deletes_repetition_unsupported_and_forbidden():
     art, check = article([[WORDS, "Dette er et viktig vedtak.", "Høyre ville utsette saken."],
-                          ["Kortet sier det samme som her.", WORDS, WORDS]],
-                         stottet={(1, 2): False}, gjentar={(2, 0): True})
+                          [WORDS, "Kortet sier det samme som her.", WORDS]],
+                         stottet={(1, 2): False}, gjentar={(2, 1): True})
     r = redaktor.rediger_artikkel(art, check)
     reasons = {x["setning"]: x["grunn"] for x in r["slettet"]}
     assert reasons["Kortet sier det samme som her."] == "gjentar kortet"
     assert reasons["Høyre ville utsette saken."].startswith("ikke støttet av kilden")
     assert reasons["Dette er et viktig vedtak."].startswith("forbudsliste: viktighetsord")
     assert r["avsnitt"][0]["tekst"] == WORDS and not r["avvist"]
+
+
+def test_article_first_sentence_may_anchor_in_the_card():
+    # A repeating first sentence stays when the paragraph adds something; it goes when nothing is new.
+    art, check = article([["Kortet sier dette.", WORDS, WORDS], ["Kortet sier også dette.", "Og dette."]],
+                         gjentar={(1, 0): True, (2, 0): True, (2, 1): True})
+    r = redaktor.rediger_artikkel(art, check)
+    assert r["avsnitt"][0]["tekst"] == f"Kortet sier dette. {WORDS} {WORDS}" and len(r["avsnitt"]) == 1
+    assert {x["setning"] for x in r["slettet"]} == {"Kortet sier også dette.", "Og dette."}
+    assert all(x["grunn"] == "gjentar kortet" for x in r["slettet"])
+    assert r["nye_fakta"] == 2  # the anchor is not a new fact
 
 
 def test_article_empty_paragraph_is_dropped_with_its_sources():
@@ -316,12 +398,32 @@ def test_article_empty_paragraph_is_dropped_with_its_sources():
 
 
 def test_article_limits_reject_not_trim():
-    long = [[WORDS] * 4] * 4 + [[WORDS]]  # 17 sentences × 16 words = 272 words
+    long = [[WORDS] * 5] * 4 + [[WORDS] * 3]  # 23 sentences × 16 words = 368 words
     r = redaktor.rediger_artikkel(*article(long))
-    assert r["avvist"] and "artikkelen har 272 ord (maks 250)" in r["grunn"]
-    assert r["ord"] == 272  # nothing trimmed
+    assert r["avvist"] and "artikkelen har 368 ord (maks 350)" in r["grunn"]
+    assert r["ord"] == 368  # nothing trimmed
     six = [[WORDS]] * 6
     assert "artikkelen har 6 avsnitt (maks 5)" in redaktor.rediger_artikkel(*article(six))["grunn"]
+
+
+def test_article_roles_are_kept_checked_and_rejected_not_edited():
+    art, check = article(ART, roller_tags=["vedtak", "videre"])
+    r = redaktor.rediger_artikkel(art, check)
+    assert not r["avvist"] and [a["rolle"] for a in r["avsnitt"]] == ["vedtak", "videre"]
+    # order, repeats and unknown names
+    assert "avsnitt 2 (vedtak) står etter videre" in redaktor.rediger_artikkel(*article(ART, roller_tags=["videre", "vedtak"]))["grunn"]
+    r = redaktor.rediger_artikkel(*article(ART, roller_tags=["vedtak", "vedtak"]))
+    assert r["koder"] == ["rolle_feil"] and "rollen vedtak brukes 2 ganger" in r["grunn"]
+    assert "ukjent rolle «intro»" in redaktor.rediger_artikkel(*article(ART, roller_tags=["intro", "videre"]))["grunn"]
+    assert not redaktor.rediger_artikkel(*article(ART, roller_tags=["bakgrunn", "bakgrunn"]))["avvist"]
+    # the checker's judgement: a paragraph that doesn't fit its role is a rewrite, never a deletion
+    art, check = article(ART, roller_tags=["vedtak", "begrunnelse"])
+    check["roller"] = [{"avsnitt": 2, "passer": False, "begrunnelse": "Avsnittet gjengir stemmetall."}]
+    r = redaktor.rediger_artikkel(art, check)
+    assert r["avvist"] and r["koder"] == ["rolle_feil"] and "avsnitt 2 passer ikke rollen begrunnelse: Avsnittet gjengir stemmetall." in r["grunn"]
+    assert r["slettet"] == [] and redaktor.omskrivbar(r, redaktor.OMSKRIVBARE_ARTIKKEL)
+    # untagged paragraphs (older articles) pass
+    assert not redaktor.rediger_artikkel(*article(ART))["avvist"]
 
 
 def test_article_with_too_little_left_is_rejected():
@@ -341,9 +443,9 @@ def test_article_unchecked_blocked_or_personvern_rejects():
 
 def test_article_missing_gjentar_flag_counts_as_repetition():
     art, check = article(ART)
-    del check["setninger"][0]["gjentar_kortet"]
+    del check["setninger"][1]["gjentar_kortet"]
     r = redaktor.rediger_artikkel(art, check)
-    assert r["slettet"][0] == {"avsnitt": 1, "setning": WORDS, "grunn": "gjentar kortet"}
+    assert r["slettet"][0] == {"avsnitt": 1, "setning": "Høyre ville utsette saken.", "grunn": "gjentar kortet"}
 
 
 def test_article_output_is_always_a_deletion_of_the_input():
@@ -388,7 +490,7 @@ def test_run_artikler_ignores_a_check_older_than_the_article(tmp_path):
         paths[step].write_text(json.dumps(obj))
     os.utime(paths["artikkelsjekk"], (1_000, 1_000))
     assert redaktor.run_artikler([item], tmp_path) == {"redigert": 1, "publiserbar": 0, "avvist": 1, "slettet": 0, "endret": 1,
-                                                       "tittel": 0}
+                                                       "venter": 0}
     out = json.loads((tmp_path / "artikler-redigert" / "571424" / "2026-09-23" / "1-26.json").read_text())
     assert out["grunn"] == "ikke faktasjekket"
     os.utime(paths["artikkelsjekk"], None)  # fresh check now

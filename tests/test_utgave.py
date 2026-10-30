@@ -48,17 +48,37 @@ def kort(nr, i, lang=True):
             "slettet": [], "avvist": False}
 
 
-def artikkel(nr, i, tittel, sjekket=True):
-    art = {"nr": nr, "avsnitt": [{"tekst": tekst(i + k, 3), "kilder": [{"dok": "saksframlegg", "side": 5 + k}]}
-                                 for k in range(4)], "avvist": False, "tittel": tittel}
-    if sjekket:
-        art["tittel_kilder"] = [{"dok": "saksframlegg", "side": 5}]
-    return art
+ROLLER = (("vedtak", ""), ("avstemning", "Slik gikk avstemningen"), ("begrunnelse", "Derfor"), ("videre", "Veien videre"))
+# The article's own sentences: none of them on the card, as the pipeline's rule has it.
+ART_SETNINGER = (
+    "Saken ble første gang lagt fram i 2024, da byrådet ba om en ny vurdering av tomten.",
+    "Et alternativ med påbygg ble forkastet fordi grunnforholdene var usikre.",
+    "Statens vegvesen må godkjenne en ny avkjørsel før arbeidet kan starte.",
+    "Byrådet skal legge fram en revidert kostnadsramme før sommeren 2027.",
+)
+
+
+def artikkel(nr, i):
+    """An edited article in the site's shape: four paragraphs, each with a role
+    (bygg sets the fixed sidehead, mellomtittel, from the role)."""
+    return {"nr": nr, "avvist": False,
+            "avsnitt": [{"tekst": f"Artikkelen om sak {nr}, avsnitt {k + 1}. " + ART_SETNINGER[(i + k) % 4] + " "
+                                  + ART_SETNINGER[(i + k + 1) % 4],
+                         "kilder": [{"dok": "saksframlegg", "side": 5 + k}], "rolle": rolle}
+                        for k, (rolle, _) in enumerate(ROLLER)]}
+
+
+def med_roller(s):
+    """The loaded sak with its article's roles and sideheads as bygg provides them
+    (the data contract for the templates), whatever the loader did with them."""
+    for a, (rolle, mellom) in zip(s["artikkel"], ROLLER):
+        a["rolle"], a["mellomtittel"] = rolle, mellom
+    return s
 
 
 @pytest.fixture
 def data_dir(tmp_path):
-    """A meeting of 22 saker (four with a background article), an interpellasjon
+    """A meeting of 22 saker (five with an article), an interpellasjon
     that shares its number with a sak, a valg, a sak without a card, and a
     byrådet meeting with the same sak number as one in bystyret."""
     d = tmp_path / "data"
@@ -79,10 +99,8 @@ def data_dir(tmp_path):
                                                  "overskrift": "Nytt varamedlem i utvalget"}))
     art = d / "artikler-redigert" / BYSTYRET / DATO
     art.mkdir(parents=True)
-    for i in range(4):
-        (art / f"{200 + i}-26.json").write_text(json.dumps(artikkel(f"{200 + i}/26", i, f"Sjekket bakgrunnstittel {i}")))
-    # Checked by nobody: the redaktør didn't keep this headline (no tittel_kilder).
-    (art / "204-26.json").write_text(json.dumps(artikkel("204/26", 4, "UKONTROLLERT TITTEL", sjekket=False)))
+    for i in range(5):
+        (art / f"{200 + i}-26.json").write_text(json.dumps(artikkel(f"{200 + i}/26", i)))
     by_red = d / "redigert" / BYRADET / "2026-09-24"
     by_red.mkdir(parents=True)
     (by_red / "200-26.json").write_text(json.dumps(kort("200/26", 40)))
@@ -173,15 +191,113 @@ def test_only_publishable_saker_go_in_print(saker):
         utgave.velg(saker, f"{BYSTYRET}-2026-01-01")
 
 
-def test_unchecked_background_title_is_never_printed(saker):
+def ren(html):
+    """The text of a block, tags off, every space (the |typo filter's no-break spaces too) a plain one."""
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html))
+
+
+def nb(html):
+    """The html with the |typo filter's no-break spaces as plain ones, so a fixture's text is found."""
+    return html.replace("\u00a0", " ").replace("\u202f", " ")
+
+
+def test_story_with_article_is_set_body_first(saker):
+    """Head, ingress, the article as the running text with the dateline and the
+    fixed sideheads, then Kort fortalt as a box; no second headline anywhere."""
     maler = utgave.Maler(utgave.FORMATER["tabloid"])
-    m = {s["nr"]: s for s in mote(saker)}
-    for nr, tittel, vises in (("200/26", "Sjekket bakgrunnstittel 0", True), ("204/26", "UKONTROLLERT TITTEL", False)):
-        s = m[nr]
-        v = utgave.varianter(s, maler.fmt, 5)[0]
-        html = str(maler.full(s, v)) + str(maler.full(utgave.del_av(s, "bakgrunn"), v))
-        assert (tittel in html) is vises, nr
-        assert s["artikkel"] and "Bakgrunn" in html  # the article itself is checked and printed
+    s = med_roller(next(s for s in mote(saker) if s["nr"] == "200/26"))
+    for v in utgave.varianter(s, maler.fmt, 5):
+        html = nb(str(maler.full(s, v)))
+        tekst_ = ren(html)
+        forste, boks = s["artikkel"][0]["tekst"], 'class="boks-tittel">Kort fortalt'
+        assert html.index('class="tittel"') < html.index('class="ingress"') < html.index(forste) < html.index(boks)
+        assert html.count('<h2 class="tittel"') == 1 and "bakgrunn" not in html.lower()
+        assert html.count('class="sted"') == 1 and html.index('class="sted"') < html.index(forste)
+        # every paragraph once, in order; the box holds every field
+        pos = [tekst_.index(a["tekst"]) for a in s["artikkel"]]
+        assert pos == sorted(pos) and all(tekst_.count(a["tekst"]) == 1 for a in s["artikkel"])
+        for f in utgave.felt(s):
+            assert f["tekst"] in tekst_ and f["label"] in tekst_
+        # the box sits in the aside when the shape has one, else in the columns after the body
+        if v.side:
+            assert html.index('class="sidefelt"') < html.index(boks) and "kortboks kompakt" in html
+        else:
+            assert html.index('class="spalter"') < html.index(boks) < html.index('class="kildefot"')
+            assert "kompakt" not in html
+
+
+def test_sideheads_once_per_role_change_and_never_for_the_decision(saker):
+    maler = utgave.Maler(utgave.FORMATER["a4"])
+    s = med_roller(next(s for s in mote(saker) if s["nr"] == "201/26"))
+    # two paragraphs in a row with the same role: bygg gives the second no sidehead
+    s["artikkel"][2]["rolle"], s["artikkel"][2]["mellomtittel"] = "avstemning", ""
+    html = nb(str(maler.full(s, utgave.varianter(s, maler.fmt, 3)[0])))
+    mellom = re.findall(r'<p class="mellomtittel">(.*?)</p>', html)
+    assert mellom == ["Slik gikk avstemningen", "Veien videre"]
+    assert html.index(s["artikkel"][0]["tekst"]) < html.index("Slik gikk avstemningen") < html.index(s["artikkel"][1]["tekst"])
+    # an article from before the roles (no mellomtittel key) prints without sideheads
+    gammel = {**s, "artikkel": [{k: v for k, v in a.items() if k not in ("rolle", "mellomtittel")} for a in s["artikkel"]]}
+    assert "mellomtittel" not in str(maler.full(gammel, utgave.varianter(gammel, maler.fmt, 3)[0]))
+
+
+def test_story_without_article_renders_as_before(saker):
+    maler = utgave.Maler(utgave.FORMATER["tabloid"])
+    s = next(s for s in mote(saker) if s["nr"] == "206/26")
+    assert not s["artikkel"]
+    html = str(maler.full(s, utgave.varianter(s, maler.fmt, 5)[0]))
+    assert "kortboks" not in html and "mellomtittel" not in html
+    etiketter = re.findall(r'<p class="felt-etikett">(.*?)</p>', html)
+    assert etiketter == ["Hvem påvirkes", "Hvorfor", "Status", "Når og hvor"]  # "Hva endres" opens after the dateline
+    assert html.index('class="sted"') < html.index("Hvem påvirkes")
+    assert utgave.deler(s, 1) == [s]
+
+
+def test_parts_of_a_split_story_with_an_article(saker):
+    maler = utgave.Maler(utgave.FORMATER["tabloid"])
+    s = med_roller(next(s for s in mote(saker) if s["nr"] == "200/26"))
+    s["figurer"] = [{"type": "kart", "svg": '<svg viewBox="0 0 10 10"></svg>', "kilde": "Kart. Bydel fra sakens tittel.",
+                     "kilder": [{"dok": "saksframlegg", "side": 9, "href": "x#page=9"}]}]
+    deler = utgave.deler(s, 1)
+    assert [d["_del"] for d in deler] == ["artikkel", "kort"]
+    assert [d["_del"] for d in utgave.deler(s, 2)] == ["artikkel", "figurer", "kort"]
+    assert deler[0]["figurer"] == [] and deler[1]["figurer"] == s["figurer"]  # the figures go with Kort fortalt
+    assert utgave._nabo(deler[0], 1) == "kort" and utgave._nabo(deler[1], -1) == "artikkel"
+    a = str(maler.full(deler[0], utgave.varianter(deler[0], maler.fmt, 5)[0]))
+    k = str(maler.full(deler[1], utgave.varianter(deler[1], maler.fmt, 5)[0]))
+    # the first part: head, ingress and the whole article, no box; the second: Kort fortalt, no article
+    assert 'class="ingress"' in a and all(x["tekst"] in ren(a) for x in s["artikkel"]) and "kortboks" not in a
+    assert "Kort fortalt" in k and 'class="ingress"' not in k and not any(x["tekst"] in ren(k) for x in s["artikkel"])
+    assert all(f["tekst"] in ren(k) for f in utgave.felt(s)) and not any(f["tekst"] in ren(a) for f in utgave.felt(s))
+    assert a.count('<h2 class="tittel"') == 1 and '<h2 class="tittel"' not in k and s["overskrift"] in ren(k)
+    # sources: the ingress and the paragraphs with the first part; the fields and the figure with the second
+    assert utgave.kildelinje(deler[0], True) == "Saksframlegg s. 2, 5, 6, 7, 8"
+    assert utgave.kildelinje(deler[1], True) == "Saksframlegg s. 2, 3, 4, 5, 6, 9 · Protokoll s. 1"
+    assert utgave.kildelinje(s, True) == "Saksframlegg s. 2, 3, 4, 5, 6, 7, 8, 9 · Protokoll s. 1"
+
+
+def test_lead_jump_counts_paragraphs_for_a_story_with_an_article(saker):
+    maler = utgave.Maler(utgave.FORMATER["tabloid"])
+    s = med_roller(next(s for s in mote(saker) if s["nr"] == "200/26"))
+    assert utgave.enheter(s) == s["artikkel"] and utgave.maks_hopp(s) == 4  # Kort fortalt always continues inside
+    front = str(maler.lead_kropp(s, 3, 200.0, 2, 4))
+    assert "Fortsettes på side 3" in front and 'class="sted"' in front
+    assert [a["tekst"] in ren(front) for a in s["artikkel"]] == [True, True, False, False]
+    assert re.findall(r'<p class="mellomtittel">(.*?)</p>', front) == ["Slik gikk avstemningen"]
+    resten = {**s, "_fra": 2}
+    inne = str(maler.full(resten, utgave.varianter(resten, maler.fmt, 5)[0]))
+    assert "Fra side 1" in inne and 'class="ingress"' not in inne and 'class="sted"' not in inne
+    assert [a["tekst"] in ren(inne) for a in s["artikkel"]] == [False, False, True, True]
+    assert re.findall(r'<p class="mellomtittel">(.*?)</p>', inne) == ["Derfor", "Veien videre"]
+    assert "Kort fortalt" in inne and 'class="kildefot"' in inne
+    # the inside part lists the pages of the whole text, the front page having no sources
+    assert utgave.kildelinje(resten, True) == utgave.kildelinje(s, True)
+    # a pointer only, when no text fits on the front
+    assert "Hele saken, med Kort fortalt og kilder, side 3" in ren(str(maler.lead_kropp(s, 3, 200.0, 0, 4)))
+    # without an article the jump still counts fields
+    u = next(s for s in mote(saker) if s["nr"] == "206/26")
+    assert utgave.enheter(u) == utgave.felt(u) and utgave.maks_hopp(u) == len(utgave.felt(u)) - 1
+    assert "Hvem påvirkes" not in str(maler.lead_kropp(u, 3, 200.0, 1, 4))
+    assert "Hvem påvirkes" in str(maler.full({**u, "_fra": 1}, utgave.varianter(u, maler.fmt, 5)[0]))
 
 
 def test_every_story_ends_with_sources_address_and_qr(saker):
@@ -324,7 +440,7 @@ def test_whole_edition(tmp_path, saker, fmt, fontmappe, monkeypatch):
         assert adresse in kort and adresse != venter["kort"]
         assert 'class="kildefot"' in innhold and 'class="qr"' in innhold, adresse
         assert bygg.kort_id(kort[adresse]) in innhold
-        assert "UKONTROLLERT" not in innhold
+        assert "bakgrunn" not in innhold.lower() and innhold.count('<h2 class="tittel"') <= 1
     trykt = {a for a, _, _ in historier}
     assert venter["nr_etikett"] not in info["hele"] + info["korte"] and info["venter"] == [venter["nr_etikett"]]
     # Every other sak with a summary is in print, as a full or a short story; the valg and the sak without a card in the listing
@@ -340,10 +456,10 @@ def test_whole_edition(tmp_path, saker, fmt, fontmappe, monkeypatch):
     if "Fortsettes på side" in html:
         assert "Fra side 1" in html
         forside = html[:html.index('data-side="2"')]
-        for f in utgave.felt(innhold_lead(saker)):
-            start = f["tekst"].split(". ")[0]
+        for e in utgave.enheter(innhold_lead(saker)):
+            start = e["tekst"].split(". ")[0]
             if start in forside:
-                assert html.count(start) == 1, f["label"]
+                assert html.count(start) == 1, start
     # A screen copy on a newsprint tone; the print file stays white.
     import pymupdf
 

@@ -4,7 +4,7 @@
 
 ## Hva Tingposten er
 
-Tingposten er en gratis og ikke-kommersiell nettside som viser hva Bergen kommune vedtar. Hver sak får et kort i samme format: hva endres, hvem påvirkes, hvorfor, status og når og hvor. Hvert kort har lenke til kommunens egne dokumenter. Koden er åpen og ligger på GitHub.
+Tingposten er en gratis og ikke-kommersiell nettside som viser hva Bergen kommune vedtar. Hver sak får et kort i samme format: en overskrift, en ingress og fem faste punkter: hva endres, hvem påvirkes, hvorfor, status og når og hvor. Hvert kort har lenke til kommunens egne dokumenter. Koden er åpen og ligger på GitHub.
 
 ## Hva som dekkes
 
@@ -14,7 +14,7 @@ Sammendrag skrives for saker fra de siste tre månedene. Eldre saker vises med k
 
 ## Slik lages kortene
 
-Kortene skrives av KI-modeller ut fra kommunens egne dokumenter, saksframlegget og protokollen fra møtet. De viktigste sakene får i tillegg en kort bakgrunnsartikkel. Deretter går teksten gjennom to kontroller:
+Kortene skrives av KI-modeller ut fra kommunens egne dokumenter, saksframlegget og protokollen fra møtet. De viktigste sakene får i tillegg en kort artikkel, der avsnittene står i fast rekkefølge: vedtaket, avstemningen, begrunnelsen, bakgrunnen og veien videre. Deretter går teksten gjennom to kontroller:
 
 - En faktasjekk gjort av en annen KI-modell, som bare ser kildedokumentene og den ferdige teksten. Setninger og titler som ikke er dekket av kildene, slettes.
 - Et redigeringssteg som håndhever lengdegrenser og språkregler. Dette steget kan bare slette tekst, aldri legge til eller skrive om.

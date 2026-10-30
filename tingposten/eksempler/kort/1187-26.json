@@ -1,0 +1,63 @@
+{
+ "nr": "1187/26",
+ "overskrift": "Åtte steder valgt som informasjonspunkt ved kriser",
+ "ingress": "Ved uønskede hendelser skal innbyggerne kunne få informasjon på ett fast sted i hver bydel, fra Grieghallen i sentrum til Fana kulturhus. Fire av de åtte stedene eies av private.",
+ "hva_endres": "Kommunen oppretter informasjonspunkter i Grieghallen, Oasen senter, Thon senter Vestkanten, Øyrane Torg, Bergenshallen, Sandslihallen, Åsane kulturhus og Fana kulturhus. Hvert punkt gjelder først når en samarbeidsavtale er signert. Byrådslederen kan flytte et punkt hvis en avtale ikke blir inngått eller sies opp, eller hvis bygget ikke lenger passer.",
+ "hvem_pavirkes": "Ett informasjonspunkt i hver bydel, for dem som bor eller oppholder seg der. Med de fire private eierne inngås egne avtaler om bruk av lokalene, øvelser og lagring av beredskapsutstyr.",
+ "hvorfor": "Byrådslederen mener stedene til sammen dekker byen godt geografisk og kan dekke behovet for informasjon også ved langvarige hendelser. Byggene har plass til mange mennesker, god kollektivdekning og adkomst, og kommunen kan ta dem i bruk innen sju timer etter varsel.",
+ "status": "Vedtatt av byrådet som foreslått.",
+ "nar_og_hvor": "",
+ "kilder": [
+  {
+   "felt": "ingress",
+   "dok": "saksframlegg",
+   "side": 1
+  },
+  {
+   "felt": "ingress",
+   "dok": "saksframlegg",
+   "side": 2
+  },
+  {
+   "felt": "hva_endres",
+   "dok": "protokoll",
+   "side": 1
+  },
+  {
+   "felt": "hva_endres",
+   "dok": "saksframlegg",
+   "side": 2
+  },
+  {
+   "felt": "hvem_pavirkes",
+   "dok": "saksframlegg",
+   "side": 1
+  },
+  {
+   "felt": "hvem_pavirkes",
+   "dok": "saksframlegg",
+   "side": 2
+  },
+  {
+   "felt": "hvorfor",
+   "dok": "saksframlegg",
+   "side": 1
+  },
+  {
+   "felt": "hvorfor",
+   "dok": "saksframlegg",
+   "side": 2
+  },
+  {
+   "felt": "hvorfor",
+   "dok": "saksframlegg",
+   "side": 3
+  },
+  {
+   "felt": "status",
+   "dok": "protokoll",
+   "side": 1
+  }
+ ],
+ "merknad": "Merkostnader skal dekkes innenfor dagens budsjett; utelatt fra «Når og hvor» fordi det verken er tid eller sted."
+}

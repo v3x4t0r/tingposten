@@ -5,20 +5,22 @@ the ones the checker found unsupported and the ones on the forbudsliste.
 It cannot add or rewrite, so it cannot inflate the text — that is the point.
 Hard limits are not trimmed: a card over a limit is rejected (avvist) and
 goes back to the writer. Anything not fully fact-checked, or with a privacy
-finding, is rejected too, because publishing is automatic.
+finding, is rejected too, because publishing is automatic. One exception
+protects the site: a NEW draft whose check hasn't run yet never replaces a
+published edit (_venter_pa_sjekk); the checked text stays until the new
+check arrives.
 
-Articles get the same treatment (rediger_artikkel): sentences that are
-unsupported, that only repeat the card (plan rule 1), or that hit the
-forbudsliste are deleted; an article over the limits, or with too little left,
-is rejected.
-
-An article's own headline (artikkeltittel.py writes and checks it) is kept
-or dropped whole (rediger_tittel): dropping it publishes the article without
-a headline, never a reworded one.
+Articles (the story's body) get the same treatment (rediger_artikkel):
+sentences that are unsupported or that hit the forbudsliste are deleted, and
+so are sentences that only repeat the card — except a paragraph's FIRST
+sentence, which may anchor the paragraph in the card ("SV, som ville sende
+saken tilbake, …"). A paragraph with nothing new in it goes whole. An article
+over the limits, with too little left, or with a paragraph whose content
+doesn't fit its role tag (the checker's "roller"), is rejected.
 """
 
-import hashlib
 import json
+import logging
 import os
 import re
 from datetime import datetime, timezone
@@ -26,20 +28,25 @@ from pathlib import Path
 
 from . import config, pdf
 
-FIELDS = ("hva_endres", "hvem_pavirkes", "hvorfor", "status", "nar_og_hvor")
-MAX_SENTENCES = {"hva_endres": 3, "hvem_pavirkes": 3, "hvorfor": 3, "status": 2, "nar_og_hvor": 2}
+log = logging.getLogger(__name__)
+
+FIELDS = ("ingress", "hva_endres", "hvem_pavirkes", "hvorfor", "status", "nar_og_hvor")
+MAX_SENTENCES = {"ingress": 2, "hva_endres": 3, "hvem_pavirkes": 2, "hvorfor": 3, "status": 2, "nar_og_hvor": 2}
+MAX_WORDS = {"ingress": 35, "hva_endres": 60, "hvem_pavirkes": 45, "hvorfor": 55, "status": 40, "nar_og_hvor": 35}
+MAX_SENTENCE_WORDS = 30   # in a card field
 MAX_HEADLINE = 65
-MAX_ARTICLE_WORDS = 250
+# The body: paragraphs tagged with a role, in this order ("bakgrunn" may take two).
+ROLLER = ("vedtak", "avstemning", "begrunnelse", "bakgrunn", "videre")
+MAX_ARTICLE_WORDS = 350
 MAX_PARAGRAPHS = 5
 MIN_ARTICLE_WORDS = 40
-MAX_TITTEL = 90  # the article's own headline: clarity first (the writer aims under 75)
 
 # Rejection codes ("koder" in the output). Only these may be fixed by the
 # writer automatically; personvern always waits for a human, and checker
 # problems (missing, blocked, bad split) are not the writer's to fix.
 OMSKRIVBARE = {"overskrift_lang", "overskrift_ustottet", "overskrift_forbudsliste",
-               "for_mange_setninger", "tom_hva_endres"}
-OMSKRIVBARE_ARTIKKEL = {"for_lang", "for_lite_nytt"}
+               "for_mange_setninger", "for_mange_ord", "tom_hva_endres"}
+OMSKRIVBARE_ARTIKKEL = {"for_lang", "for_lite_nytt", "rolle_feil"}
 
 # Forbudsliste (plan: "Redaksjonelle regler mot oppblåst tekst", rule 4).
 # A sentence matching any of these is deleted, never reworded.
@@ -191,6 +198,7 @@ def edit(card: dict, check: dict | None) -> dict:
     for f in FIELDS:
         text = card.get(f) or ""
         seg = _segment(text, [s.get("setning", "") for s in by_field.get(f, [])]) if checked else None
+        _word_limits(f, text, seg, reasons)
         if seg is None:
             if checked:
                 reasons.add("dekning", f"faktasjekken dekker ikke {f}")
@@ -236,6 +244,18 @@ def edit(card: dict, check: dict | None) -> dict:
     return result
 
 
+def _word_limits(f: str, text: str, seg: list[str] | None, reasons: "_Reasons") -> None:
+    """The field's word cap and the per-sentence cap, as rejections (never trimmed).
+    Sentences are the checker's split when there is one, else a rough one."""
+    if (n := len(text.split())) > MAX_WORDS[f]:
+        reasons.add("for_mange_ord", f"{f} har {n} ord (maks {MAX_WORDS[f]})")
+    sentences = seg if seg is not None else [s for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s]
+    for s in sentences:
+        if (n := len(s.split())) > MAX_SENTENCE_WORDS:
+            reasons.add("for_mange_ord", f"{f} har en setning på {n} ord (maks {MAX_SENTENCE_WORDS})")
+            break
+
+
 def _assert_deletion_only(card: dict, result: dict, segments: dict[str, list[str]]) -> None:
     """Every output field is its input field with whole sentences removed."""
     if result["overskrift"] != (card.get("overskrift") or ""):
@@ -272,19 +292,25 @@ def run(items: list[dict], data_dir: Path = config.DATA_DIR) -> dict:
     article steps whether the published card is newer than their output; the
     metrics log gets one line per change, not one per run."""
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    counts = {"redigert": 0, "publiserbar": 0, "avvist": 0, "slettet": 0, "endret": 0}
+    counts = {"redigert": 0, "publiserbar": 0, "avvist": 0, "slettet": 0, "endret": 0, "venter": 0}
     metrics = []
     for item in items:
         key = pdf.key(item)
         card_path = data_dir / "kort" / f"{key}.json"
         if not card_path.exists():
             continue
-        check = _read(data_dir / "sjekk" / f"{key}.json")
-        result = edit(json.loads(card_path.read_text()), check)
+        check_path = data_dir / "sjekk" / f"{key}.json"
+        out_path = data_dir / "redigert" / f"{key}.json"
+        if _venter_pa_sjekk(card_path, check_path, out_path):
+            counts["venter"] += 1
+            continue
+        # A check older than the draft was made for another text: unchecked.
+        fresh = check_path.exists() and check_path.stat().st_mtime >= card_path.stat().st_mtime
+        result = edit(json.loads(card_path.read_text()), _read(check_path) if fresh else None)
         counts["redigert"] += 1
         counts["avvist" if result["avvist"] else "publiserbar"] += 1
         counts["slettet"] += len(result["slettet"])
-        if _write_if_changed(data_dir / "redigert" / f"{key}.json", result):
+        if _write_if_changed(out_path, result):
             counts["endret"] += 1
             metrics.append({
                 "tid": now, "type": "kort", "key": key, "ord": result["ord"], "setninger": result["setninger"],
@@ -292,6 +318,23 @@ def run(items: list[dict], data_dir: Path = config.DATA_DIR) -> dict:
             })
     _log_metrics(data_dir, metrics)
     return counts
+
+
+def _venter_pa_sjekk(draft: Path, check: Path, published: Path) -> bool:
+    """A new draft whose fact-check hasn't caught up yet (the check is missing
+    or older than the draft) must not replace a published, publishable edit:
+    the reader keeps the checked text until the new check arrives. Without a
+    published edit the draft goes through edit() and is rejected as unchecked,
+    as before. This is what makes a writer-only run (say, when the checker's
+    quota is spent) harmless: nothing already on the site disappears."""
+    fresh = check.exists() and check.stat().st_mtime >= draft.stat().st_mtime
+    if fresh:
+        return False
+    before = _read(published)
+    if before is None or before.get("avvist"):
+        return False
+    log.warning("%s: nytt utkast uten fersk faktasjekk; det publiserte beholdes til sjekken er kjørt", published.stem)
+    return True
 
 
 # --- articles -------------------------------------------------------------------
@@ -313,6 +356,8 @@ def rediger_artikkel(article: dict, check: dict | None) -> dict:
     for s in (check or {}).get("setninger", []):
         if isinstance(s.get("avsnitt"), int):
             by_par.setdefault(s["avsnitt"], []).append(s)
+    roller = [a.get("rolle") or "" for a in article.get("avsnitt", [])]
+    _role_limits(roller, (check or {}).get("roller") or [], reasons)
 
     kept_pars, segments, sentences_before, new_facts = [], {}, 0, 0
     for n, text in enumerate(paragraphs, start=1):
@@ -325,24 +370,34 @@ def rediger_artikkel(article: dict, check: dict | None) -> dict:
             kept_pars.append((n, text))
             continue
         sentences_before += len(seg)
-        kept = []
-        for s, original in zip(checks, seg):
+        kept, anchor, par_new = [], [], 0
+        for i, (s, original) in enumerate(zip(checks, seg)):
+            repeats = s.get("gjentar_kortet") is not False
             if s.get("stottet") is not True:
                 why = "ikke støttet av kilden" + (f": {s['begrunnelse'].strip()}" if (s.get("begrunnelse") or "").strip() else "")
-            elif s.get("gjentar_kortet") is not False:
+            elif repeats and i > 0:
                 why = "gjentar kortet"
             elif hit := banned(original, "artikkel"):
                 why = f"forbudsliste: {hit}"
             else:
                 kept.append(original)
-                new_facts += 1
+                if repeats:
+                    anchor.append(original)  # the paragraph's first sentence may anchor in the card
+                else:
+                    par_new += 1
                 continue
             slettet.append({"avsnitt": n, "setning": original, "grunn": why})
+        if kept and not par_new:
+            # Nothing new in the paragraph: an anchor alone is a repetition.
+            slettet += [{"avsnitt": n, "setning": s, "grunn": "gjentar kortet"} for s in anchor]
+            kept = []
+        new_facts += par_new
         segments[n] = seg
         if kept:
             kept_pars.append((n, " ".join(kept)))
 
-    avsnitt = [{"tekst": t, "kilder": article["avsnitt"][n - 1].get("kilder", [])} for n, t in kept_pars]
+    avsnitt = [{"tekst": t, "kilder": article["avsnitt"][n - 1].get("kilder", []),
+                "rolle": roller[n - 1] if roller[n - 1] in ROLLER else ""} for n, t in kept_pars]
     words = sum(len(a["tekst"].split()) for a in avsnitt)
     if words < MIN_ARTICLE_WORDS:
         reasons.add("for_lite_nytt", f"for lite nytt: {words} ord igjen (minst {MIN_ARTICLE_WORDS})")
@@ -363,6 +418,31 @@ def rediger_artikkel(article: dict, check: dict | None) -> dict:
     return result
 
 
+def _role_limits(roller: list[str], checked: list[dict], reasons: "_Reasons") -> None:
+    """The body's role tags: known names in the fixed order, each once ("bakgrunn"
+    twice), and, when the checker judged them, fitting their paragraph. A
+    paragraph without a tag (older articles) passes. Rejections, never edits."""
+    pos, seen = -1, {}
+    for n, r in enumerate(roller, start=1):
+        if not r:
+            continue
+        if r not in ROLLER:
+            reasons.add("rolle_feil", f"avsnitt {n} har ukjent rolle «{r}»")
+            continue
+        i = ROLLER.index(r)
+        if i < pos:
+            reasons.add("rolle_feil", f"avsnitt {n} ({r}) står etter {ROLLER[pos]}; rekkefølgen er {', '.join(ROLLER)}")
+        pos = max(pos, i)
+        seen[r] = seen.get(r, 0) + 1
+        if seen[r] > (2 if r == "bakgrunn" else 1):
+            reasons.add("rolle_feil", f"rollen {r} brukes {seen[r]} ganger")
+    for c in checked:
+        n = c.get("avsnitt")
+        if isinstance(n, int) and 1 <= n <= len(roller) and roller[n - 1] and c.get("passer") is False:
+            why = (c.get("begrunnelse") or "").strip()
+            reasons.add("rolle_feil", f"avsnitt {n} passer ikke rollen {roller[n - 1]}" + (f": {why}" if why else ""))
+
+
 def _assert_article_deletion_only(paragraphs: list[str], kept: list[tuple[int, str]],
                                   segments: dict[int, list[str]]) -> None:
     """Kept paragraphs come from the input, in order, each with whole sentences removed."""
@@ -375,104 +455,10 @@ def _assert_article_deletion_only(paragraphs: list[str], kept: list[tuple[int, s
             raise AssertionError(f"avsnitt {n}: redaktøren la til eller endret tekst")
 
 
-# --- the article's headline -------------------------------------------------------
-
-ORGAN_FORST = re.compile(r"\s*(?:bystyret|byrådet)\b", re.IGNORECASE)
-MERKELAPP = re.compile(r"\s*(?:bakgrunn(?:en)?|mer om|om saken|saken forklart)\b", re.IGNORECASE)
-
-
-def tittel_grunnlag(kort_overskrift: str, avsnitt: list[dict]) -> str:
-    """Fingerprint of the text a headline is written for: the card's headline
-    (which it must not repeat) and the edited article's paragraphs."""
-    text = json.dumps([kort_overskrift or "", [a.get("tekst") or "" for a in avsnitt]], ensure_ascii=False)
-    return hashlib.sha256(text.encode()).hexdigest()[:16]
-
-
-def samme_overskrift(a: str, b: str) -> bool:
-    """The same words, ignoring case, punctuation and spacing."""
-    norm = lambda s: " ".join(re.sub(r"[^\w\s]", " ", s or "").casefold().split())
-    return bool(norm(a)) and norm(a) == norm(b)
-
-
-def tittel_brudd(tittel: str, kort_overskrift: str = "") -> list[str]:
-    """The hard rules a headline must keep to be published, as reasons."""
-    out = []
-    if len(tittel) > MAX_TITTEL:
-        out.append(f"over {MAX_TITTEL} tegn ({len(tittel)})")
-    if "\n" in tittel:
-        out.append("mer enn én linje")
-    if ORGAN_FORST.match(tittel):
-        out.append("begynner med organet")
-    if MERKELAPP.match(tittel):
-        out.append("en merkelapp, ikke hva bakgrunnen handler om")
-    if hit := banned(tittel, "overskrift"):
-        out.append(f"forbudsliste: {hit}")
-    elif re.search(r"[.!:;,]\s*$", tittel):
-        out.append("slutter med tegnsetting")
-    if samme_overskrift(tittel, kort_overskrift):
-        out.append("gjentar kortets overskrift")
-    return out
-
-
-def rediger_tittel(record: dict | None, avsnitt: list[dict], kort_overskrift: str) -> dict:
-    """The article's headline, if it may be published: written for exactly this
-    text (the edited paragraphs and card headline, see tittel_grunnlag), within
-    the hard limits, and checked by the fact-checker as supported, neutral and
-    new next to the card's headline, with support on pages the article cites.
-    Otherwise "" — the article is published without one — and the reason.
-    Never reworded: the headline is the checked string or nothing."""
-    def none(why: str) -> dict:
-        return {"tittel": "", "tittel_kilder": [], "tittel_grunn": why}
-
-    if not avsnitt:
-        return none("")  # no article, no headline
-    if record is None:
-        return none("ingen tittel ennå")
-    if record.get("grunnlag") != tittel_grunnlag(kort_overskrift, avsnitt):
-        return none("tittelen ble laget for en annen tekst")
-    tittel = record.get("tittel") or ""
-    if not tittel.strip():
-        return none("ingen tittel" + (f": {record['blocked'].strip()}" if (record.get("blocked") or "").strip() else ""))
-    reasons = tittel_brudd(tittel, kort_overskrift)
-    check = record.get("sjekk")
-    if not check or check.get("tittel") != tittel:
-        reasons.append("ikke faktasjekket")
-        check = None
-    else:
-        why = (check.get("begrunnelse") or "").strip()
-        if (check.get("blocked") or "").strip():
-            reasons.append(f"ikke faktasjekket: {check['blocked'].strip()}")
-        if check.get("personvern"):
-            reasons.append("personvern: " + "; ".join(check["personvern"]))
-        if check.get("stottet") is not True:
-            reasons.append("ikke støttet" + (f": {why}" if why else ""))
-        if check.get("noytral") is not True:
-            reasons.append("ikke nøytral" + (f": {why}" if why else ""))
-        if check.get("gjentar_kortet") is not False:
-            reasons.append("gjentar kortets overskrift")
-    cited = {(k.get("dok"), k.get("side")) for a in avsnitt for k in a.get("kilder") or []}
-    kilder = []
-    for k in (check or {}).get("kilder") or []:
-        ref = {"dok": k.get("dok"), "side": k.get("side")}
-        if (ref["dok"], ref["side"]) in cited and ref not in kilder:
-            kilder.append(ref)
-    if check and not kilder:
-        reasons.append("støtten ligger ikke på sidene artikkelen bygger på")
-    if reasons:
-        return none("; ".join(dict.fromkeys(reasons)))
-    return {"tittel": tittel, "tittel_kilder": kilder, "tittel_grunn": ""}
-
-
-def _uten_tittel(result: dict | None) -> dict | None:
-    return None if result is None else {k: v for k, v in result.items() if not k.startswith("tittel")}
-
-
 def run_artikler(items: list[dict], data_dir: Path = config.DATA_DIR) -> dict:
-    """Edit every item that has an article; write artikler-redigert/<key>.json,
-    with the article's headline when artikkeltittel/<key>.json holds one that
-    passes rediger_tittel."""
+    """Edit every item that has an article; write artikler-redigert/<key>.json."""
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    counts = {"redigert": 0, "publiserbar": 0, "avvist": 0, "slettet": 0, "endret": 0, "tittel": 0}
+    counts = {"redigert": 0, "publiserbar": 0, "avvist": 0, "slettet": 0, "endret": 0, "venter": 0}
     metrics = []
     for item in items:
         key = pdf.key(item)
@@ -480,26 +466,18 @@ def run_artikler(items: list[dict], data_dir: Path = config.DATA_DIR) -> dict:
         if not art_path.exists():
             continue
         check_path = data_dir / "artikkelsjekk" / f"{key}.json"
+        out_path = data_dir / "artikler-redigert" / f"{key}.json"
+        if _venter_pa_sjekk(art_path, check_path, out_path):
+            counts["venter"] += 1
+            continue
         # A check older than the article was made for another text.
         fresh = check_path.exists() and check_path.stat().st_mtime >= art_path.stat().st_mtime
         result = rediger_artikkel(json.loads(art_path.read_text()), _read(check_path) if fresh else None)
-        title_record = _read(data_dir / "artikkeltittel" / f"{key}.json")
-        card_headline = (_read(data_dir / "redigert" / f"{key}.json") or {}).get("overskrift") or ""
-        result.update(rediger_tittel(title_record, [] if result["avvist"] else result["avsnitt"], card_headline))
         counts["redigert"] += 1
         counts["avvist" if result["avvist"] else "publiserbar"] += 1
         counts["slettet"] += len(result["slettet"])
-        counts["tittel"] += bool(result["tittel"])
-        out_path = data_dir / "artikler-redigert" / f"{key}.json"
-        before = _read(out_path)
         if _write_if_changed(out_path, result):
             counts["endret"] += 1
-            if title_record is not None and ((before or {}).get("tittel"), (before or {}).get("tittel_grunn")) != (
-                    result["tittel"], result["tittel_grunn"]):
-                metrics.append({"tid": now, "type": "artikkeltittel", "key": key, "tittel": result["tittel"],
-                                "tegn": len(result["tittel"]), "grunn": result["tittel_grunn"]})
-            if _uten_tittel(before) == _uten_tittel(result):
-                continue  # only the headline changed; the article's own metrics are unchanged
             metrics.append({
                 "tid": now, "type": "artikkel", "key": key, "ord_for": result["ord_for"], "ord": result["ord"],
                 "setninger_for": result["setninger_for"], "nye_fakta": result["nye_fakta"],

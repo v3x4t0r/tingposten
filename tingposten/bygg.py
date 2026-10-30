@@ -11,10 +11,12 @@ own PDFs.
 Laid out like a newspaper: front pages with a lead story, a row of four,
 a two-column list (15 stories in all) and a tile per topic (tema) with saker
 left over; one page per meeting in agenda order and one page per sak with
-the full card and, for the top saker, a background article.
+the full card and, for the top saker, the story's body (role-tagged
+paragraphs under fixed sideheads, see ROLLE_TITTEL) with Kort fortalt beside it.
 Every sentence shown is from the edited card or the edited article, or
 from a correction (rettelser/, see rettelser.py) the editor made and the
-page notes with its date; the dek is the card's first sentence. The small
+page notes with its date; the dek is the card's written ingress, or on older
+cards the first sentence of "Hva endres". The small
 facts under a story (where, the vote, the amount) are mechanical values read
 off the documents, chosen by one fixed rule in fakta().
 """
@@ -390,7 +392,12 @@ def _sak(item: dict, ranked: dict, data_dir: Path, parsers: "_Parsers | None" = 
     anchor = f"sak-{pdf.tag(item)}"
     status = ranked.get("status") or {}
     kort_felt = _fields(item, card) if usable else []
-    dek, dek_kilder, felt = _dek(kort_felt, _setninger(item, data_dir, "hva_endres") if kort_felt else [])
+    ingress = _ingress(item, card) if usable else None
+    if ingress:
+        # A written ingress (skribent-3 cards): the dek is its own text and the fields stay whole.
+        dek, dek_kilder, felt = ingress["tekst"], ingress["kilder"], kort_felt
+    else:
+        dek, dek_kilder, felt = _dek(kort_felt, _setninger(item, data_dir, "hva_endres") if kort_felt else [])
     side = f"bergen/sak/{pdf.key(item)}/"
     tema = _tema(item, data_dir)
     sak = {
@@ -409,12 +416,14 @@ def _sak(item: dict, ranked: dict, data_dir: Path, parsers: "_Parsers | None" = 
         "status_kode": status.get("kode", ""),
         "status_tekst": status.get("tekst", ""),
         "status_klasse": _status_class(status),
-        # Lists: "Hva endres" without its first sentence, which is the dek.
+        # Lists: the five fields; without a written ingress, "Hva endres" lacks its first sentence (the dek).
         "felt": felt,
-        # The sak page: every field in full; the dek is "Hva endres"'s first sentence, as an ingress.
+        # The sak page: every field in full. The dek is the card's ingress, or (older cards)
+        # "Hva endres"'s first sentence.
         "kort_felt": kort_felt,
         "dek": dek,
         "dek_kilder": dek_kilder,
+        "har_ingress": bool(ingress),
         "har_sammendrag": bool(dek or felt),
         "tema": tema,
         "tema_navn": TEMA[tema],
@@ -432,7 +441,6 @@ def _sak(item: dict, ranked: dict, data_dir: Path, parsers: "_Parsers | None" = 
         "rettet": sorted({n["felt"] for n in notes if n["brukt"]}),
     }
     sak["har_artikkel"] = bool(sak["artikkel"])
-    sak["artikkel_tittel"] = _article_title(art) if sak["artikkel"] else ""
     sak["lesetid"] = lesetid(sak["artikkel"])
     sak["fremhevet"] = sak["score"] >= _terskel()
     sak["meld_feil"] = meld_feil(sak["nr"], sak["tittel"], _site_url() + sak["lenke"])
@@ -480,7 +488,7 @@ def _facts(item: dict, sig: dict, data_dir: Path, parsers: "_Parsers") -> dict:
 
 def fakta(s: dict) -> list[dict]:
     """The small facts under a story, by one fixed rule and in a fixed order:
-    status, where, the vote (or how many proposals fell), amount, Bakgrunn.
+    status, where, the vote (or how many proposals fell), amount, Artikkel.
 
     "Vedtatt" is the normal case and never a fact: the status is shown only
     when it says something else, or when the innstilling fell. Organ and date
@@ -509,7 +517,7 @@ def fakta(s: dict) -> list[dict]:
     elif belop_figur and belop_figur.get("belop"):
         add("kr", "Beløp", belop_figur["belop"]["tekst"])
     if s["har_artikkel"]:
-        add("bakgrunn", "Bakgrunn", f"Ca. {s['lesetid']} min lesing")
+        add("bakgrunn", "Artikkel", f"Ca. {s['lesetid']} min lesing")
     return out
 
 
@@ -573,12 +581,27 @@ def tema_fra_tittel(tittel: str) -> str:
     return "annet"
 
 
+# The body's paragraph roles (skribent.ROLLER) and the fixed sidehead each gets.
+# Template text, not model text: nothing here needs a fact-check. "vedtak" opens
+# the body and carries no sidehead.
+ROLLE_TITTEL = {
+    "vedtak": "",
+    "avstemning": "Slik gikk avstemningen",
+    "begrunnelse": "Derfor",
+    "bakgrunn": "Bakgrunnen",
+    "videre": "Veien videre",
+}
+
+
 def _article(item: dict, art: dict | None) -> list[dict]:
-    """The edited background article's paragraphs, with links to the cited pages
-    (and "rettet" on a paragraph the editor corrected)."""
+    """The edited article's paragraphs, with links to the cited pages, the
+    paragraph's role and its sidehead ("" for the first paragraph, for the
+    opening role and when the role repeats the previous paragraph's), and
+    "rettet" on a paragraph the editor corrected."""
     if not art or art.get("avvist"):
         return []
     out = []
+    forrige = None
     for a in art.get("avsnitt") or []:
         text = " ".join((a.get("tekst") or "").split())
         if not text:
@@ -588,18 +611,27 @@ def _article(item: dict, art: dict | None) -> list[dict]:
             base = pdf.url(item, k.get("dok", "")) if k.get("dok") in ("saksframlegg", "protokoll") else None
             if base and isinstance(k.get("side"), int):
                 sources.append({"dok": k["dok"], "side": k["side"], "href": f"{base}#page={k['side']}"})
-        out.append({"tekst": text, "kilder": _dedupe(sources), "rettet": bool(a.get("rettet"))})
+        rolle = a.get("rolle") if a.get("rolle") in ROLLE_TITTEL else ""
+        mellomtittel = ROLLE_TITTEL.get(rolle, "") if rolle and out and rolle != forrige else ""
+        out.append({"tekst": text, "kilder": _dedupe(sources), "rettet": bool(a.get("rettet")),
+                    "rolle": rolle, "mellomtittel": mellomtittel})
+        forrige = rolle
     return out
 
 
-def _article_title(art: dict | None) -> str:
-    """The background article's own headline, only as the redaktør kept it:
-    checked as supported, with the pages that support it (rediger_tittel).
-    "" for anything else, and the article is shown without one."""
-    if not art or art.get("avvist") or not art.get("avsnitt"):
-        return ""
-    tittel = " ".join((art.get("tittel") or "").split())
-    return tittel if tittel and art.get("tittel_kilder") and not art.get("tittel_grunn") else ""
+def _field_sources(item: dict, card: dict, key: str) -> list[dict]:
+    sources = []
+    for k in card.get("kilder", []):
+        base = pdf.url(item, k.get("dok", "")) if k.get("dok") in ("saksframlegg", "protokoll") else None
+        if k.get("felt") == key and base and isinstance(k.get("side"), int):
+            sources.append({"dok": k["dok"], "side": k["side"], "href": f"{base}#page={k['side']}"})
+    return _dedupe(sources)
+
+
+def _ingress(item: dict, card: dict) -> dict | None:
+    """The card's written ingress with its sources, or None (older cards)."""
+    text = " ".join(((card.get("felt") or {}).get("ingress") or "").split())
+    return {"tekst": text, "kilder": _field_sources(item, card, "ingress")} if text else None
 
 
 def _fields(item: dict, card: dict) -> list[dict]:
@@ -609,12 +641,7 @@ def _fields(item: dict, card: dict) -> list[dict]:
         text = (felt.get(key) or "").strip()
         if not text:
             continue
-        sources = []
-        for k in card.get("kilder", []):
-            base = pdf.url(item, k.get("dok", "")) if k.get("dok") in ("saksframlegg", "protokoll") else None
-            if k.get("felt") == key and base and isinstance(k.get("side"), int):
-                sources.append({"dok": k["dok"], "side": k["side"], "href": f"{base}#page={k['side']}"})
-        out.append({"key": key, "label": label, "tekst": text, "kilder": _dedupe(sources)})
+        out.append({"key": key, "label": label, "tekst": text, "kilder": _field_sources(item, card, key)})
     return out
 
 
@@ -782,7 +809,7 @@ def tema_counts(saker: list[dict]) -> list[dict]:
 
 def utfall(saker: list[dict]) -> list[str]:
     """The meeting page's outcome line, from the statuses the stories show:
-    "26 vedtatt", "3 tatt til orientering", … then "8 med bakgrunnsartikkel"
+    "26 vedtatt", "3 tatt til orientering", … then "8 med artikkel"
     and "2 uten sammendrag ennå". A status without a label (outcome unknown)
     isn't counted; a label this list doesn't know is counted under its own name."""
     kode_for = {tekst: kode for kode, tekst in status_mod.LABELS.items()}
@@ -800,7 +827,7 @@ def utfall(saker: list[dict]) -> list[str]:
             counts[tekst.split(" – ")[0].lower()] += 1
     out = [f"{counts[f]} {f}" for f in sorted(counts, key=lambda f: order.index(f) if f in order else len(order))]
     if n := sum(1 for s in saker if s.get("har_artikkel")):
-        out.append(f"{n} med bakgrunnsartikkel")
+        out.append(f"{n} med artikkel")
     if n := sum(1 for s in saker if not s.get("har_sammendrag")):
         out.append(f"{n} uten sammendrag ennå")
     return out

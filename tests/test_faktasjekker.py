@@ -99,6 +99,14 @@ def test_sjekk_without_card_or_protokoll(tmp_path, monkeypatch):
     assert faktasjekker.sjekk(ITEM, tmp_path, FakeLLM([])) == "mangler kilde: protokoll"
 
 
+def test_ingress_is_checked_like_the_other_fields():
+    assert "ingress" in faktasjekker.CHECKED
+    card = {**CARD, "ingress": "Hallen bygges. Den koster 69 millioner."}
+    assert faktasjekker.dekning(card, GOOD["setninger"]) == ["ingress er ikke sjekket"]
+    assert faktasjekker.dekning(card, GOOD["setninger"] + [s("ingress", "Hallen bygges."), s("ingress", "Den koster 69 millioner.")]) == []
+    assert faktasjekker.dekning(CARD, GOOD["setninger"]) == []  # an older card without an ingress
+
+
 def test_schema_is_strict_for_codex():
     def walk(schema):
         if schema.get("type") == "object":
@@ -119,8 +127,8 @@ REDIGERT = {"nr": "238/26", "overskrift": "Klarsignal til Eksempelhallen",
                      "status": "Vedtatt enstemmig.", "nar_og_hvor": ""},
             "kilder": [], "slettet": [], "avvist": False, "grunn": "", "ord": 7, "setninger": 3}
 ARTIKKEL = {"nr": "238/26", "meta": {"modell": "fake:opus", "merknad": "HEMMELIG SKRIBENTNOTAT"},
-            "avsnitt": [{"tekst": "Saken ble utsatt i juni. Bystyret ga klarsignal.", "kilder": [{"dok": "protokoll", "side": 2}]},
-                        {"tekst": "SV ville ha en mindre hall.", "kilder": [{"dok": "protokoll", "side": 3}]}]}
+            "avsnitt": [{"rolle": "bakgrunn", "tekst": "Saken ble utsatt i juni. Bystyret ga klarsignal.", "kilder": [{"dok": "protokoll", "side": 2}]},
+                        {"rolle": "avstemning", "tekst": "SV ville ha en mindre hall.", "kilder": [{"dok": "protokoll", "side": 3}]}]}
 
 
 def a(avsnitt, setning, stottet=True, gjentar=False):
@@ -129,7 +137,9 @@ def a(avsnitt, setning, stottet=True, gjentar=False):
 
 
 ART_GOOD = {"setninger": [a(1, "Saken ble utsatt i juni."), a(1, "Bystyret ga klarsignal.", gjentar=True),
-                          a(2, "SV ville ha en mindre hall.", stottet=False)], "personvern": [], "blocked": ""}
+                          a(2, "SV ville ha en mindre hall.", stottet=False)],
+            "roller": [{"avsnitt": 1, "passer": True, "begrunnelse": ""}, {"avsnitt": 2, "passer": True, "begrunnelse": ""}],
+            "personvern": [], "blocked": ""}
 
 
 @pytest.fixture
@@ -149,7 +159,7 @@ def test_artikkel_check_sees_edited_card_and_article_but_not_writer_meta(art_dir
     prompt = fake.prompts[0]
     assert "HEMMELIG" not in prompt and "<<<ARTIKKEL" in prompt and "<<<KORT" in prompt
     assert '"hva_endres": "Bystyret ga klarsignal."' in prompt  # the edited card, flattened
-    assert '"avsnitt": 2' in prompt  # paragraphs are numbered from 1
+    assert '"avsnitt": 2' in prompt and '"rolle": "avstemning"' in prompt  # paragraphs are numbered from 1, roles shown
     out = art_saved(art_dir)
     assert out["setninger"] == ART_GOOD["setninger"] and out["meta"]["prompt_versjon"] == faktasjekker.ARTIKKEL_PROMPT_VERSJON
 
@@ -161,6 +171,7 @@ def test_dekning_artikkel():
     assert "avsnitt 3 finnes ikke" in faktasjekker.dekning_artikkel(paragraphs, ART_GOOD["setninger"] + [a(3, "x")])
     reworded = [a(1, "Saken ble utsatt."), *ART_GOOD["setninger"][1:]]
     assert any("avsnitt 1" in e for e in faktasjekker.dekning_artikkel(paragraphs, reworded))
+    assert faktasjekker.dekning_artikkel(paragraphs, ART_GOOD["setninger"], [{"avsnitt": 3, "passer": True, "begrunnelse": ""}]) == ["roller: avsnitt 3 finnes ikke"]
 
 
 def test_artikkel_check_retries_bad_split_then_blocks(art_dir):
@@ -175,7 +186,7 @@ def test_artikkel_check_retries_bad_split_then_blocks(art_dir):
 def test_empty_article_needs_no_model(art_dir):
     write_json(art_dir / "artikler" / "571424" / "2026-09-23" / "238-26.json", {"nr": "238/26", "avsnitt": []})
     assert faktasjekker.sjekk_artikkel(ITEM, art_dir, FakeLLM([])) == "tom artikkel"
-    assert art_saved(art_dir)["setninger"] == [] and art_saved(art_dir)["meta"]["tom"] is True
+    assert art_saved(art_dir)["setninger"] == [] and art_saved(art_dir)["roller"] == [] and art_saved(art_dir)["meta"]["tom"] is True
 
 
 def test_artikkel_check_needs_article_and_edited_card(data_dir):

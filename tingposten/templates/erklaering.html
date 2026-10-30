@@ -3,14 +3,14 @@
 <p class="erklaering-dato">Sist oppdatert 30. oktober 2026</p>
 
 <h3>Hva Tingposten er</h3>
-<p>Tingposten er en gratis og ikke-kommersiell nettside som viser hva Bergen kommune vedtar. Hver sak får et kort i samme format: hva endres, hvem påvirkes, hvorfor, status og når og hvor. Hvert kort har lenke til kommunens egne dokumenter. Koden er åpen og ligger på <a href="https://github.com/{{ repo }}">GitHub</a>.</p>
+<p>Tingposten er en gratis og ikke-kommersiell nettside som viser hva Bergen kommune vedtar. Hver sak får et kort i samme format: en overskrift, en ingress og fem faste punkter: hva endres, hvem påvirkes, hvorfor, status og når og hvor. Hvert kort har lenke til kommunens egne dokumenter. Koden er åpen og ligger på <a href="https://github.com/{{ repo }}">GitHub</a>.</p>
 
 <h3>Hva som dekkes</h3>
 <p>Tingposten dekker sakene som behandles i Bergen bystyre og i byrådet. Alle sakene fra disse organene vises. Poengsummen bestemmer bare rekkefølgen og hvilke saker som løftes fram, ikke hvilke saker som er med. Rene formalia, som godkjenning av protokoll, vises ikke som egne saker. Hver møteside viser alle sakene fra møtet og hvordan de endte.</p>
 <p>Sammendrag skrives for saker fra de siste tre månedene. Eldre saker vises med kommunens egen tittel og lenke til dokumentene.</p>
 
 <h3>Slik lages kortene</h3>
-<p>Kortene skrives av KI-modeller ut fra kommunens egne dokumenter, saksframlegget og protokollen fra møtet. De viktigste sakene får i tillegg en kort bakgrunnsartikkel. Deretter går teksten gjennom to kontroller:</p>
+<p>Kortene skrives av KI-modeller ut fra kommunens egne dokumenter, saksframlegget og protokollen fra møtet. De viktigste sakene får i tillegg en kort artikkel, der avsnittene står i fast rekkefølge: vedtaket, avstemningen, begrunnelsen, bakgrunnen og veien videre. Deretter går teksten gjennom to kontroller:</p>
 <ul>
   <li>En faktasjekk gjort av en annen KI-modell, som bare ser kildedokumentene og den ferdige teksten. Setninger og titler som ikke er dekket av kildene, slettes.</li>
   <li>Et redigeringssteg som håndhever lengdegrenser og språkregler. Dette steget kan bare slette tekst, aldri legge til eller skrive om.</li>

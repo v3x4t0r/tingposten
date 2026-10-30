@@ -1,14 +1,15 @@
 """Utgave: the printed edition ("papirutgave") of one meeting, as a print-ready PDF.
 
 Built from exactly what the site shows (bygg.load): the edited, fact-checked
-cards and background articles, the background headlines the redaktør kept
-(checked, with sources), the mechanical facts and the figures. Never the
-models' raw output. What goes in print, for one meeting:
+cards and articles, the mechanical facts and the figures. Never the models'
+raw output. What goes in print, for one meeting:
 
 - no sak whose protokoll doesn't cover the meeting yet (venter_protokoll);
-- the best saker (the site's front-page order) as full stories: headline, dek,
-  Kort fortalt as labelled paragraphs, the background article under its own
-  checked headline, the figures (vote chart, map, amount);
+- the best saker (the site's front-page order) as full stories: headline,
+  ingress, and then, for a sak with an article, the article as the running
+  text (a dateline, the site's fixed sideheads) with Kort fortalt as a boxed
+  fact box beside or after it; for a sak without one, Kort fortalt as labelled
+  paragraphs; the figures (vote chart, map, amount);
 - every other sak with a summary in short form (headline, dek, key facts), in
   agenda order;
 - saker without a summary only as plain lines in the agenda listing, and the
@@ -207,48 +208,51 @@ def velg(saker: list[dict], mote: str) -> dict:
 
 def kilder(s: dict, full: bool) -> list[dict]:
     """Every page the printed text rests on: the dek's, and for a full story also
-    each Kort fortalt field's, the Status row's, the background paragraphs' and
-    the figures'. A story split in two (del) has each part's own. Grouped per
-    document by bygg.kildegrupper."""
+    the article paragraphs', each Kort fortalt field's, the Status row's and
+    the figures'. A story split in parts (deler) has each part's own; a lead
+    that jumps from the front lists its whole text's pages inside, since the
+    front page prints no sources. Grouped per document by bygg.kildegrupper."""
     del_ = s.get("_del")
-    out = list(s.get("dek_kilder") or []) if del_ in (None, "kort") else []
+    hode = "artikkel" if s.get("artikkel") else "kort"  # the part with the head (headline, dek)
+    out = list(s.get("dek_kilder") or []) if del_ in (None, hode) else []
     if full:
+        if del_ in (None, "artikkel"):
+            for a in s.get("artikkel") or []:
+                out += a.get("kilder") or []
         if del_ in (None, "kort"):
             for f in s.get("felt") or []:
                 out += f.get("kilder") or []
             if s.get("status_rad"):
                 out += s["status_rad"].get("kilder") or []
+            out += s.get("_ekstra_kilder") or []
         if del_ in (None, "kort", "figurer"):
             for fig in s.get("figurer") or []:
                 out += fig.get("kilder") or []
-        if del_ in (None, "bakgrunn"):
-            for a in s.get("artikkel") or []:
-                out += a.get("kilder") or []
-        out += s.get("_ekstra_kilder") or []
     return out
 
 
 def deler(s: dict, niva: int) -> list[dict]:
     """A full story too long for one page, as parts placed one after another
     (on one page, or carried to the top of the next). Split between sections
-    only, never inside one: level 1 = the card (headline, dek, facts, figures,
-    Kort fortalt) and the background article under its own checked headline;
-    level 2 = the card without figures, the figures, the background."""
+    only, never inside one. With an article: level 1 = the story (headline,
+    ingress, facts, the article's paragraphs) and then Kort fortalt with the
+    figures as its own block; level 2 = the story, the figures, Kort fortalt.
+    Without one: level 2 = the card without figures, then the figures."""
     if niva == 0:
         return [s]
     figs = [f for f in s.get("figurer") or [] if f.get("type") in FIGUR_MIN]
+    artikkel = bool(s.get("artikkel"))
     if niva == 1:
-        rekke = ("kort", "bakgrunn") if s.get("artikkel") else ()
+        rekke = ("artikkel", "kort") if artikkel else ()
     else:
-        rekke = tuple(d for d, med in (("kort", True), ("figurer", bool(figs)), ("bakgrunn", bool(s.get("artikkel"))))
-                      if med)
+        rekke = tuple(d for d, med in (("artikkel", artikkel), ("figurer", bool(figs)), ("kort", True)) if med)
     if len(rekke) < 2:
         return [s]
     ut = []
     for d in rekke:
         del_ = {**s, "_del": d, "_rekke": rekke}
-        if d == "kort" and "figurer" in rekke:
-            del_["figurer"] = [f for f in s.get("figurer") or [] if f.get("type") not in FIGUR_MIN]
+        if d == "artikkel" or (d == "kort" and "figurer" in rekke):
+            del_["figurer"] = [] if d == "artikkel" else [f for f in s.get("figurer") or [] if f.get("type") not in FIGUR_MIN]
         ut.append(del_)
     return ut
 
@@ -273,9 +277,10 @@ def kildelinje(s: dict, full: bool) -> str:
 
 
 def felt(s: dict) -> list[dict]:
-    """Kort fortalt for print: the fields after the dek ("Hva endres" without its
-    first sentence, which is the dek), the Status row from the protokoll when the
-    card has none, empty fields left out."""
+    """Kort fortalt for print: the five fields (for a card without a written
+    ingress, "Hva endres" without its first sentence, which is then the dek),
+    the Status row from the protokoll when the card has none, empty fields
+    left out."""
     out = [f for f in s.get("felt") or [] if (f.get("tekst") or "").strip()]
     if s.get("status_rad") and not any(f["key"] == "status" for f in out):
         status = {"key": "status", "label": "Status", "tekst": s["status_rad"]["tekst"],
@@ -283,6 +288,13 @@ def felt(s: dict) -> list[dict]:
         orden = [k for k, _ in bygg.FIELDS]
         out = sorted([*out, status], key=lambda f: orden.index(f["key"]))
     return out
+
+
+def enheter(s: dict) -> list[dict]:
+    """The units of a story's running text, which a jump from the front page
+    counts in whole: the article's paragraphs when the sak has one, otherwise
+    the Kort fortalt fields (felt). Never split inside a unit."""
+    return list(s.get("artikkel") or []) if s.get("artikkel") else felt(s)
 
 
 def fakta(s: dict) -> list[dict]:
@@ -640,7 +652,8 @@ def varianter(s: dict, fmt: Format, spalter: int, topp: bool = False) -> list[Va
             return []
         valgt = tuple((f, min(figur_maks(fmt, f["type"]), bredde)) for f in figs)
         return [Variant(spalter, spalter, 0, TITTEL[fmt.navn][spalter], bredde, 0.0, valgt)]
-    if s.get("_del") == "bakgrunn":
+    if s.get("_del") == "artikkel":
+        # The story's head and its article, text only: the figures go with Kort fortalt.
         tittel = "--h-topp" if topp and spalter == fmt.spalter else TITTEL[fmt.navn][spalter]
         return [Variant(spalter, spalter, 0, tittel, fmt.spenn(spalter))]
     for tekst, side in FORMER[fmt.navn].get(spalter, ()):
@@ -656,8 +669,8 @@ def varianter(s: dict, fmt: Format, spalter: int, topp: bool = False) -> list[Va
         valgt = tuple((f, min(figur_maks(fmt, f["type"]), plass)) for f in figs)
         i_tekst = ()
         if not side or (len(figs) > 1 and any(figur_min(fmt, f["type"]) > fmt.spenn(side) - fmt.spalte for f in figs)):
-            # A locator map fits a text column: it goes with the text, after Kort fortalt
-            # (a row above the text, or an aside the vote chart fills, would only grow taller).
+            # A locator map fits a text column: it goes with the text, after the body and
+            # Kort fortalt (a row above the text, or an aside the vote chart fills, would only grow taller).
             i_tekst = tuple((f, min(figur_maks(fmt, f["type"]), fmt.spalte)) for f in figs if f["type"] == "kart")
             valgt = tuple(x for x in valgt if x[0]["type"] != "kart")
         ut.append(Variant(spalter, tekst, side, tittel, bredde, fmt.spenn(side) if side else 0.0, valgt, i_tekst))
@@ -670,7 +683,7 @@ def _env(fmt: Format) -> Environment:
     env = bygg._env()
     env.loader = FileSystemLoader([MAL, HERE / "templates"])
     env.globals.update(
-        kildelinje=kildelinje, felt=felt, fakta=fakta, qr=qr_svg, kort_visning=kort_visning, adresse=adresse, figur_svg=figur_svg,
+        kildelinje=kildelinje, felt=felt, enheter=enheter, fakta=fakta, qr=qr_svg, kort_visning=kort_visning, adresse=adresse, figur_svg=figur_svg,
         figur_av=bygg.figur, mellom=fmt.mellom, nr=UTGAVE_NR, lead_figurer=lambda s, b: lead_figurer(s, b, fmt),
         nettsted=urlsplit(bygg._site_url()).netloc.removeprefix("www."),
     )
@@ -1315,11 +1328,12 @@ def front_former(fmt: Format) -> dict:
 
 
 def sett_forside(pakker: Pakker, innhold: dict, sider: list[Side], komplett: Variant | None,
-                 n_felt: int | None = None) -> Side | None:
+                 n_enheter: int | None = None) -> Side | None:
     """The front page: the site's masthead and the folio bar; the lead under a
     banner head (across the page where there is a rail beside the lead), its
-    text in columns with as many of its card's fields as fit and the jump
-    inside, or the complete lead when it fits; teasers for the next stories
+    text in columns with as many whole units of its text (enheter: the
+    article's paragraphs, or the card's fields) as fit and the jump inside, or
+    the complete lead when it fits; teasers for the next stories
     with their page; and the boxes: what's in this edition, the meeting in
     numbers (in the rail, or a strip under the lead), how Tingposten is made
     (tabloid), a word about this being a trial. None when it doesn't fit."""
@@ -1357,16 +1371,16 @@ def sett_forside(pakker: Pakker, innhold: dict, sider: list[Side], komplett: Var
         banner = None
         leads = maaling.maal([Blokk(f"lead:{lead_s['kort']}:{komplett.id}", maler.full(lead_s, komplett), bl, sak=lead_s,
                                     type="full")])
-        leads[0].n_felt = len(felt(lead_s))
+        leads[0].n_enheter = len(enheter(lead_s))
     else:
         banner = maaling.maal([Blokk(f"leadhode:{lead_s['kort']}", maler.lead_hode(lead_s), W, sak=lead_s,
                                      type="lead")])[0]
-        mulige = range(maks_hopp(lead_s) + 1) if n_felt is None else [n_felt]
+        mulige = range(maks_hopp(lead_s) + 1) if n_enheter is None else [n_enheter]
         leads = maaling.maal([Blokk(f"leadkropp:{lead_s['kort']}:{k}",
                                     maler.lead_kropp(lead_s, side_for.get(lead_s["kort"], 2), bl, k, form["lead"]),
                                     bl, sak=lead_s, type="lead") for k in mulige])
         for b, k in zip(leads, mulige):
-            b.n_felt = k
+            b.n_enheter = k
     y1 = y0 + (banner.hoyde + luft if banner else 0.0)  # under the banner: the lead's text and the rail
 
     def stabel(ider):
@@ -1407,7 +1421,7 @@ def sett_forside(pakker: Pakker, innhold: dict, sider: list[Side], komplett: Var
         if kort_rail:
             passer = [b for b in passer if railhoyde(rail) <= b.hoyde + hs]
         if passer:
-            valg.append((passer[-1].n_felt, kort_rail, not stripe, passer[-1], stripe, kort_rail, rail, rad, plass))
+            valg.append((passer[-1].n_enheter, kort_rail, not stripe, passer[-1], stripe, kort_rail, rail, rad, plass))
     if not valg:
         return None
     # The most of the lead's text on the front; then a rail that ends where the teasers start;
@@ -1415,15 +1429,15 @@ def sett_forside(pakker: Pakker, innhold: dict, sider: list[Side], komplett: Var
     *_, lead, stripe, kort_rail, rail, rad, plass = max(valg, key=lambda v: v[:3])
 
     hs = (boks["motetall-stripe"].hoyde + luft) if stripe else 0.0
-    if banner and lead.n_felt:
-        # Room to spare: the lead's text a size up (still whole fields, the same jump).
-        stor = maaling.maal([Blokk(f"leadkropp-stor:{lead_s['kort']}:{lead.n_felt}",
-                                   maler.lead_kropp(lead_s, side_for.get(lead_s["kort"], 2), bl, lead.n_felt,
+    if banner and lead.n_enheter:
+        # Room to spare: the lead's text a size up (still whole units, the same jump).
+        stor = maaling.maal([Blokk(f"leadkropp-stor:{lead_s['kort']}:{lead.n_enheter}",
+                                   maler.lead_kropp(lead_s, side_for.get(lead_s["kort"], 2), bl, lead.n_enheter,
                                                     form["lead"], True), bl, sak=lead_s, type="lead")])[0]
         rad_h = max((b.hoyde for b in rad), default=0.0)
         if stor.hoyde <= plass and stor.hoyde + 0.5 * rad_h <= plass + rad_h * 0.5 and \
                 (not kort_rail or railhoyde(rail) <= stor.hoyde + hs):
-            stor.n_felt = lead.n_felt
+            stor.n_enheter = lead.n_enheter
             lead = stor
     yt_teaser = y1 + lead.hoyde + luft + hs + ((ombord_bred.hoyde + luft) if ombord_bred else 0.0)
     store = maaling.maal([Blokk(f"teaser-stor:{s_['kort']}", maler.teaser(s_, side_for.get(s_["kort"], 2),
@@ -1440,7 +1454,7 @@ def sett_forside(pakker: Pakker, innhold: dict, sider: list[Side], komplett: Var
         y += b.hoyde + 1.5
     if banner:
         side.ruter.append(Rute(banner.id, 0, y0, W, banner.hoyde, banner.html, "lead", (banner.id,)))
-        if lead.n_felt or form["rail"]:
+        if lead.n_enheter or form["rail"]:
             side.streker.append(Strek(0, y1 - luft / 2, W, 0, 0.6))
         else:
             y1 = y0 + banner.hoyde + 1.0  # no text on the front: the pointer follows the deck directly
@@ -1483,15 +1497,16 @@ def sett_forside(pakker: Pakker, innhold: dict, sider: list[Side], komplett: Var
         else:
             side.blokker += getattr(b, "blokker", None) or [b.id]
     side.ledig = plass - lead.hoyde
-    side.lead_felt = lead.n_felt
+    side.lead_enheter = lead.n_enheter
     return side
 
 
 def maks_hopp(s: dict) -> int:
-    """How many of the lead's fields the front page may take: all but one when
-    nothing else (figures, background) would continue inside, so the jump never
-    leads to an empty page."""
-    n = len(felt(s))
+    """How many units of the lead's text (enheter) the front page may take:
+    all of them when something else continues inside (Kort fortalt after an
+    article, or figures), otherwise all but one, so the jump never leads to
+    an empty page."""
+    n = len(enheter(s))
     resten = s.get("artikkel") or [f for f in s.get("figurer") or [] if f.get("type") in FIGUR_MIN]
     return n if resten else max(n - 1, 0)
 
@@ -1666,20 +1681,21 @@ def ombrekk(fmt: Format, maler: Maler, maaling: Maaling, innhold: dict) -> list[
 
 def hoppsider(fmt: Format, maler: Maler, maaling: Maaling, innhold: dict) -> list[Side] | None:
     """The lead starts on the front page and jumps: the front takes its head,
-    deck, facts and as many of its card's fields as fit, whole, ending with
-    "Fortsettes på side N"; the story goes on inside under "Fra side 1" with the
-    rest of the fields, the figures, the background and the sources. Nothing
-    is printed twice and no sentence is split. The number of fields is chosen
+    deck, facts and as many whole units of its text as fit (the article's
+    paragraphs, or the card's fields), ending with "Fortsettes på side N"; the
+    story goes on inside under "Fra side 1" with the rest of the text, Kort
+    fortalt (after an article), the figures and the sources. Nothing is
+    printed twice and no sentence is split. The number of units is chosen
     first (the front page's other blocks don't depend on the inside pages),
     then the inside is packed with the rest of the story first."""
     lead = innhold["fulle"][0]
     pakker = Pakker(fmt, maler, maaling, innhold, 0)
     pakker.forhandsmaal()
     forhand = sett_forside(pakker, innhold, [], None)
-    k = forhand.lead_felt if forhand is not None else 0
+    k = forhand.lead_enheter if forhand is not None else 0
     while k >= 0:
         if k:
-            resten = {**lead, "_fra_felt": k}
+            resten = {**lead, "_fra": k}
             vist = lead_figurer(lead, fmt.spenn(front_former(fmt)["lead"]), fmt)
             if vist:  # figures printed on the front aren't repeated; their sources are
                 resten["figurer"] = [f for f in lead.get("figurer") or [] if f not in [x for x, _ in vist]]
@@ -1699,7 +1715,7 @@ def hoppsider(fmt: Format, maler: Maler, maaling: Maaling, innhold: dict) -> lis
         if k and not plassert:
             k = 0  # the rest of the story didn't find room inside: the front shows head and deck only
             continue
-        front = sett_forside(pk, innhold, inne, None, n_felt=k)
+        front = sett_forside(pk, innhold, inne, None, n_enheter=k)
         if front is not None:
             return [front, *inne]
         k -= 1

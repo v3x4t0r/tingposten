@@ -12,6 +12,7 @@ Docker er allerede installert på Pi-en, så en container er et alternativ hvis 
 2. **last-ned** – manglende saksframlegg og protokoller. **Gjør ingenting** før `ALLOW_PDF_FETCH` er slått på i `tingposten/config.py`, fordi robots.txt sier nei til automatisk henting av filene. Slå det på først når Bystyrets kontor har sagt ja. Da hentes høyst `MAKS_PDF_PER_KJORING` filer per kjøring, én om gangen med pause imellom.
    Inntil da skriver steget i stedet `data/bergen/last-ned-mangler.sh`: ett skript med alle PDF-ene som mangler. Det henter ingenting selv; det er du som kjører det (se «PDF-er for hånd» under).
 3. **kjor** – skribent (Claude), faktasjekker (Codex), klassifiserer og redaktør for hver sak som har PDF-er. Går en modell tom for kvote, fortsetter kjøringen med resten, og neste kjøring tar det som mangler. Feil her er derfor bare en advarsel.
+   Et nytt utkast som ennå ikke er faktasjekket (for eksempel fordi Codex gikk tom for kvote, eller fordi skribentreglene fikk nytt versjonsnummer og alle kort i vinduet skrives på nytt) erstatter **aldri** et publisert kort eller en publisert brødtekst: redaktøren beholder den sjekkede teksten og logger «nytt utkast uten fersk faktasjekk; det publiserte beholdes». Tallet `venter` i kjor-loggen sier hvor mange som står slik. Når sjekken er kjørt, går den nye teksten gjennom som vanlig.
 4. **bygg** – lager siden i `site/` av det som er publiserbart. Feiler byggingen, publiseres ingenting.
 5. **publiser** – committer `site/` til grenen `nettside` og pusher den, og statichost.eu publiserer den (se `PUBLISER_TIL` i `tingposten/config.py`), men **bare hvis filen `PUBLISER` finnes** i repo-roten. Uten den blir alt liggende lokalt.
 
@@ -137,6 +138,15 @@ rm ~/tingposten/PUBLISER      # av
 
 Henting, skriving og bygging fortsetter uansett; bare publiseringen hoppes over.
 
+## Første kjøring etter 30.10.2026 (ny artikkelstruktur)
+
+Skribentreglene er versjon `skribent-3` (ingress, ordgrenser, brødtekst med roller). Første `kjor` etter oppdateringen skriver derfor **alle kort i 92-dagersvinduet på nytt**, og så artiklene deres. Det er mange modellkall, og alt må gjennom Codex før det vises; til sjekken er kjørt beholdes de gamle kortene på siden (se punkt 3 over). Gjør slik:
+
+1. Sjekk at både `claude` og `codex` har kvote (`codex exec` må svare).
+2. `uv run --no-sync tingposten kjor` (gjerne et møte om gangen: `--utvalg 571424 --dato 2026-09-23`), og se at `venter` går til 0 i loggen.
+3. Les sakene 236, 239, 247 og 255 fra 23.09.2026 i `site/` før du publiserer: ingress uten «Bystyret …», status i klarspråk, mellomtitler i brødteksten.
+4. `bygg` og `publiser` som vanlig.
+
 ## Kjøre én gang for hånd
 
 ```sh
@@ -169,7 +179,7 @@ uv run --no-sync tingposten bygg && uv run --no-sync tingposten publiser
 ```
 
 - Saken kan oppgis som adressen, stien (`bergen/sak/571424/2026-09-23/266-26`) eller nøkkelen (`571424/2026-09-23/266-26`).
-- `--felt` er `overskrift`, `hva_endres`, `hvem_pavirkes`, `hvorfor`, `status`, `nar_og_hvor`, `artikkel:<n>` (avsnitt n i bakgrunnen) eller `artikkel_tittel`. Ingressen er første setning i `hva_endres`: rett `hva_endres`, så følger ingressen med. `--tekst ''` fjerner teksten.
+- `--felt` er `overskrift`, `ingress`, `hva_endres`, `hvem_pavirkes`, `hvorfor`, `status`, `nar_og_hvor` eller `artikkel:<n>` (avsnitt n i brødteksten). På eldre kort uten ingress er ingressen første setning i `hva_endres`: rett `hva_endres`, så følger den med. `--tekst ''` fjerner teksten.
 - Feltet beholder kildene sine. Gjelder den nye teksten andre sider, gi dem med `--kilde saksframlegg:5` (kan gjentas).
 - Merknaden vises slik du skriver den: hva som var feil og hva som er riktig, i én eller to setninger.
 - Kommandoen sjekker at feltet finnes på saken, lagrer rettelsen med dagens dato og skriver den ut. Den bygger og publiserer ikke. Den nattlige kjøringen tar den med; `bygg` og `publiser` for hånd viser den med en gang.

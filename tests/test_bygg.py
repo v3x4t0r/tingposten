@@ -55,8 +55,8 @@ ONE_SENTENCE = {**CARD, "nr": "239/26", "overskrift": "Skolen rehabiliteres",
 ARTICLE = {
     "nr": "238/26",
     "avsnitt": [
-        {"tekst": "Hallen har vært planlagt siden 2019. <b>fet</b>", "kilder": [{"dok": "saksframlegg", "side": 2}]},
-        {"tekst": "Byggestart er satt til våren 2027.", "kilder": [{"dok": "protokoll", "side": 1}, {"dok": "bilag", "side": 9}]},
+        {"rolle": "vedtak", "tekst": "Hallen har vært planlagt siden 2019. <b>fet</b>", "kilder": [{"dok": "saksframlegg", "side": 2}]},
+        {"rolle": "videre", "tekst": "Byggestart er satt til våren 2027.", "kilder": [{"dok": "protokoll", "side": 1}, {"dok": "bilag", "side": 9}]},
     ],
     "slettet": [], "avvist": False, "grunn": "", "ord": 14,
 }
@@ -383,60 +383,70 @@ def test_tema_tiles_pages_and_breadcrumb(site):
 def test_article_rendering_and_cue(site):
     site, _ = site
     page = sak_page(site, "238/26").read_text()
-    bakgrunn = re.search(r'<section class="bakgrunn lag".*?</section>', page, re.S).group(0)
-    assert '<h2 class="etikett etikett-strek bakgrunn-etikett" id="bakgrunn-tittel">Bakgrunn</h2>' in bakgrunn
-    assert "Saken bak vedtaket" not in bakgrunn
-    assert "Bygger på saksframlegget og protokollen" in bakgrunn and "Ca. 1 minutt å lese" in bakgrunn
-    assert "Hallen har vært planlagt siden 2019. &lt;b&gt;fet&lt;/b&gt;" in bakgrunn  # escaped
+    artikkel = re.search(r'<section class="artikkel lag".*?</section>', page, re.S).group(0)
+    assert '<h2 class="etikett etikett-strek artikkel-etikett" id="artikkel-tittel">Saken</h2>' in artikkel
+    assert "Bygger på saksframlegget og protokollen" in artikkel and "Ca. 1 minutt å lese" in artikkel
+    assert "Hallen har vært planlagt siden 2019. &lt;b&gt;fet&lt;/b&gt;" in artikkel  # escaped
     # footnote numbers per paragraph, sources in the list below, every page a link
-    assert '<sup class="fn"><a href="#kilde-1"' in bakgrunn and 'id="kilde-2"' in bakgrunn
-    assert "/fil/bk360/111/Framstilling-x#page=2" in bakgrunn and "/fil/bk360/222/Protokoll-x#page=1" in bakgrunn
-    assert "bilag" not in bakgrunn  # only the two known documents become links
-    assert bakgrunn.index("Hallen har vært") < bakgrunn.index("Byggestart")
-    assert page.index('id="kort"') < page.index('id="bakgrunn"')
+    assert '<sup class="fn"><a href="#kilde-1"' in artikkel and 'id="kilde-2"' in artikkel
+    assert "/fil/bk360/111/Framstilling-x#page=2" in artikkel and "/fil/bk360/222/Protokoll-x#page=1" in artikkel
+    assert "bilag" not in artikkel  # only the two known documents become links
+    assert artikkel.index("Hallen har vært") < artikkel.index("Byggestart")
+    # the body first, with a sidehead where the role changes (never above the opening paragraph); Kort fortalt in the rail
+    assert '<p id="avsnitt-1" class="forste">' in artikkel and 'class="mellomtittel"' not in artikkel.split("Byggestart")[0].split('id="avsnitt-1"')[0]
+    assert '<h3 class="mellomtittel">Veien videre</h3>' in artikkel
+    assert page.index('id="artikkel"') < page.index('id="kort"') < page.index('id="dokumenter"')
+    assert '<section class="kort kort-rail" id="kort"' in page
     assert "AVVIST ARTIKKEL" not in sak_page(site, "239/26").read_text()
-    assert 'id="bakgrunn"' not in sak_page(site, "240/26").read_text()
+    # without an article the card is the main column
+    uten = sak_page(site, "240/26").read_text()
+    assert 'id="artikkel"' not in uten and '<section class="kort" id="kort"' in uten
     forside = (site / "bergen/index.html").read_text()
     assert "min lesing" not in lead_html(forside) and "faktum-bakgrunn" in lead_html(forside)
     sek = re.search(r'<article class="blokk sek">(.*?)</article>', forside, re.S).group(1)
-    assert "Bakgrunn" not in sek
+    assert "Artikkel" not in sek
 
 
-@pytest.mark.parametrize("extra, shown", [
-    ({"tittel": "Hallen har vært planlagt siden 2019", "tittel_kilder": [{"dok": "saksframlegg", "side": 2}],
-      "tittel_grunn": ""}, True),
-    # anything the redaktør didn't keep as checked is never rendered
-    ({"tittel": "Hallen har vært planlagt siden 2019", "tittel_kilder": [], "tittel_grunn": ""}, False),
-    ({"tittel": "Hallen har vært planlagt siden 2019", "tittel_kilder": [{"dok": "saksframlegg", "side": 2}],
-      "tittel_grunn": "ikke faktasjekket"}, False),
-    ({"tittel": "", "tittel_kilder": [], "tittel_grunn": "ikke støttet"}, False),
-])
-def test_article_headline_only_when_checked(tmp_path, data_dir, extra, shown):
+def test_article_roles_give_sideheads_and_no_second_headline(tmp_path, data_dir):
     path = data_dir / "artikler-redigert" / BYSTYRET / "2026-09-23" / "238-26.json"
-    path.write_text(json.dumps({**ARTICLE, **extra}))
+    avsnitt = [
+        {"rolle": "vedtak", "tekst": "Vedtaket i detalj.", "kilder": [{"dok": "saksframlegg", "side": 1}]},
+        {"rolle": "avstemning", "tekst": "SV ville utsette.", "kilder": [{"dok": "protokoll", "side": 1}]},
+        {"rolle": "bakgrunn", "tekst": "Første bakgrunn.", "kilder": [{"dok": "saksframlegg", "side": 2}]},
+        {"rolle": "bakgrunn", "tekst": "Andre bakgrunn.", "kilder": [{"dok": "saksframlegg", "side": 3}]},
+        {"rolle": "videre", "tekst": "Neste steg.", "kilder": [{"dok": "saksframlegg", "side": 4}]},
+    ]
+    path.write_text(json.dumps({**ARTICLE, "avsnitt": avsnitt, "tittel": "SKAL IKKE VISES",
+                                "tittel_kilder": [{"dok": "protokoll", "side": 1}], "tittel_grunn": ""}))
     site = tmp_path / "site"
     bygg.build(site, data_dir, idag=date(2026, 10, 1))
     page = sak_page(site, "238/26").read_text()
-    bakgrunn = re.search(r'<section class="bakgrunn lag.*?</section>', page, re.S).group(0)
-    assert ("Hallen har vært planlagt siden 2019</h2>" in bakgrunn) is shown
-    if shown:
-        assert '<section class="bakgrunn lag bakgrunn-med-tittel" id="bakgrunn" aria-labelledby="bakgrunn-tittel">' in bakgrunn
-        assert ('<p class="etikett etikett-strek bakgrunn-etikett" aria-hidden="true">Bakgrunn</p>' in bakgrunn
-                and '<h2 class="bakgrunn-tittel" id="bakgrunn-tittel"><span class="vh">Bakgrunn: </span>' in bakgrunn)
-        assert bakgrunn.index('<h2 class="bakgrunn-tittel"') < bakgrunn.index('class="byline"') < bakgrunn.index("Hallen har vært planlagt siden 2019. ")
-    else:  # the layout without a headline: the label is the heading
-        assert '<h2 class="etikett etikett-strek bakgrunn-etikett" id="bakgrunn-tittel">Bakgrunn</h2>' in bakgrunn
-        assert "bakgrunn-med-tittel" not in bakgrunn and 'class="bakgrunn-tittel"' not in bakgrunn
+    assert "SKAL IKKE VISES" not in page and page.count("<h1") == 1
+    heads = re.findall(r'<h3 class="mellomtittel">(.*?)</h3>', page)
+    assert heads == ["Slik gikk avstemningen", "Bakgrunnen", "Veien videre"]  # once per role change, none for vedtak
+    assert page.index("Slik gikk avstemningen") < page.index("SV ville utsette.")
+    s = {x["nr"]: x for x in bygg.load(data_dir)}["238/26"]
+    assert [a["mellomtittel"] for a in s["artikkel"]] == ["", "Slik gikk avstemningen", "Bakgrunnen", "", "Veien videre"]
 
 
-def test_no_article_headline_without_a_publishable_article(tmp_path, data_dir):
-    path = data_dir / "artikler-redigert" / BYSTYRET / "2026-09-23" / "239-26.json"
-    rejected = json.loads(path.read_text())
-    path.write_text(json.dumps({**rejected, "tittel": "SKAL IKKE VISES", "tittel_kilder": [{"dok": "protokoll", "side": 1}],
-                                "tittel_grunn": ""}))
+def test_ingress_is_the_dek_and_leaves_the_fields_whole(tmp_path, data_dir):
+    path = data_dir / "redigert" / BYSTYRET / "2026-09-23" / "238-26.json"
+    card = json.loads(path.read_text())
+    card["felt"]["ingress"] = "Hallen får 69 millioner kroner, og byggingen kan starte."
+    card["kilder"].append({"felt": "ingress", "dok": "saksframlegg", "side": 3})
+    path.write_text(json.dumps(card))
     site = tmp_path / "site"
     bygg.build(site, data_dir, idag=date(2026, 10, 1))
-    assert "SKAL IKKE VISES" not in sak_page(site, "239/26").read_text()
+    s = {x["nr"]: x for x in bygg.load(data_dir)}["238/26"]
+    assert s["har_ingress"] and s["dek"] == "Hallen får 69 millioner kroner, og byggingen kan starte."
+    assert s["dek_kilder"] == [{"dok": "saksframlegg", "side": 3,
+                                "href": "https://www.bergen.kommune.no/politikere-utvalg/api/fil/bk360/111/Framstilling-x#page=3"}]
+    hva = next(f for f in s["felt"] if f["key"] == "hva_endres")
+    assert hva["tekst"] == card["felt"]["hva_endres"]  # not cut: the ingress is its own text
+    assert [f["key"] for f in s["kort_felt"]][0] == "hva_endres"  # the ingress is not a Kort fortalt row
+    page = sak_page(site, "238/26").read_text()
+    body = page[page.index('<article class="sak">'):]
+    assert body.count("Hallen får 69") == 1  # the dek once (typo filter adds no-break spaces), not again in Kort fortalt
 
 
 def test_rss_has_tema_category(site):
@@ -507,7 +517,7 @@ def test_structured_facts_come_from_the_signals(site):
     s = saker["238/26"]
     assert {k: s[k] for k in ("stemmer", "forslag_falt", "innstilling_falt", "bydeler", "hele_byen", "belop")} == {
         "stemmer": None, "forslag_falt": 0, "innstilling_falt": False, "bydeler": [], "hele_byen": False, "belop": None}
-    assert s["lesetid"] == 1 and s["fakta"] == [{"type": "bakgrunn", "etikett": "Bakgrunn", "verdi": "Ca. 1 min lesing"}]
+    assert s["lesetid"] == 1 and s["fakta"] == [{"type": "bakgrunn", "etikett": "Artikkel", "verdi": "Ca. 1 min lesing"}]
 
 
 def test_score_signals_expose_the_vote_as_numbers():

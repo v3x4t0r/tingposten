@@ -1,4 +1,5 @@
 import json
+import re
 
 import pymupdf
 import pytest
@@ -14,12 +15,14 @@ ITEM = {
 KILDER = {"saksframlegg": "--- side 1 ---\nHallen koster 69 mill.", "protokoll": "--- side 1 ---\nVedtatt enstemmig."}
 CARD = {
     "overskrift": "Klarsignal til å bygge Eksempelhallen",
+    "ingress": "Eksempelhallen kan bygges for 69 millioner kroner.",
     "hva_endres": "Bystyret ga endelig klarsignal til å bygge hallen. Rammen er 69 millioner kroner.",
     "hvem_pavirkes": "",
     "hvorfor": "Byrådet skriver at hallen trengs.",
     "status": "Vedtatt enstemmig.",
     "nar_og_hvor": "",
-    "kilder": [{"felt": "hva_endres", "dok": "saksframlegg", "side": 1},
+    "kilder": [{"felt": "ingress", "dok": "saksframlegg", "side": 1},
+               {"felt": "hva_endres", "dok": "saksframlegg", "side": 1},
                {"felt": "hvorfor", "dok": "saksframlegg", "side": 1},
                {"felt": "status", "dok": "protokoll", "side": 1}],
     "merknad": "",
@@ -99,14 +102,17 @@ def test_setninger_ignores_abbreviations_and_dates():
 def test_examples_have_no_private_reasons():
     for path in skribent.EKSEMPLER.glob("*.json"):
         card = json.loads(path.read_text())
-        assert set(card) == {"nr", "overskrift", "hva_endres", "hvem_pavirkes", "hvorfor", "status", "nar_og_hvor",
-                             "kilder", "merknad"}
+        assert set(card) == {"nr", "overskrift", "ingress", "hva_endres", "hvem_pavirkes", "hvorfor", "status",
+                             "nar_og_hvor", "kilder", "merknad"}
+        assert card["ingress"] and not re.match(r"(Bystyret|Byrådet|Kommunen vedtok)", card["ingress"])
+        assert skribent.grenser(card) == [], path.name
         text = json.dumps(card, ensure_ascii=False).lower()
-        for word in ("helse", "sykdom", "bosted", "flytt", "ny jobb"):
+        for word in ("helse", "sykdom", "bosted", "har flyttet", "flyttet fra", "ny jobb"):
             assert word not in text, (path.name, word)
 
 
-ARTICLE = {"avsnitt": [{"tekst": "Saken har vært utsatt to ganger.", "kilder": [{"dok": "saksframlegg", "side": 1}]}],
+ARTICLE = {"avsnitt": [{"rolle": "bakgrunn", "tekst": "Saken har vært utsatt to ganger.",
+                        "kilder": [{"dok": "saksframlegg", "side": 1}]}],
            "blocked": ""}
 
 
@@ -115,15 +121,42 @@ def test_skriv_artikkel(tmp_path, sources):
     assert skribent.skriv_artikkel(ITEM, CARD, tmp_path, fake) == "skrevet"
     saved = json.loads((tmp_path / "artikler" / "571424" / "2026-09-23" / "238-26.json").read_text())
     assert saved["avsnitt"] == ARTICLE["avsnitt"] and saved["nr"] == "238/26"
-    assert "do not repeat any of it" in fake.prompts[0] and CARD["hva_endres"] in fake.prompts[0]
+    assert "THE CARD AS PUBLISHED" in fake.prompts[0] and CARD["hva_endres"] in fake.prompts[0]
+    assert '"vedtak"' in fake.prompts[0] and "Slik gikk" not in fake.prompts[0]  # roles, not sideheads, are the writer's
 
 
 def test_artikkel_grenser_and_rewrite(tmp_path, sources):
-    long = {"avsnitt": [{"tekst": "ord " * 60, "kilder": [{"dok": "protokoll", "side": 1}]}] * 6, "blocked": ""}
-    assert skribent.artikkel_grenser(long) == ["artikkelen har 360 ord (maks 250)", "artikkelen har 6 avsnitt (maks 5)"]
+    long = {"avsnitt": [{"rolle": "bakgrunn", "tekst": "ord " * 60, "kilder": [{"dok": "protokoll", "side": 1}]}] * 6,
+            "blocked": ""}
+    problems = skribent.artikkel_grenser(long)
+    assert problems[:2] == ["artikkelen har 360 ord (maks 350)", "artikkelen har 6 avsnitt (maks 5)"]
+    assert any("setning på 60 ord" in p for p in problems) and any("bakgrunn brukes mer enn to ganger" in p for p in problems)
     fake = FakeLLM([long, dict(ARTICLE)])
     assert skribent.skriv_artikkel(ITEM, CARD, tmp_path, fake) == "skrevet"
     assert "artikkelen har 360 ord" in fake.prompts[1]
+
+
+def test_artikkel_grenser_roles_in_order_once_each():
+    def art(*roller):
+        return {"avsnitt": [{"rolle": r, "tekst": "En kort setning.", "kilder": [{"dok": "protokoll", "side": 1}]} for r in roller]}
+    assert skribent.artikkel_grenser(art("vedtak", "avstemning", "bakgrunn", "bakgrunn", "videre")) == []
+    assert skribent.artikkel_grenser(art("avstemning", "videre")) == []  # roles may be skipped
+    assert skribent.artikkel_grenser(art("bakgrunn", "vedtak")) == ["avsnitt 2 (vedtak) står etter bakgrunn; rekkefølgen er vedtak, avstemning, begrunnelse, bakgrunn, videre"]
+    assert skribent.artikkel_grenser(art("vedtak", "vedtak")) == ["rollen vedtak brukes mer enn én gang"]
+    assert skribent.artikkel_grenser(art("intro")) == ["avsnitt 1 har ukjent rolle «intro»"]
+
+
+def test_grenser_word_caps_and_party_spelling():
+    long = " ".join(["ord"] * 31) + "."
+    problems = skribent.grenser({**CARD, "hvorfor": long, "kilder": CARD["kilder"]})
+    assert "hvorfor har en setning på 31 ord (maks 30); del den" in problems
+    assert any(p.startswith("status har 41 ord (maks 40)") for p in skribent.grenser({**CARD, "status": " ".join(["ja"] * 41) + "."}))
+    assert "partinavn skrives som partiene selv gjør: Ap, FrP, KrF, Sp" in skribent.grenser({**CARD, "status": "Vedtatt med 52 stemmer (AP, FRP)."})
+    assert not any("partinavn" in p for p in skribent.grenser({**CARD, "status": "Vedtatt med 52 stemmer (Ap, FrP)."}))
+    assert skribent.grenser(CARD) == []
+    uten = {**CARD, "kilder": [k for k in CARD["kilder"] if k["felt"] != "ingress"]}
+    assert "ingress mangler kilde" in skribent.grenser(uten)
+    assert "ingress har 3 setninger (maks 2)" in skribent.grenser({**CARD, "ingress": "En. To. Tre."})
 
 
 def test_rewrite_with_feedback_counts_and_tells_the_writer(tmp_path, sources):

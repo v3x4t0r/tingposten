@@ -39,8 +39,7 @@ CARD = {"nr": "250/26", "overskrift": "Nye prinsipper for hvordan skolene får p
 SJEKK = {"nr": "250/26", "setninger": [
     {"felt": "hva_endres", "setning": "Bystyret vedtok en ny modell for skolene.", "stottet": True,
      "kilde": {"dok": "saksframlegg", "side": 9}}]}
-ARTIKKEL = {"nr": "250/26", "avvist": False, "tittel": "Elevtallet styrte pengene i tjue år",
-            "tittel_kilder": [{"dok": "saksframlegg", "side": 2}], "tittel_grunn": "",
+ARTIKKEL = {"nr": "250/26", "avvist": False,
             "avsnitt": [{"tekst": "Modellen fra 2004 ga skolene midler etter elevtall.",
                          "kilder": [{"dok": "saksframlegg", "side": 2}]},
                         {"tekst": "Rektorene ba om et grunnbeløp.", "kilder": [{"dok": "saksframlegg", "side": 5}]},
@@ -152,23 +151,23 @@ def test_overskrift(tmp_path, data_dir):
     assert ">Ny modell for pengene til grunnskolene</h1>" in page
 
 
-def test_article_paragraph_and_title(tmp_path, data_dir):
+def test_article_paragraph_and_ingress(tmp_path, data_dir):
     rett(data_dir,
          {"dato": "2026-10-30", "merknad": "Det var foreldrene, ikke rektorene.", "felt": "artikkel:2",
           "tekst": "Foreldreutvalget ba om et grunnbeløp."},
-         {"dato": "2026-10-30", "merknad": "Tittelen sa tjue år. Det var atten.", "felt": "artikkel_tittel",
-          "tekst": "Elevtallet styrte pengene i atten år"})
+         {"dato": "2026-10-30", "merknad": "Ingressen manglet.", "felt": "ingress",
+          "tekst": "Skolene får penger etter en ny modell.", "kilder": [{"dok": "saksframlegg", "side": 2}]})
     s = sak(data_dir)
+    assert s["har_ingress"] and s["dek"] == "Skolene får penger etter en ny modell."
+    assert s["dek_kilder"][0]["side"] == 2 and "ingress" in s["rettet"]
     assert [a["tekst"] for a in s["artikkel"]] == [ARTIKKEL["avsnitt"][0]["tekst"], "Foreldreutvalget ba om et grunnbeløp.",
                                                    ARTIKKEL["avsnitt"][2]["tekst"]]
     assert [a["rettet"] for a in s["artikkel"]] == [False, True, False]
     assert s["artikkel"][1]["kilder"][0]["side"] == 5            # the paragraph's sources stay
-    assert s["artikkel_tittel"] == "Elevtallet styrte pengene i atten år"
     page = side(bygg_side(tmp_path, data_dir))
     p2 = page[page.index('id="avsnitt-2"'):page.index('id="avsnitt-3"')]
     assert "Foreldreutvalget ba om et grunnbeløp." in p2 and 'class="rettet-merke"' in p2
     assert "rektorene" not in page.lower().replace("ikke rektorene", "")
-    assert "pengene i atten år</h2>" in page and "Tittelen er rettet" in page
     # the pipeline's article is never touched
     assert json.loads((data_dir / "artikler-redigert" / f"{KEY}.json").read_text()) == ARTIKKEL
 

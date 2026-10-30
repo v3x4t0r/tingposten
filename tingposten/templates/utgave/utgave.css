@@ -70,14 +70,26 @@ svg { display: block; }
 .kropp { display: grid; column-gap: var(--mellom); margin-top: 3mm; align-items: start; }
 .hopp-fra { margin: 0 0 1mm; font: 600 calc(var(--liten) * 1.05)/1.2 "TP Serif"; letter-spacing: 0.1em; text-transform: uppercase; }
 
-/* Kort fortalt: the fields under small-caps sideheads, a hairline between them (the site's rows) */
+/* Kort fortalt as running text: the fields under small-caps sideheads, a hairline between them (the site's rows) */
 .felt { margin-top: 1.4mm; padding-top: 1.1mm; border-top: 0.3pt solid #000; }
 .felt-etikett { margin: 0 0 0.5mm; font: 700 calc(var(--liten) * 0.95)/1.2 "TP Franklin"; letter-spacing: 0.12em; text-transform: uppercase; break-after: avoid; }
-.bakgrunn { margin-top: 3mm; }
-.bakgrunn-stikk { margin: 0 0 1.2mm; padding: 0.7mm 0 0.6mm; border-top: 0.8pt solid #000; border-bottom: 0.3pt solid #000; text-align: center;
-                  font: 700 calc(var(--liten) * 0.95)/1.2 "TP Franklin"; letter-spacing: 0.14em; text-transform: uppercase; break-after: avoid; break-inside: avoid; }
-.bakgrunn-tittel { margin: 0 0 1.4mm; text-align: center; font: 700 calc(var(--brod) * 1.36)/1.1 "TP Bodoni"; word-spacing: 0.05em; text-wrap: balance;
-                   break-inside: avoid; break-after: avoid; hyphens: auto; hyphenate-limit-chars: 10 5 4; }
+/* The article's sideheads (the site's fixed labels per role: "Slik gikk avstemningen", "Derfor" …), set like the field labels */
+.mellomtittel { margin: 1.6mm 0 0.5mm; padding-top: 1.1mm; border-top: 0.3pt solid #000; font: 700 calc(var(--liten) * 0.95)/1.2 "TP Franklin";
+                letter-spacing: 0.12em; text-transform: uppercase; break-after: avoid; }
+.mellomtittel + .avsnitt { text-indent: 0; }
+/* Kort fortalt as a fact box beside or after the article: the five fields under their labels in an Oxford-ruled frame */
+.kortboks .boks-tittel { margin-bottom: 1mm; font-size: calc(var(--brod) * 1.2); }
+.kortboks .felt { margin-top: 1.1mm; padding-top: 0.9mm; }
+.kortboks .felt:first-of-type { margin-top: 0; padding-top: 0; border-top: 0; }
+.kortboks .avsnitt { text-align: left; text-indent: 0; font-size: calc(var(--brod) * 0.94); line-height: calc(var(--brod-linje) * 0.94); hyphens: auto; }
+/* In the text columns the box may run on into the next column, whole fields at a time, each fragment framed */
+.spalter .kortboks { margin: 2.6mm 0 1.4mm; break-inside: auto; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.spalter .kortboks .ramme-inne { box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.spalter .kortboks .felt { break-inside: avoid; }
+.spalter .kortboks .boks-tittel { break-after: avoid; }
+.sidefelt .kortboks.kompakt .avsnitt { font-size: calc(var(--brod) * 0.9); line-height: calc(var(--brod-linje) * 0.9); }
+.sidefelt .kortboks.kompakt .ramme-inne { padding: 1.6mm 2mm 1.8mm; }
+.sak-kortdel .stikk { text-align: center; }
 .rettet { margin-top: 1.6mm; font: italic 400 calc(var(--brod) * 0.92)/1.3 "TP Serif"; text-align: left; }
 
 /* Sources, short address and QR code: where every story ends, under a short rule */

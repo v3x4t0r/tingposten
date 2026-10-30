@@ -17,11 +17,11 @@ The file is a list, applied in date order (the file's order within a day):
       "kilder": [{"dok": "saksframlegg", "side": 5}],  # optional: the new text's pages
       "var": "…"}]                                     # the text it replaced (`tingposten rett` writes it)
 
-Targets: "overskrift", a card field (hva_endres, hvem_pavirkes, hvorfor,
-status, nar_og_hvor), "artikkel:<n>" (the background article's paragraph n,
-1-based, numbered as in the edited article) and "artikkel_tittel". The dek is
-the first sentence of hva_endres: correct hva_endres and the dek follows.
-Without "felt" a correction is a note only. A target keeps its sources unless
+Targets: "overskrift", a card field (ingress, hva_endres, hvem_pavirkes,
+hvorfor, status, nar_og_hvor) and "artikkel:<n>" (the body's paragraph n,
+1-based, numbered as in the edited article). On an older card without an
+ingress the dek is the first sentence of hva_endres: correct hva_endres and
+the dek follows. Without "felt" a correction is a note only. A target keeps its sources unless
 the correction gives "kilder".
 
 Every note is shown, also when its change can't be made: the target is gone,
@@ -42,7 +42,7 @@ from . import pdf
 
 log = logging.getLogger(__name__)
 
-FELT = ("hva_endres", "hvem_pavirkes", "hvorfor", "status", "nar_og_hvor")
+FELT = ("ingress", "hva_endres", "hvem_pavirkes", "hvorfor", "status", "nar_og_hvor")
 DOKUMENTER = ("saksframlegg", "protokoll")
 _AVSNITT = re.compile(r"artikkel:([1-9]\d*)")
 # "https://tingposten.no/bergen/sak/571424/2026-09-23/266-26/", "bergen/sak/…" or the key itself.
@@ -54,7 +54,7 @@ def sti(data_dir: Path, key: str) -> Path:
 
 
 def gyldig_felt(felt: str) -> bool:
-    return felt in ("overskrift", "artikkel_tittel", *FELT) or bool(_AVSNITT.fullmatch(felt))
+    return felt in ("overskrift", *FELT) or bool(_AVSNITT.fullmatch(felt))
 
 
 def _ord(text) -> str:
@@ -126,11 +126,6 @@ class _Sak:
         if m := _AVSNITT.fullmatch(felt):
             n = int(m[1])
             return _ord(self.avsnitt[n - 1].get("tekst")) if n <= len(self.avsnitt) else None
-        if felt == "artikkel_tittel":
-            art = self.artikkel
-            # The rule bygg._article_title shows a headline by: checked and kept.
-            if self.avsnitt and _ord(art.get("tittel")) and art.get("tittel_kilder") and not art.get("tittel_grunn"):
-                return _ord(art["tittel"])
         return None
 
     def sett(self, felt: str, tekst: str, kilder: list[dict] | None) -> None:
@@ -147,10 +142,6 @@ class _Sak:
             a["rettet"] = True
             if kilder is not None:
                 a["kilder"] = kilder
-        elif felt == "artikkel_tittel":
-            self.artikkel["tittel"] = tekst
-            if kilder is not None:
-                self.artikkel["tittel_kilder"] = kilder
 
 
 def bruk(rettelser: list[dict], kort: dict | None, artikkel: dict | None,
@@ -227,10 +218,10 @@ def ny(data_dir: Path, key: str, merknad: str, felt: str | None = None, tekst: s
             raise ValueError("--tekst og --kilde trenger --felt: hva skal rettes?")
     else:
         if felt == "dek":
-            raise ValueError("ingressen er første setning i hva_endres: rett hva_endres, så følger ingressen med")
+            raise ValueError("ingressen rettes som feltet ingress (på eldre kort uten ingress: rett hva_endres, "
+                             "så følger ingressen med)")
         if not gyldig_felt(felt):
-            raise ValueError(f"ukjent felt «{felt}»: bruk overskrift, {', '.join(FELT)}, artikkel:<n> "
-                             "eller artikkel_tittel")
+            raise ValueError(f"ukjent felt «{felt}»: bruk overskrift, {', '.join(FELT)} eller artikkel:<n>")
         if tekst is None:
             raise ValueError("--felt trenger --tekst (ny tekst, eller --tekst '' for å fjerne)")
         if kilder and felt == "overskrift":
@@ -244,13 +235,11 @@ def ny(data_dir: Path, key: str, merknad: str, felt: str | None = None, tekst: s
         naa = (sak := _Sak(kort, art)).hent(felt)
         if naa is None:
             if not felt.startswith("artikkel"):
-                grunn = "saken har ikke noe publisert kort"
+                grunn = "saken har ikke noe publisert kort" if not sak._kort_ok() else "feltet er tomt på dette kortet"
             elif not sak.avsnitt:
-                grunn = "saken har ingen bakgrunnsartikkel"
-            elif felt == "artikkel_tittel":
-                grunn = "bakgrunnen vises uten tittel"
+                grunn = "saken har ingen brødtekst"
             else:
-                grunn = f"bakgrunnen har {len(sak.avsnitt)} avsnitt"
+                grunn = f"brødteksten har {len(sak.avsnitt)} avsnitt"
             raise ValueError(f"«{felt}» finnes ikke på siden: {grunn}")
         if _ord(tekst) == naa:
             raise ValueError(f"«{felt}» har allerede den teksten")

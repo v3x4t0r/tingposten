@@ -52,7 +52,7 @@ def main(argv: list[str] | None = None) -> int:
     kjorp.add_argument("--utvalg", help="only this utvalgId")
     kjorp.add_argument("--dato", help="only this meeting date YYYY-MM-DD")
     kjorp.add_argument("--steg", help="comma-separated subset of skriv,sjekk,klassifiser,rediger,artikkel,"
-                                      "artikkelsjekk,artikkelrediger,artikkeltittel")
+                                      "artikkelsjekk,artikkelrediger")
     kjorp.add_argument("--parallel", type=int, default=3)
     kjorp.add_argument("--fra", help="oldest meeting date YYYY-MM-DD (default: config.TILBAKE_DAGER back)")
 
@@ -69,9 +69,9 @@ def main(argv: list[str] | None = None) -> int:
                                    "266-26/, bergen/sak/571424/2026-09-23/266-26 eller 571424/2026-09-23/266-26")
     rettp.add_argument("--merknad", required=True,
                        help="hva som var feil og hva som er riktig, én eller to setninger. Vises på saken som du skriver den")
-    rettp.add_argument("--felt", help="det som rettes: overskrift, hva_endres, hvem_pavirkes, hvorfor, status, "
-                                      "nar_og_hvor, artikkel:<n> (avsnitt n i bakgrunnen) eller artikkel_tittel. "
-                                      "Ingressen følger hva_endres. Uten --felt er rettelsen bare en merknad")
+    rettp.add_argument("--felt", help="det som rettes: overskrift, ingress, hva_endres, hvem_pavirkes, hvorfor, "
+                                      "status, nar_og_hvor eller artikkel:<n> (avsnitt n i brødteksten). "
+                                      "Uten --felt er rettelsen bare en merknad")
     rettp.add_argument("--tekst", help="ny tekst for feltet; --tekst '' fjerner teksten")
     rettp.add_argument("--kilde", action="append", metavar="DOK:SIDE",
                        help="kilde for den nye teksten, f.eks. saksframlegg:5 (kan gjentas). Uten beholder feltet "
@@ -310,7 +310,6 @@ def _pdf_mangler(args) -> int:
     targets = pipeline.pdf_som_mangler(items, config.DATA_DIR)
     if oppdater := sum(1 for t in targets if t.get("oppdater")):
         logging.info("%d protokoll(er) mangler møtets vedtak og hentes på nytt", oppdater)
-
     meetings = sorted({t["filename"].rsplit("/", 1)[0] for t in targets})
     logging.info("%d PDF(s) to fetch across %d meeting(s)%s", len(targets), len(meetings), f" since {fra}" if fra else "")
     for t in targets:

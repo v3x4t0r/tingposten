@@ -33,7 +33,7 @@
       {% endif %}
       {% if s.har_sammendrag and s.tittel != s.overskrift %}<p class="kommunetittel"><strong>Kommunens tittel:</strong> {{ s.tittel|typo }}</p>{% endif %}
       {% if s.har_sammendrag or s.artikkel %}
-      <p class="paa-siden"><span>På siden:</span>{% if s.har_sammendrag %}<a href="#kort">Kort fortalt</a>{% endif %}{% if s.artikkel %}<span><a href="#bakgrunn">Bakgrunn</a>, ca.&nbsp;{{ s.lesetid }}&nbsp;min</span>{% endif %}<a href="#dokumenter">Dokumenter</a></p>
+      <p class="paa-siden"><span>På siden:</span>{% if s.artikkel %}<span><a href="#artikkel">Saken</a>, ca.&nbsp;{{ s.lesetid }}&nbsp;min</span>{% endif %}{% if s.har_sammendrag %}<a href="#kort">Kort fortalt</a>{% endif %}<a href="#dokumenter">Dokumenter</a></p>
       {% endif %}
     </div>
   </header>
@@ -46,10 +46,35 @@
     </ul>
   </section>
   {% endif %}
-  <div class="sak-oppsett">
+  <div class="sak-oppsett{% if s.artikkel %} sak-oppsett-artikkel{% endif %}">
     {% if s.venter_protokoll %}
     <section class="sak-melding sak-melding-venter lag" aria-label="Sammendrag">
       <p class="sak-melding-tekst">Protokollen fra møtet {{ s.dato_tekst }} er ikke publisert ennå. Når den kommer, skriver vi et kort sammendrag med kilde til hver setning.</p>
+    </section>
+    {% elif s.artikkel %}
+    {# The story's body first; Kort fortalt stands beside it in the rail. #}
+    {% set bygger = artikkel_dokumenter(s.artikkel) %}
+    <section class="artikkel lag" id="artikkel" aria-labelledby="artikkel-tittel">
+      <h2 class="etikett etikett-strek artikkel-etikett" id="artikkel-tittel">Saken</h2>
+      <div>
+        <p class="byline">{% if bygger %}<span>Bygger på {{ bygger }}</span>{% endif %}<span class="nb">Ca. {{ s.lesetid }} {{ "minutt" if s.lesetid == 1 else "minutter" }} å lese</span></p>
+        <div class="brodtekst">
+          {% for a in s.artikkel %}
+          {% if a.mellomtittel %}<h3 class="mellomtittel">{{ a.mellomtittel }}</h3>{% endif %}
+          <p id="avsnitt-{{ loop.index }}"{% if loop.first %} class="forste"{% endif %}>{{ a.tekst|typo }}{% if a.kilder %}<sup class="fn"><a href="#kilde-{{ loop.index }}" aria-label="Kilder til avsnitt {{ loop.index }}">{{ loop.index }}</a></sup>{% endif %}{% if a.rettet %} <a class="rettet-merke" href="#rettelser">Rettet</a>{% endif %}</p>
+          {% endfor %}
+        </div>
+        <div class="fotnoter">
+          <h3>Kilder til teksten</h3>
+          <p>Tallet etter hvert avsnitt viser til sidene i kommunens dokumenter som avsnittet bygger på.</p>
+          <ol>
+            {% for a in s.artikkel %}{% if a.kilder %}
+            <li id="kilde-{{ loop.index }}"><span class="nr">{{ loop.index }}</span><span>{{ kildegrupper_html(a.kilder) }}</span><a class="tilbake" href="#avsnitt-{{ loop.index }}" aria-label="Tilbake til avsnitt {{ loop.index }}">↑</a></li>
+            {% endif %}{% endfor %}
+          </ol>
+        </div>
+        <p class="meld-feil">Ser du en feil? {{ meld_feil_lenker(s) }}</p>
+      </div>
     </section>
     {% elif s.har_sammendrag %}
     <section class="kort" id="kort" aria-labelledby="kort-tittel">
@@ -73,6 +98,23 @@
     </section>
     {% endif %}
     <div class="rail">
+      {% if s.artikkel and s.har_sammendrag %}
+    <section class="kort kort-rail" id="kort" aria-labelledby="kort-tittel">
+      <div class="kort-hode lag"><h2 id="kort-tittel">Kort fortalt</h2><p>De samme fem punktene for hver sak.</p></div>
+      {% for key, label in FELT %}
+      {% set f = (s.kort_felt|selectattr("key", "eq", key)|list or [none])[0] %}
+      {% if not f and key == "status" and s.status_rad %}{% set f = s.status_rad %}{% endif %}
+      <div class="felt lag"><h3>{{ label }}{% if key in s.rettet %} <a class="rettet-merke" href="#rettelser">Rettet</a>{% endif %}</h3><div>
+        {% if f %}
+        <p class="felt-tekst">{{ f.tekst|typo }}</p>{{ kildelinje(f.kilder) }}
+        {% else %}
+        <p class="felt-tom"><span aria-hidden="true">–</span><span class="vh">Ingen opplysning i kortet</span></p>
+        {% endif %}
+      </div></div>
+      {% endfor %}
+      <p class="meld-feil lag"><span></span><span>Ser du en feil? {{ meld_feil_lenker(s) }}</span></p>
+    </section>
+      {% endif %}
       {% if s.figurer %}
       <div class="rail-figurer figurer-{{ s.figurer|length }}">{% for f in s.figurer %}{{ figur_sak(s, f) }}{% endfor %}</div>
       {% endif %}
@@ -84,36 +126,6 @@
         <p class="smaatekst">Alt på denne siden bygger på Bergen kommunes egne dokumenter. Ser du en feil? {{ meld_feil_lenker(s) }}.</p>
       </section>
     </div>
-    {% if s.artikkel %}
-    {% set bygger = artikkel_dokumenter(s.artikkel) %}
-    <section class="bakgrunn lag{% if s.artikkel_tittel %} bakgrunn-med-tittel{% endif %}" id="bakgrunn" aria-labelledby="bakgrunn-tittel">
-      {# The article's own headline only as the redaktør kept it (fact-checked); "Bakgrunn" is then its kicker. #}
-      {% if s.artikkel_tittel %}
-      <p class="etikett etikett-strek bakgrunn-etikett" aria-hidden="true">Bakgrunn</p>
-      {% else %}
-      <h2 class="etikett etikett-strek bakgrunn-etikett" id="bakgrunn-tittel">Bakgrunn</h2>
-      {% endif %}
-      <div>
-        {% if s.artikkel_tittel %}<h2 class="bakgrunn-tittel" id="bakgrunn-tittel"><span class="vh">Bakgrunn: </span>{{ s.artikkel_tittel|tittel }}</h2>{% endif %}
-        <p class="byline">{% if bygger %}<span>Bygger på {{ bygger }}</span>{% endif %}<span class="nb">Ca. {{ s.lesetid }} {{ "minutt" if s.lesetid == 1 else "minutter" }} å lese</span>{% if "artikkel_tittel" in s.rettet %}<span><a class="rettet-merke" href="#rettelser">Tittelen er rettet</a></span>{% endif %}</p>
-        <div class="brodtekst">
-          {% for a in s.artikkel %}
-          <p id="avsnitt-{{ loop.index }}">{{ a.tekst|typo }}{% if a.kilder %}<sup class="fn"><a href="#kilde-{{ loop.index }}" aria-label="Kilder til avsnitt {{ loop.index }}">{{ loop.index }}</a></sup>{% endif %}{% if a.rettet %} <a class="rettet-merke" href="#rettelser">Rettet</a>{% endif %}</p>
-          {% endfor %}
-        </div>
-        <div class="fotnoter">
-          <h3>Kilder til bakgrunnen</h3>
-          <p>Tallet etter hvert avsnitt viser til sidene i kommunens dokumenter som avsnittet bygger på.</p>
-          <ol>
-            {% for a in s.artikkel %}{% if a.kilder %}
-            <li id="kilde-{{ loop.index }}"><span class="nr">{{ loop.index }}</span><span>{{ kildegrupper_html(a.kilder) }}</span><a class="tilbake" href="#avsnitt-{{ loop.index }}" aria-label="Tilbake til avsnitt {{ loop.index }}">↑</a></li>
-            {% endif %}{% endfor %}
-          </ol>
-        </div>
-        <p class="meld-feil">Ser du en feil? {{ meld_feil_lenker(s) }}</p>
-      </div>
-    </section>
-    {% endif %}
   </div>
 </article>
 {% if relaterte %}

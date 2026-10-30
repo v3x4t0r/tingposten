@@ -66,7 +66,7 @@ def test_utfall_line():
                 s("", sammendrag=False),                       # outcome unknown: not counted
                 s("Venter på protokoll", sammendrag=False)])   # a label this list doesn't know
     assert bygg.utfall(saker) == ["3 vedtatt", "1 der innstillingen falt", "2 tatt til orientering", "1 sendt tilbake",
-                                  "1 valg og fritak", "1 venter på protokoll", "3 med bakgrunnsartikkel",
+                                  "1 valg og fritak", "1 venter på protokoll", "3 med artikkel",
                                   "3 uten sammendrag ennå"]
     assert bygg.utfall([]) == []
 
@@ -85,7 +85,7 @@ def test_meeting_page_one_column_in_agenda_order(site):
     assert page.index('id="sakene"') < page.index('id="valg"')
     # the outcome line, from the statuses
     utfall = re.search(r'<p class="utfall">(.*?)</p>', page, re.S).group(1)
-    assert "1 sendt tilbake" in utfall and "1 med bakgrunnsartikkel" in utfall and "uten sammendrag ennå" in utfall
+    assert "1 sendt tilbake" in utfall and "1 med artikkel" in utfall and "uten sammendrag ennå" in utfall
     assert '<meta name="description" content="Alle sakene bystyret behandlet 23. september 2026' in page
     # breadcrumbs start with Forsiden; Møter is the section, not the page
     assert '<li><a href="../../../bergen/">Forsiden</a></li>' in page

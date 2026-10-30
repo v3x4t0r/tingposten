@@ -22,6 +22,7 @@ from . import config, pdf
 log = logging.getLogger(__name__)
 
 FIELDS = (
+    ("ingress", "Ingress"),
     ("hva_endres", "Hva endres"),
     ("hvem_pavirkes", "Hvem påvirkes"),
     ("hvorfor", "Hvorfor"),

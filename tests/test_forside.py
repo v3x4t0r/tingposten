@@ -110,10 +110,10 @@ def test_rendered_front_page(site):
     # a sak without a card keeps the kommune's title, set as a plain line
     assert re.search(r'<h4 class="flis-tittel raatittel"><a [^>]*>Sak med høy score men uten kort</a>', forside)
     assert re.search(r'<h2 class="lead-tittel"><a', forside)  # the lead has a card: a headline
-    # the rare status is boxed (239: sent back), the Bakgrunn cue is not a link
+    # the rare status is boxed (239: sent back), the Artikkel cue is not a link
     assert '<li class="faktum faktum-status"><span class="vh">Status: </span>Sendt tilbake' in forside
     assert "min lesing" not in lead_html(forside)
-    assert not re.search(r'<a[^>]*>[^<]*Bakgrunn', forside)
+    assert not re.search(r'<a[^>]*>[^<]*Artikkel', forside)
     # the tile's count link sits at its foot
     assert re.search(r'<p class="flis-fot"><a class="pil" href="../bergen/tema/annet/">Alle 3 vedtak<span class="vh"> om annet</span></a></p>', forside)
 

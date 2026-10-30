@@ -202,17 +202,17 @@ def test_typography_on_card_and_article(side):
     page = side(0)
     assert f"2{NN}330{NN}692{NB}kroner" in page
     assert f'§{NB}<span class="nb">7-9</span>' in page and f"54{NB}stemmer" in page
-    bakgrunn = re.search(r'<section class="bakgrunn lag".*?</section>', page, re.S).group(0)
-    assert f"ca.{NB}200{NB}skoler" in bakgrunn
+    artikkel = re.search(r'<section class="artikkel lag".*?</section>', page, re.S).group(0)
+    assert f"ca.{NB}200{NB}skoler" in artikkel
 
 
-def test_background_heading_and_meld_feil_lines(side):
+def test_article_heading_and_meld_feil_lines(side):
     page = side(0)
-    bakgrunn = re.search(r'<section class="bakgrunn lag".*?</section>', page, re.S).group(0)
-    assert '<h2 class="etikett etikett-strek bakgrunn-etikett" id="bakgrunn-tittel">Bakgrunn</h2>' in bakgrunn
-    assert "Saken bak vedtaket" not in page and "Saken så langt" not in page
-    kort = re.search(r'<section class="kort".*?</section>', page, re.S).group(0)
-    for part in (kort, bakgrunn):
+    artikkel = re.search(r'<section class="artikkel lag".*?</section>', page, re.S).group(0)
+    assert '<h2 class="etikett etikett-strek artikkel-etikett" id="artikkel-tittel">Saken</h2>' in artikkel
+    assert "Bakgrunn" not in page.split('id="artikkel"')[1].split("</section>")[0]
+    kort = re.search(r'<section class="kort[^"]*".*?</section>', page, re.S).group(0)
+    for part in (kort, artikkel):
         assert re.search(r'Ser du en feil\? <a href="https://github.com/[^"]+">Meld feil</a>', part)
 
 

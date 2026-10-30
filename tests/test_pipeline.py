@@ -78,15 +78,11 @@ def test_kjor_runs_steps_in_order_with_given_backends(tmp_path, monkeypatch):
     monkeypatch.setattr(pipeline, "todo", lambda step, items, data_dir: items)
     monkeypatch.setattr(pipeline, "velg_artikler", lambda items, data_dir: items)
     monkeypatch.setattr(pipeline, "omskriv_kandidater", lambda items, data_dir, **kw: {})
-    monkeypatch.setattr(pipeline.artikkeltittel, "run", lambda items, data_dir, llm, sjekk_llm, parallel:
-                        calls.append(("artikkeltittel.run", (llm, sjekk_llm), None)) or {"ok": len(items)})
     pipeline.kjor(tmp_path, llms={"skriv": "W", "sjekk": "C", "klassifiser": "K"})
     assert calls == [("skribent.run", "W", True), ("faktasjekker.run", "C", True), ("klassifiserer.run", "K", True),
                      ("redaktor.run", None, None),
                      ("skribent.run_artikkel", "W", True), ("faktasjekker.run_artikkel", "C", True),
-                     ("redaktor.run_artikler", None, None),
-                     # last: the article headline (writer + checker), then the redaktør again to keep or drop it
-                     ("artikkeltittel.run", ("W", "C"), None), ("redaktor.run_artikler", None, None)]
+                     ("redaktor.run_artikler", None, None)]
 
 
 def test_kjor_steg_subset_skips_the_rest(tmp_path, monkeypatch):
@@ -184,7 +180,7 @@ def test_kjor_rewrites_a_rejected_card_once_end_to_end(tmp_path, monkeypatch):
     monkeypatch.setattr(kildetekst, "kilder_for", lambda item, data_dir: {"saksframlegg": "s", "protokoll": "p"})
 
     def card(status):
-        return {"overskrift": "Planen for parken er vedtatt", "hva_endres": "Planen er vedtatt.", "hvem_pavirkes": "",
+        return {"overskrift": "Planen for parken er vedtatt", "ingress": "", "hva_endres": "Planen er vedtatt.", "hvem_pavirkes": "",
                 "hvorfor": "", "status": status, "nar_og_hvor": "", "merknad": "", "blocked": "",
                 "kilder": [{"felt": "hva_endres", "dok": "protokoll", "side": 1}, {"felt": "status", "dok": "protokoll", "side": 1}]}
 
