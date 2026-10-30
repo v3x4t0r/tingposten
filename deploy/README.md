@@ -138,14 +138,11 @@ rm ~/tingposten/PUBLISER      # av
 
 Henting, skriving og bygging fortsetter uansett; bare publiseringen hoppes over.
 
-## Første kjøring etter 30.10.2026 (ny artikkelstruktur)
+## Ny artikkelstruktur fra 30.10.2026: hva som skjer med gamle kort
 
-Skribentreglene er versjon `skribent-3` (ingress, ordgrenser, brødtekst med roller). Første `kjor` etter oppdateringen skriver derfor **alle kort i 92-dagersvinduet på nytt**, og så artiklene deres. Det er mange modellkall, og alt må gjennom Codex før det vises; til sjekken er kjørt beholdes de gamle kortene på siden (se punkt 3 over). Gjør slik:
+Skribentreglene er versjon `skribent-3` (ingress, ordgrenser, brødtekst med roller). Kort og artikler skrevet under eldre regler **fryses** (`pipeline.eldre_regler`): de skrives ikke på nytt bare fordi reglene fikk nytt versjonsnummer, redigeres ikke på nytt, og sendes ikke til omskriving. Det koster null modellkall, og siden viser gamle og nye saker om hverandre. Bare nye saker, og saker der PDF-ene endrer seg, får `skribent-3`.
 
-1. Sjekk at både `claude` og `codex` har kvote (`codex exec` må svare).
-2. `uv run --no-sync tingposten kjor` (gjerne et møte om gangen: `--utvalg 571424 --dato 2026-09-23`), og se at `venter` går til 0 i loggen.
-3. Les sakene 236, 239, 247 og 255 fra 23.09.2026 i `site/` før du publiserer: ingress uten «Bystyret …», status i klarspråk, mellomtitler i brødteksten.
-4. `bygg` og `publiser` som vanlig.
+Vil du likevel ha et gammelt kort i ny form, slett `data/bergen/kort/<nøkkel>.json` (og `artikler/<nøkkel>.json`) og kjør `kjor`; til den nye sjekken er kjørt, beholdes det publiserte kortet (punkt 3 over). Les saken i `site/` før du publiserer: ingress uten «Bystyret …», status i klarspråk, mellomtitler i brødteksten.
 
 ## Kjøre én gang for hånd
 
