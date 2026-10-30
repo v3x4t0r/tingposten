@@ -276,6 +276,7 @@ def maskin(root: Path = config.ROOT) -> dict:
         "disk_brukt": round(100 * disk.used / disk.total),
         "claude": bool(shutil.which("claude", path=path)),
         "codex": bool(shutil.which("codex", path=path)),
+        "reserve": config.FAKTASJEKKER_RESERVE,
     }
 
 

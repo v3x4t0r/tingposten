@@ -99,6 +99,10 @@ KONTAKT_EPOST = "tingposten@freetime.no"  # Domeneshop alias on freetime.no, for
 MODELL_SKRIBENT = "opus"
 MODELL_KLASSIFISERER = "sonnet"
 MODELL_FAKTASJEKKER = None  # None → the model set in ~/.codex/config.toml
+# When Codex can't answer (not installed, out of quota), Claude with this model
+# fact-checks instead, for the rest of that run; the check records which model did
+# it. Owner, 30.10.2026: Codex out of tokens, Fable as the backup reviewer. None = no reserve.
+FAKTASJEKKER_RESERVE = "fable"
 
 # Organs whose items are recommendations to another organ, not decisions.
 # Their cases show up on the site when the deciding organ has decided.

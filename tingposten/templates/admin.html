@@ -322,7 +322,9 @@ function tegn() {
   fakta("maskin", [
     ["Ledig disk", `${tall(m.disk_ledig_gb)} GB (${m.disk_brukt} % brukt)`, m.disk_ledig_gb < 2 ? "nei" : ""],
     ["Claude (skribent)", m.claude ? "Funnet" : "Mangler", m.claude ? "ok" : "nei"],
-    ["Codex (faktasjekk)", m.codex ? "Funnet" : "Mangler", m.codex ? "ok" : "nei"],
+    ["Faktasjekk", m.codex ? (m.reserve ? `Codex (${m.reserve} som reserve)` : "Codex")
+                           : m.reserve ? `${m.reserve[0].toUpperCase() + m.reserve.slice(1)} (Claude), Codex mangler` : "Codex mangler",
+     m.codex || m.reserve ? "ok" : "nei"],
     s ? ["Siste kjøring", `${MODUSNAVN[s.modus] || s.modus}, ${tid(s.startet)}`] : null,
   ]);
 }

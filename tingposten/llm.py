@@ -13,6 +13,7 @@ import logging
 import os
 import subprocess
 import tempfile
+import threading
 import tomllib
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -99,6 +100,42 @@ class CodexCLI(_Backend):
                 return json.loads(answer.read_text())
             except ValueError:
                 raise LLMError("codex answer is not JSON") from None
+
+
+class MedReserve(_Backend):
+    """Asks `forste`; when it can't answer (not installed, out of quota, timed out,
+    an answer that stays malformed), asks `reserve` and keeps to it for the rest
+    of the run, so a missing CLI isn't tried again for every sak. `name` is the
+    backend that gave this thread's last answer, which is what the steps record."""
+
+    def __init__(self, forste: _Backend, reserve: _Backend | None):
+        self.forste, self.reserve = forste, reserve
+        self.byttet = False
+        self._lock = threading.Lock()
+        self._svarte = threading.local()
+
+    @property
+    def name(self) -> str:
+        brukt = getattr(self._svarte, "backend", None) or (self.reserve if self.byttet else self.forste)
+        return brukt.name
+
+    def ask(self, prompt: str, schema: dict) -> dict:
+        if not self.byttet or self.reserve is None:
+            try:
+                svar = self.forste.ask(prompt, schema)
+                self._svarte.backend = self.forste
+                return svar
+            except LLMError as e:
+                if self.reserve is None:
+                    raise
+                with self._lock:
+                    if not self.byttet:
+                        log.warning("%s can't answer (%s); %s takes over for the rest of this run",
+                                    self.forste.name, str(e)[:200], self.reserve.name)
+                        self.byttet = True
+        svar = self.reserve.ask(prompt, schema)
+        self._svarte.backend = self.reserve
+        return svar
 
 
 class FakeLLM(_Backend):

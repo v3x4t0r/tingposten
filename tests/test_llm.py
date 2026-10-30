@@ -131,3 +131,23 @@ def test_write_json_is_atomic_and_readable(tmp_path):
     assert llm.read_json(path) == {"å": 1}
     assert llm.read_json(tmp_path / "missing.json") is None
     assert list(path.parent.iterdir()) == [path]
+
+
+def test_reserve_takes_over_when_the_first_cannot_answer():
+    forste = llm.FakeLLM([llm.LLMError("codex is not installed"), llm.LLMError("codex is not installed")], "codex")
+    reserve = llm.FakeLLM([GOOD, GOOD], "claude:fable")
+    sjekk = llm.MedReserve(forste, reserve)
+    assert sjekk.ask("p", SCHEMA) == GOOD and sjekk.name == "claude:fable" and sjekk.byttet
+    assert sjekk.ask("p2", SCHEMA) == GOOD
+    assert len(forste.prompts) == 2 and reserve.prompts == ["p", "p2"]  # codex isn't tried again
+
+
+def test_reserve_unused_while_the_first_answers():
+    sjekk = llm.MedReserve(llm.FakeLLM([GOOD], "codex"), llm.FakeLLM([], "claude:fable"))
+    assert sjekk.ask("p", SCHEMA) == GOOD and sjekk.name == "codex" and not sjekk.byttet
+
+
+def test_without_reserve_the_error_stands():
+    sjekk = llm.MedReserve(llm.FakeLLM([llm.LLMError("x"), llm.LLMError("x")], "codex"), None)
+    with pytest.raises(llm.LLMError):
+        sjekk.ask("p", SCHEMA)

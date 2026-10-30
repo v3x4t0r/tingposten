@@ -30,7 +30,7 @@ from pathlib import Path
 
 from . import (artikkeltittel, config, faktasjekker, klassifiserer, pdf, protokoll, redaktor, score, skribent,
                status)
-from .llm import ClaudeCLI, CodexCLI, read_json
+from .llm import ClaudeCLI, CodexCLI, MedReserve, read_json
 
 log = logging.getLogger(__name__)
 
@@ -212,7 +212,9 @@ def kjor(data_dir: Path = config.DATA_DIR, utvalg: str | None = None, dato: str 
         log.info("%d of %d saker have no protokoll on disk yet%s", len(missing), len(items), hint)
     llms = llms or {
         "skriv": ClaudeCLI(config.MODELL_SKRIBENT),
-        "sjekk": CodexCLI(config.MODELL_FAKTASJEKKER),
+        # Codex checks; when it can't answer, Claude (config.FAKTASJEKKER_RESERVE) does.
+        "sjekk": MedReserve(CodexCLI(config.MODELL_FAKTASJEKKER),
+                            ClaudeCLI(config.FAKTASJEKKER_RESERVE) if config.FAKTASJEKKER_RESERVE else None),
         "klassifiser": ClaudeCLI(config.MODELL_KLASSIFISERER),
     }
     llm = {**llms, "artikkel": llms.get("artikkel", llms.get("skriv")),
