@@ -732,6 +732,7 @@ def _env() -> Environment:
     env.globals["artikkel_dokumenter"] = artikkel_dokumenter
     env.globals["fonter"] = (HERE / "static" / "fonts.css").exists()
     env.globals["skjult"] = getattr(config, "SKJUL_FOR_SOK", False)
+    env.globals["goatcounter"] = getattr(config, "GOATCOUNTER", None)
     return env
 
 

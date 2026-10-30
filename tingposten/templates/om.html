@@ -41,4 +41,13 @@
   <p>Alt kommer fra Bergen kommunes egne saksframlegg og protokoller. Hver setning på et kort lenker til siden i dokumentet den bygger på. Finner du en feil, bruk «Meld feil» på saken.</p>
   </div>
 </section>
+{% if goatcounter %}
+
+<section class="omdel lag" aria-labelledby="besok">
+  <h2 class="etikett etikett-strek" id="besok">Besøkstall</h2>
+  <div class="lesetekst">
+  <p>Vi teller besøk med <a href="https://www.goatcounter.com/">GoatCounter</a>, et åpent verktøy uten informasjonskapsler. For hver sidevisning registreres hvilken side som ble åpnet, hvilken side du kom fra og skjermbredden, ikke hvem du er. Ifølge GoatCounter lagres ikke IP-adresser. Skriptet ligger hos Tingposten selv; bare selve tellingen sendes til GoatCounter.</p>
+  </div>
+</section>
+{% endif %}
 {% endblock %}

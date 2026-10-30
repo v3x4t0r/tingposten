@@ -70,6 +70,10 @@ SITE_URL = ("https://tingposten.no/" if PUBLISER_TIL.startswith("statichost")
 # Until launch the site is online but kept out of search engines: noindex on
 # every page and a robots.txt that disallows everything (user's choice, 2026-10-30).
 SKJUL_FOR_SOK = True
+# Visitor counts: GoatCounter (cookieless, no IP addresses stored). The count.js
+# in static/ is GoatCounter's own script (ISC), unmodified and served from this
+# site; only the count goes to this endpoint. None = no counting.
+GOATCOUNTER = "https://v3x4t0r.goatcounter.com/count"
 FREMHEVET_TERSKEL = 40  # score at or above this is highlighted on the front page
 MELD_FEIL = None  # None → GitHub issue on REPO, prefilled with the sak
 

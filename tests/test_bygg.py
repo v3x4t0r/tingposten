@@ -567,3 +567,16 @@ def test_hidden_from_search_until_launch(tmp_path, data_dir, monkeypatch):
     bygg.build(tmp_path / "apen", data_dir, idag=date(2026, 10, 1))
     assert not (tmp_path / "apen" / "robots.txt").exists()
     assert "noindex" not in (tmp_path / "apen" / "bergen" / "index.html").read_text()
+
+
+def test_goatcounter_is_self_hosted_and_explained(tmp_path, data_dir, monkeypatch):
+    monkeypatch.setattr(config, "GOATCOUNTER", "https://eksempel.goatcounter.com/count")
+    bygg.build(tmp_path / "med", data_dir, idag=date(2026, 10, 1))
+    forside = (tmp_path / "med" / "bergen" / "index.html").read_text()
+    assert '<script data-goatcounter="https://eksempel.goatcounter.com/count" async src="../static/count.js"></script>' in forside
+    assert "gc.zgo.at" not in forside and (tmp_path / "med" / "static" / "count.js").exists()
+    assert "Besøkstall" in (tmp_path / "med" / "om" / "index.html").read_text()
+    monkeypatch.setattr(config, "GOATCOUNTER", None)
+    bygg.build(tmp_path / "uten", data_dir, idag=date(2026, 10, 1))
+    assert "goatcounter" not in (tmp_path / "uten" / "bergen" / "index.html").read_text()
+    assert "Besøkstall" not in (tmp_path / "uten" / "om" / "index.html").read_text()
