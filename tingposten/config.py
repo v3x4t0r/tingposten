@@ -92,7 +92,7 @@ ANSVARLIG_REDAKTOR = "Henrik Midttun"
 UTGIVER = "RO-Studio AS"            # publisher; the Om page also says it makes Freetime
 UTGIVER_ORGNR = "938 625 999"
 UTGIVER_OGSA = ("Freetime", "https://freetime.no/")  # "som også står bak …" (a reference, not an ad)
-KONTAKT_EPOST = None                # set when the address works, e.g. "redaksjon@tingposten.no"
+KONTAKT_EPOST = "tingposten@freetime.no"  # Domeneshop alias on freetime.no, forwarded to the editor (30.10.2026)
 
 # Models, called through the subscription CLIs (no API keys): Claude writes
 # and classifies, Codex fact-checks — a different provider on purpose.

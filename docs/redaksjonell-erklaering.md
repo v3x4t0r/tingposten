@@ -39,13 +39,13 @@ Tingposten publiserer ikke navn på privatpersoner, selv om navnene står i offe
 
 ## Feil og rettelser
 
-Hver sak har en lenke merket «Meld feil». Du kan melde feil på e-post til [e-post] eller som en offentlig sak på GitHub. Rettelser gjøres synlig: saken får en merknad om hva som ble endret og når.
+Hver sak har en lenke merket «Meld feil». Du kan melde feil på e-post til tingposten@freetime.no eller som en offentlig sak på GitHub. Rettelser gjøres synlig: saken får en merknad om hva som ble endret og når.
 
 ## Uavhengighet
 
 Tingposten følger ikke med på enkeltlesere. Vi teller besøk uten informasjonskapsler, som forklart under «Besøkstall». Tingposten er ikke knyttet til noe parti eller til Bergen kommune, og tar ikke imot betaling for omtale.
 
-Tingposten utgis av RO-Studio AS (org.nr. 938 625 999), som også står bak Freetime (freetime.no). Ansvarlig redaktør er Henrik Midttun, som kan kontaktes på [e-post].
+Tingposten utgis av RO-Studio AS (org.nr. 938 625 999), som også står bak Freetime (freetime.no). Ansvarlig redaktør er Henrik Midttun, som kan kontaktes på tingposten@freetime.no.
 
 ## Kilder og gjenbruk
 
