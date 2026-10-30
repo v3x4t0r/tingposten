@@ -1,13 +1,29 @@
-{# Building blocks of the printed edition (utgave.py). Every text is the site's:
-   the edited card (overskrift, dek, felt), the edited background article and
-   its checked headline, the mechanical facts and figures. All text goes
-   through |typo or |tittel (no-break spaces). Every story ends with its
-   sources, its short address and a QR code (kildefot). #}
+{# Building blocks of the printed edition (utgave.py), set like a classic
+   broadsheet in the site's design D: centred Bodoni heads over an italic deck,
+   justified columns with column rules, a "BERGEN –" dateline at the start of
+   each story, small-caps sideheads, Oxford-ruled boxes.
+   Every text is the site's: the edited card (overskrift, dek, felt), the
+   edited background article and its checked headline, the mechanical facts and
+   figures. All text goes through |typo or |tittel (no-break spaces). Every
+   story ends with its sources, its short address and a QR code (kildefot). #}
 
+{% set FAKTA_IKON = {"sted": "sted", "stemmer": "stemmer", "falt": "stemmer", "kr": "kr"} %}
+
+{% macro ikon(navn) %}<svg class="ikon" aria-hidden="true"><use href="#i-{{ navn }}"/></svg>{% endmacro %}
+
+{# The site's kicker: the tema in tracked capitals, the sak number, a boxed status. #}
 {% macro stikk(s, status=True, nr=True) -%}
 {%- set st = (s.fakta|selectattr("type", "eq", "status")|list or [none])[0] -%}
-<p class="stikk"><span>{{ s.tema_navn }}</span>{% if nr %}<wbr><span class="del nb">{{ s.nr_etikett }}</span>{% endif %}{% if status and st %}<wbr><span class="status">{{ st.verdi|typo }}</span>{% endif %}</p>
+<p class="stikk"><span class="stikk-tema">{{ s.tema_navn }}</span>{% if nr %}<wbr><span class="del nb">{{ s.nr_etikett }}</span>{% endif %}{% if status and st %}<wbr><span class="status">{{ st.verdi|typo }}</span>{% endif %}</p>
 {%- endmacro %}
+
+{# The facts under a story, as the site's fact row: icon and value. #}
+{% macro fakta_rad(ff) -%}
+{% if ff %}<ul class="fakta">{% for f in ff %}<li>{% if f.type in FAKTA_IKON %}{{ ikon(FAKTA_IKON[f.type]) }}{% endif %}{% if f.type == "falt" %}{{ f.verdi }} forslag falt{% elif f.type == "stemmer" %}Avstemning {{ f.verdi|typo }}{% else %}{{ f.verdi|typo }}{% endif %}</li>{% endfor %}</ul>{% endif %}
+{%- endmacro %}
+
+{# The opening of a story's first paragraph, as a newspaper sets it. #}
+{% macro sted() %}<span class="sted">Bergen</span>&#8239;– {% endmacro %}
 
 {% macro kildefot(s, full) -%}
 <footer class="kildefot">
@@ -18,7 +34,7 @@
 {%- endmacro %}
 
 {% macro nokkel(ff) -%}
-{% if ff %}<dl class="nokkel">{% for f in ff %}<div><dt>{{ f.etikett }}</dt><dd>{{ f.verdi|typo }}</dd></div>{% endfor %}</dl>{% endif %}
+{% if ff %}<dl class="nokkel">{% for f in ff %}<div><dt>{% if f.type in FAKTA_IKON %}{{ ikon(FAKTA_IKON[f.type]) }}{% endif %}{{ f.etikett }}</dt><dd>{{ f.verdi|typo }}</dd></div>{% endfor %}</dl>{% endif %}
 {%- endmacro %}
 
 {% macro figur(s, f, bredde) -%}
@@ -39,32 +55,53 @@
 </figure>
 {%- endmacro %}
 
+{# Kort fortalt as running text: the rest of "Hva endres" opens the story after
+   the dateline; the other fields follow under small-caps sideheads (the site's
+   label column, on a newspaper column's width). fra: fields already printed
+   on the front page (a jump). #}
+{% macro feltene(s, kf, dateline=True) -%}
+{% for f in kf %}
+{% if loop.first and f.key == "hva_endres" %}
+<p class="avsnitt forste">{% if dateline %}{{ sted() }}{% endif %}{{ f.tekst|typo }}</p>
+{% else %}
+<div class="felt"><p class="felt-etikett">{{ f.label }}</p><p class="avsnitt{% if loop.first %} forste{% endif %}">{% if loop.first and dateline %}{{ sted() }}{% endif %}{{ f.tekst|typo }}</p></div>
+{% endif %}
+{% endfor %}
+{%- endmacro %}
+
+{# A story's head: kicker, Bodoni headline, a short rule, the italic deck, the facts. #}
+{% macro hode(s, tittel_var, ff, fakta=True, fra=None) -%}
+<header class="sak-hode">
+  {% if fra %}<p class="hopp-fra">Fra side {{ fra }}</p>{% endif %}
+  {{ stikk(s) }}
+  <h2 class="tittel" style="font-size: var({{ tittel_var }})">{{ s.overskrift|tittel }}</h2>
+  {% if s.dek and not fra %}<p class="ingress">{{ s.dek|typo }}</p>{% endif %}
+  {% if fakta %}{{ fakta_rad(ff) }}{% endif %}
+</header>
+{%- endmacro %}
+
 {# A full story. v: the shape (utgave.Variant): bredde (mm), tekst (columns of
-   text), side (aside width, mm, 0 = none), figurer: [(figure, width mm)]. #}
+   text), side (aside width, mm, 0 = none), figurer: [(figure, width mm)].
+   s._fra_felt: the story continues from the front page (a jump). #}
 {% macro full(s, v) -%}
 {% if s.get("_del") == "bakgrunn" %}{{ bakgrunnsdel(s, v) }}{% elif s.get("_del") == "figurer" %}{{ figurdel(s, v) }}{% else %}
 {% set ff = fakta(s) %}
-{% set kf = felt(s) %}
+{% set fra = s.get("_fra_felt") %}
+{% set kf = felt(s)[fra or 0:] %}
 <article class="sak sak-full" data-sak="{{ s.kort }}" data-type="full" style="width: {{ '%.2f'|format(v.bredde) }}mm">
-  <header class="sak-hode">
-    {{ stikk(s) }}
-    <h2 class="tittel" style="font-size: var({{ v.tittel }})">{{ s.overskrift|tittel }}</h2>
-    {% if s.dek %}<p class="ingress">{{ s.dek|typo }}</p>{% endif %}
-  </header>
+  {{ hode(s, v.tittel, ff, fakta=not v.figurer and not v.side, fra=1 if fra is not none else None) }}
   {% if not v.side and v.figurer %}
   <div class="figurrad">{{ nokkel(ff) }}{% for f, b in v.figurer %}{{ figur(s, f, b) }}{% endfor %}</div>
-  {% elif not v.side and ff %}
-  <dl class="nokkelrad">{% for f in ff %}<div><dt>{{ f.etikett }}</dt><dd>{{ f.verdi|typo }}</dd></div>{% endfor %}</dl>
   {% endif %}
   <div class="kropp" style="grid-template-columns: {% if v.side %}{{ '%.2f'|format(v.bredde - v.sidebredde - mellom) }}mm {{ '%.2f'|format(v.sidebredde) }}mm{% else %}100%{% endif %}">
     <div class="spalter" style="column-count: {{ v.tekst }}">
-      {% for f in kf %}<p class="felt"><span class="felt-etikett">{{ f.label }}</span> {{ f.tekst|typo }}</p>{% endfor %}
+      {{ feltene(s, kf, dateline=fra is none) }}
       {% for f, b in v.i_tekst %}{{ figur(s, f, b) }}{% endfor %}
       {% if s.artikkel and not s.get("_del") %}
       <div class="bakgrunn">
         <p class="bakgrunn-stikk">Bakgrunn</p>
         {% if s.artikkel_tittel %}<h3 class="bakgrunn-tittel">{{ s.artikkel_tittel|tittel }}</h3>{% endif %}
-        {% for a in s.artikkel %}<p>{{ a.tekst|typo }}</p>{% endfor %}
+        {% for a in s.artikkel %}<p class="avsnitt{% if loop.first %} forste{% endif %}">{{ a.tekst|typo }}</p>{% endfor %}
       </div>
       {% endif %}
       {% for r in s.rettelser %}<p class="rettet">Rettet {{ r.dato_tekst }}: {{ r.merknad|typo }}</p>{% endfor %}
@@ -81,26 +118,36 @@
 {% macro bakgrunnsdel(s, v) -%}
 <article class="sak sak-full sak-bakgrunn" data-sak="{{ s.kort }}" data-type="full" style="width: {{ '%.2f'|format(v.bredde) }}mm">
   <header class="sak-hode">
-    <p class="stikk"><span>Bakgrunn</span><wbr><span class="del nb">{{ s.tema_navn }}</span><wbr><span class="del nb">{{ s.nr_etikett }}</span></p>
+    <p class="stikk"><span class="stikk-tema">Bakgrunn</span><wbr><span class="del nb">{{ s.tema_navn }}</span><wbr><span class="del nb">{{ s.nr_etikett }}</span></p>
     <h2 class="tittel" style="font-size: var({{ v.tittel }})">{{ (s.artikkel_tittel or s.overskrift)|tittel }}</h2>
   </header>
   <div class="kropp">
-    <div class="spalter bakgrunn-alene" style="column-count: {{ v.tekst + (v.side or 0) }}">
-      {% for a in s.artikkel %}<p>{{ a.tekst|typo }}</p>{% endfor %}
+    <div class="spalter" style="column-count: {{ v.tekst + (v.side or 0) }}">
+      {% for a in s.artikkel %}<p class="avsnitt{% if loop.first %} forste{% endif %}">{{ a.tekst|typo }}</p>{% endfor %}
       {{ kildefot(s, True) }}
     </div>
   </div>
 </article>
 {%- endmacro %}
 
-{# A short story: headline, dek and key facts; its sources, address and QR. #}
-{% macro kort(s) -%}
+{# The figures of a story too long for one page, as their own block between card and background. #}
+{% macro figurdel(s, v) -%}
+<article class="sak sak-full sak-figurer" data-sak="{{ s.kort }}" data-type="full" style="width: {{ '%.2f'|format(v.bredde) }}mm">
+  {{ stikk(s, status=False) }}
+  <h3 class="figurdel-tittel">{{ s.overskrift|tittel }}</h3>
+  <div class="figurrad">{% for f, b in v.figurer %}{{ figur(s, f, b) }}{% endfor %}</div>
+  {{ kildefot(s, True) }}
+</article>
+{%- endmacro %}
+
+{# A short story: a one-column head, the dek as its paragraph, the facts; its sources, address and QR. #}
+{% macro kort(s, stor=False) -%}
 {% set ff = fakta(s) %}
-<article class="sak kort" data-sak="{{ s.kort }}" data-type="kort">
+<article class="sak kort{% if stor %} stor{% endif %}" data-sak="{{ s.kort }}" data-type="kort">
   {{ stikk(s) }}
   <h3 class="tittel">{{ s.overskrift|tittel }}</h3>
-  {% if s.dek %}<p class="ingress">{{ s.dek|typo }}</p>{% endif %}
-  {% if ff %}<ul class="fakta">{% for f in ff %}<li>{% if f.type == "falt" %}{{ f.verdi }} forslag falt{% else %}{{ f.etikett }}: {{ f.verdi|typo }}{% endif %}</li>{% endfor %}</ul>{% endif %}
+  {% if s.dek %}<p class="avsnitt forste">{{ sted() }}{{ s.dek|typo }}</p>{% endif %}
+  {{ fakta_rad(ff) }}
   {% for r in s.rettelser %}<p class="rettet">Rettet {{ r.dato_tekst }}: {{ r.merknad|typo }}</p>{% endfor %}
   {{ kildefot(s, False) }}
 </article>
@@ -117,49 +164,61 @@
 </section>
 {%- endmacro %}
 
+{# A box framed with an Oxford rule: a thick line outside, a hairline inside. #}
+{% macro ramme(klasse, innhold) -%}
+<section class="ramme {{ klasse }}"><div class="ramme-inne">{{ innhold }}</div></section>
+{%- endmacro %}
+
 {% macro motetall(m, utfall_, venter, vannrett=False) -%}
-<section class="boks motetall{% if vannrett %} vannrett{% endif %}">
-  <div class="motetall-hode"><h3>{{ m.organ_kort }} {{ m.dato_tekst }}</h3>
+{% set inne %}
+  <div class="motetall-hode"><h3 class="boks-tittel">{{ m.organ_kort }} {{ m.dato_tekst }}</h3>
   <p class="mote-tall"><strong>{{ m.antall }}</strong><span>{{ "sak" if m.antall == 1 else "saker" }} på sakslisten</span></p></div>
   <ul class="utfall">{% for u in utfall_ %}{% set n, _, tekst = u.partition(" ") %}<li><span>{{ tekst|capitalize }}</span><span>{{ n }}</span></li>{% endfor %}
   {% if venter %}<li><span>Venter på protokoll, ikke med her</span><span>{{ venter|length }}</span></li>{% endif %}</ul>
-</section>
+{% endset %}
+{{ ramme("boks motetall" ~ (" vannrett" if vannrett else ""), inne) }}
 {%- endmacro %}
 
 {% macro innhold(rader) -%}
-<section class="boks i-utgaven">
-  <h3>I denne utgaven</h3>
+{% set inne %}
+  <h3 class="boks-tittel">I denne utgaven</h3>
   <ul class="innhold-liste">{% for r in rader %}<li><span{% if r.sak %} class="tit"{% endif %}>{{ r.tekst|tittel }}</span><span>{{ r.side }}</span></li>{% endfor %}</ul>
-</section>
+{% endset %}
+{{ ramme("boks i-utgaven", inne) }}
 {%- endmacro %}
 
 {% macro slik() -%}
-<section class="boks slik">
-  <h3>Slik lages Tingposten</h3>
-  <p>Sammendragene i Tingposten skrives av KI-modeller ut fra Bergen kommunes egne dokumenter: saksframlegget og protokollen fra møtet.</p>
-  <p>En annen KI-modell faktasjekker teksten mot dokumentene, og setninger som ikke er dekket av kildene, slettes.</p>
-  <p>På tingposten.no lenker hver setning til siden i dokumentet den bygger på. Her på papiret står sidene i kildelinjen under hver sak.</p>
-  <p>Tingposten vurderer ikke om et vedtak er bra eller dårlig, og ved tvil er det kommunens dokumenter som gjelder.</p>
-</section>
+{% set inne %}
+  <h3 class="boks-tittel">Slik lages Tingposten</h3>
+  <p class="avsnitt forste">Sammendragene i Tingposten skrives av KI-modeller ut fra Bergen kommunes egne dokumenter: saksframlegget og protokollen fra møtet.</p>
+  <p class="avsnitt">En annen KI-modell faktasjekker teksten mot dokumentene, og setninger som ikke er dekket av kildene, slettes.</p>
+  <p class="avsnitt">På tingposten.no lenker hver setning til siden i dokumentet den bygger på. Her på papiret står sidene i kildelinjen under hver sak.</p>
+  <p class="avsnitt">Tingposten vurderer ikke om et vedtak er bra eller dårlig, og ved tvil er det kommunens dokumenter som gjelder.</p>
+{% endset %}
+{{ ramme("boks slik", inne) }}
 {%- endmacro %}
 
 {% macro rettelser_boks() -%}
-<section class="boks rettelser">
-  <h3>Rettelser</h3>
-  <p>Feil i en tidligere utgave rettes her.</p>
+{% set inne %}
+  <h3 class="boks-tittel">Rettelser</h3>
+  <p class="avsnitt forste">Feil i en tidligere utgave rettes her.</p>
   <p class="smal">Meld feil: {{ kontakt_epost }}</p>
-</section>
+{% endset %}
+{{ ramme("boks rettelser", inne) }}
 {%- endmacro %}
 
-{% macro erklaering(deler) -%}
-<section class="boks erklaering">
-  <h3>Fra den redaksjonelle erklæringen</h3>
-  {% for d in deler %}<h4>{{ d.tittel }}</h4>{% for p in d.avsnitt %}<p>{{ p|typo }}</p>{% endfor %}{% endfor %}
-</section>
+{# A section of the editorial statement (erklaering.html, approved 30.10.2026), verbatim. #}
+{% macro erklaeringsdel(d) -%}
+{% set inne %}
+  <p class="etikett">Fra den redaksjonelle erklæringen</p>
+  <h3 class="boks-tittel">{{ d.tittel }}</h3>
+  {% for p in d.avsnitt %}<p class="avsnitt{% if loop.first %} forste{% endif %}">{{ p|typo }}</p>{% endfor %}
+{% endset %}
+{{ ramme("boks erklaering", inne) }}
 {%- endmacro %}
 
 {% macro kolofon() -%}
-<section class="boks kolofon">
+<section class="kolofon">
   <p class="kolofon-navn">Tingposten</p>
   <p>Utgitt av {{ utgiver }} (<span class="nb">org.nr. {{ utgiver_orgnr }}</span>) · Ansvarlig redaktør: {{ redaktor }} · {{ kontakt_epost }} · {{ nettsted }}</p>
   {% if utgiver_ogsa %}<p>Tingposten utgis av {{ utgiver }}, som også står bak {{ utgiver_ogsa[0] }} ({{ utgiver_ogsa[1]|vertsnavn }}).</p>{% endif %}
@@ -168,77 +227,67 @@
 {%- endmacro %}
 
 {% macro ombord(nr) -%}
-<section class="ombord">
-  <h3>Prøveutgave nr. {{ nr }}</h3>
-  <p>Dette er en prøve på Tingposten på papir. Vil du lese, eller kjøpe, en slik avis etter hvert bystyremøte? Si din mening til {{ kontakt_epost }}.</p>
-</section>
+{% set inne %}
+  <h3 class="boks-tittel">Prøveutgave nr. {{ nr }}</h3>
+  <p class="avsnitt forste">Dette er en prøve på Tingposten på papir. Vil du lese, eller kjøpe, en slik avis etter hvert bystyremøte? Si din mening til {{ kontakt_epost }}.</p>
+{% endset %}
+{{ ramme("boks ombord", inne) }}
 {%- endmacro %}
 
-{# Front page teasers: headline, dek, facts, a small map, and where the full story is. #}
-{% macro teaser(s, side, med_kart=True) -%}
+{# Front page teasers: kicker, head, the dek's first sentence, facts, a small map, where the story is. #}
+{% macro teaser(s, side, med_kart=True, stor=False) -%}
 {% set ff = fakta(s) %}
 {% set kart = figur_av(s, "kart") if med_kart else none %}
-<article class="teaser" data-sak="{{ s.kort }}" data-type="teaser">
+<article class="teaser{% if stor %} stor{% endif %}" data-sak="{{ s.kort }}" data-type="teaser">
   {{ stikk(s, nr=False) }}
   <h2 class="tittel">{{ s.overskrift|tittel }}</h2>
-  {% if s.dek %}<p class="ingress">{{ s.dek|forste_setning }}</p>{% endif %}
+  {% if s.dek %}<p class="avsnitt forste">{{ sted() }}{{ s.dek|forste_setning }}</p>{% endif %}
   {% set uten = ("sted",) if kart else () %}
-  {% set vis = ff|rejectattr("type", "in", uten)|list %}
-  {% if vis %}<ul class="fakta">{% for f in vis %}<li>{% if f.type == "falt" %}{{ f.verdi }} forslag falt{% else %}{{ f.etikett }}: {{ f.verdi|typo }}{% endif %}</li>{% endfor %}</ul>{% endif %}
+  {{ fakta_rad(ff|rejectattr("type", "in", uten)|list) }}
   {% if kart %}<p class="minikart">{{ kart.svg|minikart_print }}<span>{{ (ff|selectattr("type", "eq", "sted")|map(attribute="verdi")|list or [s.bydeler|join(", ")])[0] }}</span></p>{% endif %}
-  <p class="henvisning">Hele saken side {{ side }}</p>
+  <p class="hopp">Side {{ side }}</p>
 </article>
 {%- endmacro %}
 
-{# The lead as a large teaser. Like the site's front-page lead, the card's next
-   fields may follow the dek, verbatim and whole (n_felt of them), when the page has room. #}
-{% macro lead(s, side, bredde, n_felt=0, spalter=4) -%}
+{# The lead under a banner head across the page: centred kicker, head, rule,
+   italic deck and facts. Its text (lead_kropp) follows in the lead's columns:
+   as many of its card's fields as fit, whole, and the jump to the rest of the
+   story inside (n_felt > 0), or a pointer to it. #}
+{% macro lead_hode(s) -%}
 {% set ff = fakta(s) %}
-<article class="lead" data-sak="{{ s.kort }}" data-type="lead">
+<header class="sak-hode lead-hode" data-sak="{{ s.kort }}" data-type="lead">
   {{ stikk(s) }}
   <h2 class="tittel">{{ s.overskrift|tittel }}</h2>
   {% if s.dek %}<p class="ingress">{{ s.dek|typo }}</p>{% endif %}
-  {% if ff %}<dl class="nokkelrad">{% for f in ff %}<div><dt>{{ f.etikett }}</dt><dd>{{ f.verdi|typo }}</dd></div>{% endfor %}</dl>{% endif %}
-  {% set figs = lead_figurer(s, bredde) %}
-  {% if figs %}<div class="front-figurer">{% for f, b in figs %}{{ figur(s, f, b) }}{% endfor %}</div>{% endif %}
-  {% if n_felt %}<div class="spalter lead-felt" style="column-count: {{ spalter }}">{% for f in felt(s)[:n_felt] %}<p class="felt"><span class="felt-etikett">{{ f.label }}</span> {{ f.tekst|typo }}</p>{% endfor %}</div>{% endif %}
-  <p class="henvisning">Hele saken{% if s.artikkel %}, med bakgrunn og kilder,{% else %} med kilder{% endif %} side {{ side }}</p>
-</article>
-{%- endmacro %}
-
-{% macro masthode() -%}
-<header class="masthode">
-  <p class="ore ore-v"><span class="prove">Prøveutgave</span></p>
-  <p class="navnetrekk">Tingposten</p>
-  <p class="ore ore-h">Hva kommunen<br>faktisk vedtar</p>
+  {{ fakta_rad(ff) }}
 </header>
 {%- endmacro %}
 
-{% macro datolinje(m) -%}
-<p class="dateline"><span>Bergen</span><span>{{ m.organ_kort }} {{ m.dato_tekst }}</span><span>Prøveutgave nr. {{ nr }}</span><span>Gratis</span></p>
+{% macro lead_kropp(s, side, bredde, n_felt=0, spalter=4, stor=False) -%}
+<article class="lead{% if stor %} stor{% endif %}" data-sak="{{ s.kort }}" data-type="lead">
+  {% set figs = lead_figurer(s, bredde) %}
+  {% if figs %}<div class="front-figurer">{% for f, b in figs %}{{ figur(s, f, b) }}{% endfor %}</div>{% endif %}
+  {% if n_felt %}<div class="spalter lead-felt" style="column-count: {{ spalter }}">{{ feltene(s, felt(s)[:n_felt]) }}<p class="hopp">Fortsettes på side {{ side }}</p></div>
+  {% else %}<p class="hopp hopp-sentrert">Hele saken{% if s.artikkel %}, med bakgrunn og kilder,{% else %} med kilder{% endif %} side {{ side }}</p>{% endif %}
+</article>
+{%- endmacro %}
+
+{# The site's masthead: the blackletter nameplate between its ears. #}
+{% macro masthode(dato) -%}
+<header class="masthode">
+  <div class="ore ore-v"><p class="ore-by">Bergen</p><p class="ore-dato">{{ dato }}</p></div>
+  <p class="navnetrekk">Tingposten</p>
+  <p class="ore ore-h"><span class="nb">Hva kommunen</span><br><span class="nb">faktisk vedtar</span></p>
+</header>
+{%- endmacro %}
+
+{# The folio bar under the nameplate, between a rule and the double rule. #}
+{% macro datolinje(m, dato) -%}
+<p class="dateline"><span>Bergen, {{ dato }}</span><span>Prøveutgave nr. {{ nr }}</span><span>Gratis</span></p>
 {%- endmacro %}
 
 {% macro flythode(m) -%}
 <div class="flyt-hode"><h2>Flere saker fra møtet</h2><p>{{ m.organ_kort }} {{ m.dato_tekst }}, i sakslistens rekkefølge</p></div>
-{%- endmacro %}
-
-{# A section of the editorial statement (erklaering.html, approved 30.10.2026), verbatim. #}
-{% macro erklaeringsdel(d) -%}
-<section class="boks erklaering">
-  <p class="etikett">Fra den redaksjonelle erklæringen</p>
-  <h3>{{ d.tittel }}</h3>
-  {% for p in d.avsnitt %}<p>{{ p|typo }}</p>{% endfor %}
-</section>
-{%- endmacro %}
-
-{# The figures of a story too long for one page, as their own block between card and background. #}
-{% macro figurdel(s, v) -%}
-<article class="sak sak-full sak-figurer" data-sak="{{ s.kort }}" data-type="full" style="width: {{ '%.2f'|format(v.bredde) }}mm">
-  {{ stikk(s, status=False) }}
-  <h3 class="figurdel-tittel">{{ s.overskrift|tittel }}</h3>
-  <div class="figurrad">{% for f, b in v.figurer %}{{ figur(s, f, b) }}{% endfor %}</div>
-  {{ kildefot(s, True) }}
-</article>
 {%- endmacro %}
 
 {# Several boxes in one cell of the front page's row, stacked. #}

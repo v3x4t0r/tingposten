@@ -64,6 +64,10 @@ FONTER = HERE / "static" / "fonts"
 PX_PER_MM = 96 / 25.4
 UTGAVE_NR = 1  # "Prøveutgave nr. 1"
 
+# The screen copy's paper: a warm newsprint tone (the print files stay white:
+# ink on white paper, and a printed tint can't reach the sheet's edge at home).
+SKJERM_PAPIR = "#f1ece0"
+
 # Print colours: black for every glyph (small grey type breaks up in a halftone
 # screen), greys only for areas (bars, map, tint). The figures read --tp-*.
 FARGER = {
@@ -117,8 +121,8 @@ FORMATER = {
         spalter=5, mellom=4.6, sider=(4, 8, 12, 16), folio=11,
         css={"--brod": "9.2pt", "--brod-linje": "11.6pt", "--ingress": "11.8pt", "--ingress-liten": "10.4pt",
              "--h-topp": "31pt", "--h-5": "25pt", "--h-3": "21pt", "--h-2": "18pt", "--h-kort": "13pt",
-             "--h-lead": "54pt", "--h-front": "16.5pt", "--stikk": "7.2pt", "--liten": "7pt", "--qr": "13mm",
-             "--qr-kort": "11.5mm", "--navn": "112pt"},
+             "--h-lead": "46pt", "--h-front": "16.5pt", "--stikk": "7.2pt", "--liten": "7pt", "--qr": "13mm",
+             "--qr-kort": "11.5mm", "--navn": "102pt"},
     ),
     # A4 booklet, stapled: folded A3 sheets, three columns.
     "a4": Format(
@@ -127,7 +131,7 @@ FORMATER = {
         css={"--brod": "9.5pt", "--brod-linje": "12.1pt", "--ingress": "11pt", "--ingress-liten": "10.2pt",
              "--h-topp": "23pt", "--h-5": "20pt", "--h-3": "20pt", "--h-2": "16.5pt", "--h-kort": "12.5pt",
              "--h-lead": "34pt", "--h-front": "17pt", "--stikk": "7pt", "--liten": "6.9pt", "--qr": "13mm",
-             "--qr-kort": "11.5mm", "--navn": "76pt"},
+             "--qr-kort": "11.5mm", "--navn": "66pt"},
     ),
     # A5 booklet: A4 sheets folded in the middle, stapled by hand (home inkjet).
     # The inner margin is wider: the fold and the staples take some of it.
@@ -220,6 +224,7 @@ def kilder(s: dict, full: bool) -> list[dict]:
         if del_ in (None, "bakgrunn"):
             for a in s.get("artikkel") or []:
                 out += a.get("kilder") or []
+        out += s.get("_ekstra_kilder") or []
     return out
 
 
@@ -293,7 +298,7 @@ def kort_visning(s: dict) -> str:
 
 
 ERKLAERING_DELER = ("Nøytralitet", "Personvern")  # the statement's sections that read the same on paper
-OM_SIDE_DELER = ("Nøytralitet", "Når vi ikke vet", "Personvern", "Kilder og gjenbruk")
+OM_SIDE_DELER = ("Nøytralitet", "Personvern", "Kilder og gjenbruk")
 
 
 def erklaering_deler(titler: tuple[str, ...] = ERKLAERING_DELER) -> list[dict]:
@@ -339,9 +344,54 @@ def figur_svg(svg: str) -> Markup:
     font, which print shops' preflight rejects. The caption names the bydeler."""
     def bytt(m):
         return FARGER.get(m.group(1), "#000000")
-    svg = re.sub(r"<text\b[^>]*\bstroke=[^>]*>.*?</text>", "", svg, flags=re.S)
     svg = re.sub(r"var\((--tp-[a-z]+)(?:,\s*[^)]*)?\)", bytt, svg)
+    font = _etikettfont()
+    svg = re.sub(r"<text\b([^>]*\bstroke=[^>]*)>(.*?)</text>", lambda m: _etikett_som_sti(m, font), svg, flags=re.S)
     return Markup(svg)
+
+
+def _etikettfont() -> Path | None:
+    """The bold Franklin instance (fonter()), for drawing map labels as outlines."""
+    funnet = sorted(font_mappe().glob("TPFranklin-wght700-normal-*.ttf"))
+    return funnet[0] if funnet else None
+
+
+@lru_cache(maxsize=4)
+def _glyfer(sti: str):
+    from fontTools.ttLib import TTFont
+
+    f = TTFont(sti)
+    return f.getGlyphSet(), f.getBestCmap(), f["head"].unitsPerEm, f["hmtx"]
+
+
+def _etikett_som_sti(m: re.Match, font: Path | None) -> str:
+    """A map label with a halo (the bydel's name over the map, as on the site) as
+    a vector path: Chromium can only put stroked *text* in a PDF as a Type 3
+    font, which print shops' preflight rejects; a stroked path is plain vector
+    art. Without the font file the label is left out (the caption names the bydel)."""
+    if font is None:
+        return ""
+    from fontTools.pens.svgPathPen import SVGPathPen
+    from fontTools.pens.transformPen import TransformPen
+
+    attr = dict(re.findall(r'([\w-]+)="([^"]*)"', m.group(1)))
+    tekst = html.unescape(re.sub(r"<[^>]+>", "", m.group(2)))
+    glyfer, cmap, upm, hmtx = _glyfer(str(font))
+    k = float(attr.get("font-size", 12)) / upm
+    navn = [cmap.get(ord(c)) for c in tekst]
+    bredde = sum(hmtx[n][0] for n in navn if n) * k
+    x, y = float(attr.get("x", 0)), float(attr.get("y", 0))
+    x -= {"middle": bredde / 2, "end": bredde}.get(attr.get("text-anchor"), 0)
+    d = []
+    for n in navn:
+        if n:
+            pen = SVGPathPen(glyfer)
+            glyfer[n].draw(TransformPen(pen, (k, 0, 0, -k, x, y)))
+            d.append(pen.getCommands())
+            x += hmtx[n][0] * k
+    return (f'<path class="etikett-sti" d="{" ".join(d)}" fill="{attr.get("fill", "#000000")}" '
+            f'stroke="{attr.get("stroke", "#ffffff")}" stroke-width="{attr.get("stroke-width", "3")}" '
+            f'stroke-linejoin="round" style="paint-order:stroke"/>')
 
 
 def svg_storrelse(svg: str) -> tuple[float, float]:
@@ -367,6 +417,7 @@ INSTANSER = (
     ("source-serif-4-latin-opsz-normal.woff2", "TP Serif", "normal", {"wght": 600, "opsz": 10}),
     ("source-serif-4-latin-opsz-normal.woff2", "TP Serif", "normal", {"wght": 700, "opsz": 10}),
     ("source-serif-4-latin-opsz-italic.woff2", "TP Serif", "italic", {"wght": 400, "opsz": 10}),
+    ("source-serif-4-latin-opsz-italic.woff2", "TP Serif", "italic", {"wght": 600, "opsz": 10}),
     # Deks at a larger optical size.
     ("source-serif-4-latin-opsz-normal.woff2", "TP Serif Display", "normal", {"wght": 400, "opsz": 16}),
     ("source-serif-4-latin-opsz-italic.woff2", "TP Serif Display", "italic", {"wght": 400, "opsz": 16}),
@@ -498,9 +549,12 @@ class Nettleser:
     def hoyder(self) -> dict[str, float]:
         """Height in mm of every [data-maal] element."""
         # scrollHeight too: what the overflow check will see (a 112 pt nameplate's glyphs reach past its line box).
+        # A block with a word wider than its column can't be used in that shape at all: infinitely tall.
         px = self.side.evaluate("""() => Object.fromEntries([...document.querySelectorAll('[data-maal]')]
-            .map(e => [e.dataset.maal, Math.max(e.getBoundingClientRect().height, e.scrollHeight)]))""")
-        return {k: v / PX_PER_MM for k, v in px.items()}
+            .map(e => [e.dataset.maal, [...e.querySelectorAll('p, h2, h3, li')].some(p => p.scrollWidth > p.clientWidth + 0.75)
+                       || e.scrollWidth > e.clientWidth + 0.75
+                       ? -1 : Math.max(e.getBoundingClientRect().height, e.scrollHeight)]))""")
+        return {k: (math.inf if v < 0 else v / PX_PER_MM) for k, v in px.items()}
 
     def sjekk(self) -> list[dict]:
         """Every box that spills: content taller or wider than its box (a CSS
@@ -644,10 +698,15 @@ class Maler:
         makro = getattr(self.m, navn)
         return lambda *a, **kw: Markup(str(makro(*a, **kw)))
 
-    def dokument(self, mote: dict, fontcss: str, sider=None, maal=None) -> str:
+    def dokument(self, mote: dict, fontcss: str, sider=None, maal=None, papir: str | None = None) -> str:
         return self.dok.render(fmt=self.fmt, mote=mote, nr=UTGAVE_NR, fontcss=Markup(fontcss), css=Markup(self.css),
                                luft=LUFT[self.fmt.navn], folio_luft=FOLIO_LUFT[self.fmt.navn], sider=sider or [],
-                               maal=maal or [])
+                               maal=maal or [], papir=papir, dato_lang=dato_lang(mote))
+
+
+def dato_lang(mote: dict) -> str:
+    """"Onsdag 23. september 2026": the meeting's day, for the masthead and the folios."""
+    return bygg.nb_weekday_date(mote["dato"])
 
 
 LUFT = {"tabloid": 7.0, "a4": 6.0, "a5": 5.0}  # space between bands, mm (the rule sits in the middle)
@@ -785,6 +844,7 @@ class Pakker:
                             bl.append(Blokk(f"full:{s['kort']}:{del_}:{v.id}", self.maler.full(s, v), v.bredde, sak=s,
                                             type="full", variant=v))
         bl += self.flytblokker([])
+        bl += self.flytblokker([], stor=True)
         bl += self.bunnblokker()
         bl += self.fyllbokser()
         self.maaling.maal(bl)
@@ -808,13 +868,14 @@ class Pakker:
                                         Markup(f'<div class="blokk blokk-boks">{self.maler.erklaeringsdel(d)}</div>'),
                                         sp, type="boks") for d in erklaering_deler()])
 
-    def flytblokker(self, fulle: list[dict], brukt: tuple = ()) -> list[Blokk]:
-        """The short stories in agenda order, then the agenda listing, then the
-        box on how Tingposten is made (unless a full page took it)."""
+    def flytblokker(self, fulle: list[dict], brukt: tuple = (), stor: bool = False) -> list[Blokk]:
+        """The short stories in agenda order (stor: a size up), then the agenda
+        listing, then the box on how Tingposten is made (unless a full page took it)."""
         i = self.innhold
         sp = self.fmt.spalte
         hele = {s["kort"] for s in fulle}
-        ut = [(f"kort:{s['kort']}", self.maler.kort(s), s, "kort") for s in i["korte"] if s["kort"] not in hele]
+        ut = [(f"kort{'-stor' if stor else ''}:{s['kort']}", self.maler.kort(s, stor), s, "kort")
+              for s in i["korte"] if s["kort"] not in hele]
         if i["liste"]:
             ut.append(("liste", self.maler.dagsorden("Uten sammendrag", "Saker vi ikke har oppsummert ennå, med "
                                                      "kommunens egen tittel.", i["liste"]), None, "liste"))
@@ -824,8 +885,13 @@ class Pakker:
             ut.append(("valg", self.maler.dagsorden("Valg og fritak", "", i["valg"]), None, "valg"))
         if "slik" not in brukt and "slik" not in self.forside_bokser:
             ut.append(("slik", self.maler.slik(), None, "boks"))
-        return self.maaling.maal([Blokk(bid, Markup(f'<div class="blokk blokk-{t}">{h}</div>'), sp, sak=s_, type=t)
-                                  for bid, h, s_, t in ut])
+        blokker = self.maaling.maal([Blokk(bid, Markup(f'<div class="blokk blokk-{t}">{h}</div>'), sp, sak=s_, type=t)
+                                     for bid, h, s_, t in ut])
+        if stor:
+            # A story whose head doesn't fit the column a size up keeps its normal size.
+            vanlige = {b.sak["kort"]: b for b in self.flytblokker(fulle, brukt) if b.sak}
+            blokker = [vanlige[b.sak["kort"]] if b.sak and b.hoyde == math.inf else b for b in blokker]
+        return blokker
 
     def hode(self) -> Blokk:
         html_text = self.maler.flythode(self.innhold["mote"])
@@ -1037,12 +1103,17 @@ class Pakker:
                 continue  # half a split story: not a plan
             fulle = list({x["kort"]: x for x in plassert}.values())
             brukt = tuple(b.id for side in bandsider for band in side for b, _ in band.celler if b.type == "boks")
-            blokker = self.flytblokker(self.innhold["fulle"][:self.forste] + fulle, brukt)
             valgfrie = [b for b in self.valgfrie() if b.id.removeprefix("smal:") not in brukt]
-            flytsider, kost_flyt = self.flyt(blokker, ledig, bunn, valgfrie)
-            delt = bool(flytsider) and flytsider[0]["hode"] and flytsider[0]["start"] > 0
-            totalt = 1 + len(bandsider) + len(flytsider) - delt
-            kandidater.append((totalt, kost_f + kost_flyt, len(fulle), bandsider, flytsider))
+            for stor in (False, True):
+                # The short stories a size up too, for pages they would leave half empty.
+                blokker = self.flytblokker(self.innhold["fulle"][:self.forste] + fulle, brukt, stor)
+                try:
+                    flytsider, kost_flyt = self.flyt(blokker, ledig, bunn, valgfrie)
+                except UtgaveFeil:
+                    continue  # a block that fits no column (too tall, or a word too wide at this size)
+                delt = bool(flytsider) and flytsider[0]["hode"] and flytsider[0]["start"] > 0
+                totalt = 1 + len(bandsider) + len(flytsider) - delt
+                kandidater.append((totalt, kost_f + kost_flyt, len(fulle), bandsider, flytsider))
         # Enough full stories: at least every one with a background article (the
         # site's top quarter of the meeting), counting the lead on the front.
         onsket = max(3, round(self.fmt.hele_andel * sum(1 for s_ in self.innhold["fulle"] if s_.get("har_artikkel"))))
@@ -1069,9 +1140,9 @@ class Pakker:
         sections of the editorial statement that read the same on paper."""
         f = self.fmt
         deler = erklaering_deler(OM_SIDE_DELER)
-        tekst = Markup(f'<div class="band-boks om-tingposten" style="--boks-spalter: {f.spalter}">'
+        tekst = Markup(f'<div class="band-boks om-tingposten" style="--boks-spalter: {min(2, f.spalter)}">'
                        f'<h2 class="om-tittel">Om Tingposten</h2>{self.maler.slik()}'
-                       + "".join(str(self.maler.erklaeringsdel(d)) for d in deler) + "</div>")
+                       + "".join(str(self.maler.erklaeringsdel(d)) for d in deler) + str(self.maler.kolofon()) + "</div>")
         return self.maaling.maal([Blokk("om-tingposten", tekst, f.satsbredde, type="boks")])[0]
 
 
@@ -1092,7 +1163,7 @@ def jevn_ut(forrige: dict, siste: dict, spalter: int, tom: float) -> float:
     for_blokker = [b for c in forrige["kolonner"] for b in c]
     slutt_blokker = [b for c in siste["kolonner"] for b in c]
     beste = (max(ledig(forrige["kolonner"], forrige["kol_hoyde"]), tom), 0, None, None)
-    for k in range(1, min(4, len(for_blokker))):
+    for k in range(1, min(12, len(for_blokker))):
         a = balanser(for_blokker[:-k], spalter, forrige["kol_hoyde"])
         b = balanser(for_blokker[-k:] + slutt_blokker, spalter, siste["kol_hoyde"])
         if a is None or b is None:
@@ -1160,7 +1231,10 @@ def sett_inne(pakker: Pakker, plan: dict) -> list[Side]:
         om = pakker.om_side()
         if om.hoyde > H:
             raise UtgaveFeil("siden om Tingposten er for lang")
-        sider.append(Side(nr, "Om Tingposten", [Rute(om.id, 0, 0, W, om.hoyde, om.html, "boks", (om.id,))],
+        # The page's boxes spread down the whole page.
+        html_om = Markup(str(om.html).replace('class="band-boks om-tingposten"',
+                                              f'class="band-boks om-tingposten om-hel" data-h="{H:.1f}"', 1))
+        sider.append(Side(nr, "Om Tingposten", [Rute(om.id, 0, 0, W, H, html_om, "boks", (om.id,))],
                           blokker=["om-tingposten"]))
         nr += 1
     bandsider = plan["bandsider"]
@@ -1218,7 +1292,8 @@ def sett_inne(pakker: Pakker, plan: dict) -> list[Side]:
         if fs["slutt"]:
             hb = max(b.hoyde for b in bunn)
             y = H - hb
-            side.streker.append(Strek(0, y - luft / 2, W, 0, 2.0))
+            side.streker.append(Strek(0, y - luft / 2 - 0.6, W, 0, 1.6))  # an Oxford rule: thick over thin
+            side.streker.append(Strek(0, y - luft / 2 + 0.5, W, 0, 0.4))
             x = 0.0
             for bi, b in enumerate(bunn):
                 if bi:
@@ -1232,20 +1307,22 @@ def sett_inne(pakker: Pakker, plan: dict) -> list[Side]:
 def front_former(fmt: Format) -> dict:
     """The front page's grid: columns for the lead (and the teasers under it),
     and the rail beside it (0 = the boxes go in the teaser row)."""
-    return {"tabloid": {"lead": 4, "rail": 1, "teasere": 4, "slik": True},
+    return {"tabloid": {"lead": 4, "rail": 1, "teasere": 4, "slik": False},
             "a4": {"lead": 3, "rail": 0, "teasere": 2, "slik": False},
             # A5: the meeting in numbers goes inside (before Valg og fritak), the trial note in a strip.
             "a5": {"lead": 2, "rail": 0, "teasere": 1, "slik": False, "motetall_inne": True, "ombord_bred": True,
                    "teaser_kart": False}}[fmt.navn]
 
 
-def sett_forside(pakker: Pakker, innhold: dict, sider: list[Side], komplett: Variant | None) -> Side | None:
-    """The front page: nameplate, dateline, the lead (complete, or as a large
-    teaser with "Hele saken side N" and as many of its card's fields as fit),
-    teasers for the next stories with their page, and the boxes: what's in
-    this edition, the meeting in numbers (a strip under the lead when there's
-    room, else in the rail), how Tingposten is made (tabloid), a word about
-    this being a trial. None when it doesn't fit."""
+def sett_forside(pakker: Pakker, innhold: dict, sider: list[Side], komplett: Variant | None,
+                 n_felt: int | None = None) -> Side | None:
+    """The front page: the site's masthead and the folio bar; the lead under a
+    banner head (across the page where there is a rail beside the lead), its
+    text in columns with as many of its card's fields as fit and the jump
+    inside, or the complete lead when it fits; teasers for the next stories
+    with their page; and the boxes: what's in this edition, the meeting in
+    numbers (in the rail, or a strip under the lead), how Tingposten is made
+    (tabloid), a word about this being a trial. None when it doesn't fit."""
     f, maler, maaling = pakker.fmt, pakker.maler, pakker.maaling
     form = front_former(f)
     H, W, luft = f.satshoyde, f.satsbredde, pakker.luft
@@ -1259,8 +1336,8 @@ def sett_forside(pakker: Pakker, innhold: dict, sider: list[Side], komplett: Var
     teaser_saker = innhold["fulle"][1:1 + form["teasere"]]
     bl = f.spenn(form["lead"])
 
-    hode = maaling.maal([Blokk("masthode", maler.masthode(), W, type="front"),
-                         Blokk("datolinje", maler.datolinje(m), W, type="front")])
+    hode = maaling.maal([Blokk("masthode", maler.masthode(dato_lang(m)), W, type="front"),
+                         Blokk("datolinje", maler.datolinje(m, dato_lang(m)), W, type="front")])
     y0 = hode[0].hoyde + 1.5 + hode[1].hoyde + luft * 0.8
     teasere = maaling.maal([Blokk(f"teaser:{s_['kort']}", maler.teaser(s_, side_for.get(s_["kort"], 2),
                                                                     form.get("teaser_kart", True)),
@@ -1277,85 +1354,156 @@ def sett_forside(pakker: Pakker, innhold: dict, sider: list[Side], komplett: Var
          Blokk("ombord-bred", maler.ombord(UTGAVE_NR), W, type="boks")])}
     ombord_bred = boks["ombord-bred"] if form.get("ombord_bred") else None
     if komplett:
+        banner = None
         leads = maaling.maal([Blokk(f"lead:{lead_s['kort']}:{komplett.id}", maler.full(lead_s, komplett), bl, sak=lead_s,
                                     type="full")])
+        leads[0].n_felt = len(felt(lead_s))
     else:
-        leads = maaling.maal([Blokk(f"leadteaser:{lead_s['kort']}:{k}",
-                                    maler.lead(lead_s, side_for.get(lead_s["kort"], 2), bl, k, form["lead"]),
-                                    bl, sak=lead_s, type="lead") for k in range(len(felt(lead_s)) + 1)])
+        banner = maaling.maal([Blokk(f"leadhode:{lead_s['kort']}", maler.lead_hode(lead_s), W, sak=lead_s,
+                                     type="lead")])[0]
+        mulige = range(maks_hopp(lead_s) + 1) if n_felt is None else [n_felt]
+        leads = maaling.maal([Blokk(f"leadkropp:{lead_s['kort']}:{k}",
+                                    maler.lead_kropp(lead_s, side_for.get(lead_s["kort"], 2), bl, k, form["lead"]),
+                                    bl, sak=lead_s, type="lead") for k in mulige])
+        for b, k in zip(leads, mulige):
+            b.n_felt = k
+    y1 = y0 + (banner.hoyde + luft if banner else 0.0)  # under the banner: the lead's text and the rail
 
-    for stripe in ((False,) if form.get("motetall_inne") else (True, False)):
+    def stabel(ider):
+        celle = maaling.maal([Blokk("stabel:" + "+".join(ider), maler.stabel([boks[i].html for i in ider]),
+                                    f.spalte, type="boks")])[0]
+        celle.blokker = ider
+        return celle
+
+    def railhoyde(ider):
+        return sum(boks[i].hoyde for i in ider) + luft * 0.7 * max(len(ider) - 1, 0)
+
+    valg = []
+    alternativ = [(stripe, kort) for stripe in ((False,) if form.get("motetall_inne") else (False, True))
+                  for kort in ((True, False) if form["rail"] else (False,))]
+    for stripe, kort_rail in alternativ:
         if form["rail"]:
-            rail = ["i-utgaven"] + ([] if stripe else ["motetall"]) + (["slik"] if form["slik"] else []) + ["ombord"]
-            rad = teasere
+            alle_bokser = ["i-utgaven"] + ([] if stripe else ["motetall"]) + (["slik"] if form["slik"] else []) + ["ombord"]
+            if kort_rail:
+                # The rail beside the lead only; the other boxes in the teaser row's fifth column.
+                rail = ["i-utgaven"] + ([] if stripe else ["motetall"])
+                rad = teasere + [stabel([i for i in alle_bokser if i not in rail])]
+            else:
+                rail = alle_bokser
+                rad = teasere
+                if railhoyde(rail) > H - y1:
+                    continue
         else:
             # No rail: the boxes stacked in one cell of the row beside the teasers.
             rail = []
             ider = ["i-utgaven"] + ([] if stripe or form.get("motetall_inne") else ["motetall"]) + \
                 ([] if ombord_bred else ["ombord"])
-            celle = maaling.maal([Blokk("stabel:" + "+".join(ider), maler.stabel([boks[i].html for i in ider]),
-                                        f.spalte, type="boks")])[0]
-            celle.blokker = ider
-            rad = teasere[:f.spalter - 1] + [celle]
+            rad = teasere[:f.spalter - 1] + [stabel(ider)]
         ht = max((b.hoyde for b in rad), default=0.0)
-        plass = H - y0 - luft - ht - ((boks["motetall-stripe"].hoyde + luft) if stripe else 0.0)
+        hs = (boks["motetall-stripe"].hoyde + luft) if stripe else 0.0
+        plass = H - y1 - luft - ht - hs
         plass -= (ombord_bred.hoyde + luft) if ombord_bred else 0.0
         passer = [b for b in leads if b.hoyde <= plass]
-        if not passer:
-            continue
-        lead = passer[-1]
-        if sum(boks[i].hoyde for i in rail) + luft * 0.7 * (len(rail) - 1) > H - y0:
-            continue
-        side = Side(1, None)
-        y = 0.0
-        for b in hode:
-            side.ruter.append(Rute(b.id, 0, y, W, b.hoyde, b.html, "front", (b.id,)))
-            y += b.hoyde + 1.5
-        side.ruter.append(Rute(lead.id, 0, y0, bl, lead.hoyde, lead.html, "lead", (lead.id,)))
-        side.saker.append((lead_s, "full" if komplett else "lead"))
-        yt = y0 + lead.hoyde + luft
-        if stripe:
-            st = boks["motetall-stripe"]
-            side.streker.append(Strek(0, yt - luft / 2, bl if rail else W, 0, 0.6))
-            side.ruter.append(Rute(st.id, 0, yt, bl, st.hoyde, st.html, "boks", (st.id,)))
-            side.blokker.append("motetall")
-        if rail:
-            xr = bl + f.mellom
-            side.streker.append(Strek(xr - f.mellom / 2, y0, 0, H - y0, 0.35))
-            yr = y0
-            for i, bid in enumerate(rail):
-                b = boks[bid]
-                if i == len(rail) - 1:
-                    yr = max(yr, H - b.hoyde)  # the last box sits at the foot of the rail
-                side.ruter.append(Rute(b.id, xr, yr, f.spalte, b.hoyde, b.html, "boks", (b.id,)))
-                side.blokker.append(b.id)
-                yr += b.hoyde + luft * 0.7
-        # The teaser row follows; its columns run to the foot of the page.
-        if stripe:
-            yt += boks["motetall-stripe"].hoyde + luft
-        if ombord_bred:
-            side.ruter.append(Rute(ombord_bred.id, 0, yt, W, ombord_bred.hoyde, ombord_bred.html, "boks",
-                                   (ombord_bred.id,)))
-            side.blokker.append("ombord")
-            yt += ombord_bred.hoyde + luft
-        ht = H - yt
+        if kort_rail:
+            passer = [b for b in passer if railhoyde(rail) <= b.hoyde + hs]
+        if passer:
+            valg.append((passer[-1].n_felt, kort_rail, not stripe, passer[-1], stripe, kort_rail, rail, rad, plass))
+    if not valg:
+        return None
+    # The most of the lead's text on the front; then a rail that ends where the teasers start;
+    # then the meeting box in the rail rather than a strip.
+    *_, lead, stripe, kort_rail, rail, rad, plass = max(valg, key=lambda v: v[:3])
+
+    hs = (boks["motetall-stripe"].hoyde + luft) if stripe else 0.0
+    if banner and lead.n_felt:
+        # Room to spare: the lead's text a size up (still whole fields, the same jump).
+        stor = maaling.maal([Blokk(f"leadkropp-stor:{lead_s['kort']}:{lead.n_felt}",
+                                   maler.lead_kropp(lead_s, side_for.get(lead_s["kort"], 2), bl, lead.n_felt,
+                                                    form["lead"], True), bl, sak=lead_s, type="lead")])[0]
+        rad_h = max((b.hoyde for b in rad), default=0.0)
+        if stor.hoyde <= plass and stor.hoyde + 0.5 * rad_h <= plass + rad_h * 0.5 and \
+                (not kort_rail or railhoyde(rail) <= stor.hoyde + hs):
+            stor.n_felt = lead.n_felt
+            lead = stor
+    yt_teaser = y1 + lead.hoyde + luft + hs + ((ombord_bred.hoyde + luft) if ombord_bred else 0.0)
+    store = maaling.maal([Blokk(f"teaser-stor:{s_['kort']}", maler.teaser(s_, side_for.get(s_["kort"], 2),
+                                                                         form.get("teaser_kart", True), True),
+                                f.spalte, sak=s_, type="teaser") for s_ in teaser_saker])
+    if store and max(b.hoyde for b in store) + 2 <= H - yt_teaser and \
+            all(max(b.hoyde for b in store) >= c.hoyde for c in rad if c not in teasere):
+        rad = store + [c for c in rad if c not in teasere]
+
+    side = Side(1, None)
+    y = 0.0
+    for b in hode:
+        side.ruter.append(Rute(b.id, 0, y, W, b.hoyde, b.html, "front", (b.id,)))
+        y += b.hoyde + 1.5
+    if banner:
+        side.ruter.append(Rute(banner.id, 0, y0, W, banner.hoyde, banner.html, "lead", (banner.id,)))
+        if lead.n_felt or form["rail"]:
+            side.streker.append(Strek(0, y1 - luft / 2, W, 0, 0.6))
+        else:
+            y1 = y0 + banner.hoyde + 1.0  # no text on the front: the pointer follows the deck directly
+    side.ruter.append(Rute(lead.id, 0, y1, bl, lead.hoyde, lead.html, "lead", (lead.id,)))
+    side.saker.append((lead_s, "full" if komplett else "lead"))
+    yt = y1 + lead.hoyde + luft
+    if stripe:
+        st = boks["motetall-stripe"]
         side.streker.append(Strek(0, yt - luft / 2, bl if rail else W, 0, 0.6))
-        for i, b in enumerate(rad):
-            x = i * (f.spalte + f.mellom)
-            if i:
-                side.streker.append(Strek(x - f.mellom / 2, yt, 0, ht, 0.35))
-            side.ruter.append(Rute(b.id, x, yt, f.spalte, ht, b.html, b.type, (b.id,)))
-            if b.sak:
-                side.saker.append((b.sak, "teaser"))
-            else:
-                side.blokker += getattr(b, "blokker", None) or [b.id]
-        side.ledig = plass - lead.hoyde
-        return side
-    return None
+        side.ruter.append(Rute(st.id, 0, yt, bl, st.hoyde, st.html, "boks", (st.id,)))
+        side.blokker.append("motetall")
+        yt += st.hoyde + luft
+    if rail:
+        xr = bl + f.mellom
+        bunn = (yt - luft) if kort_rail else H
+        side.streker.append(Strek(xr - f.mellom / 2, y1, 0, bunn - y1, 0.35))
+        yr = y1
+        for i, bid in enumerate(rail):
+            b = boks[bid]
+            if i == len(rail) - 1 and not kort_rail:
+                yr = max(yr, H - b.hoyde)  # the last box sits at the foot of the rail
+            side.ruter.append(Rute(b.id, xr, yr, f.spalte, b.hoyde, b.html, "boks", (b.id,)))
+            side.blokker.append(b.id)
+            yr += b.hoyde + luft * 0.7
+    if ombord_bred:
+        side.ruter.append(Rute(ombord_bred.id, 0, yt, W, ombord_bred.hoyde, ombord_bred.html, "boks",
+                               (ombord_bred.id,)))
+        side.blokker.append("ombord")
+        yt += ombord_bred.hoyde + luft
+    # The teaser row follows; its columns run to the foot of the page.
+    ht = H - yt
+    side.streker.append(Strek(0, yt - luft / 2, bl if rail and not kort_rail else W, 0, 0.6))
+    for i, b in enumerate(rad):
+        x = i * (f.spalte + f.mellom)
+        if i:
+            side.streker.append(Strek(x - f.mellom / 2, yt, 0, ht, 0.35))
+        side.ruter.append(Rute(b.id, x, yt, f.spalte, ht, b.html, b.type, (b.id,)))
+        if b.sak:
+            side.saker.append((b.sak, "teaser"))
+        else:
+            side.blokker += getattr(b, "blokker", None) or [b.id]
+    side.ledig = plass - lead.hoyde
+    side.lead_felt = lead.n_felt
+    return side
+
+
+def maks_hopp(s: dict) -> int:
+    """How many of the lead's fields the front page may take: all but one when
+    nothing else (figures, background) would continue inside, so the jump never
+    leads to an empty page."""
+    n = len(felt(s))
+    resten = s.get("artikkel") or [f for f in s.get("figurer") or [] if f.get("type") in FIGUR_MIN]
+    return n if resten else max(n - 1, 0)
 
 
 def innholdsrader(innhold: dict, sider: list[Side], komplett, fmt: Format) -> list[dict]:
-    """"I denne utgaven": the full stories with their page, then the sections."""
+    """"I denne utgaven": the full stories with their page, then the sections.
+    Before the inside pages are made (sider empty): rows of the same size, to measure the box."""
+    maks = {"tabloid": 6, "a4": 5, "a5": 3}[fmt.navn]
+    if not sider:
+        return [{"tekst": s_["overskrift"], "side": 12, "sak": True} for s_ in innhold["fulle"][1:maks + 1]] + \
+            [{"tekst": t, "side": "12–15", "sak": False} for t in
+             ("Flere saker fra møtet", "Valg og fritak", "Slik lages Tingposten", "Rettelser og utgiver")]
     rader, korte, valg, slik, slutt = [], [], None, None, None
     for sd in sider:
         for s_, typ in sd.saker:
@@ -1370,7 +1518,6 @@ def innholdsrader(innhold: dict, sider: list[Side], komplett, fmt: Format) -> li
             slik = sd.nr
         if "kolofon" in blokker:
             slutt = sd.nr
-    maks = {"tabloid": 9, "a4": 5, "a5": 3}[fmt.navn]
     if len(rader) > maks:
         rader = rader[:maks]
     if korte:
@@ -1447,9 +1594,18 @@ def lag(mote: str, format_: str, til: Path, *, saker: list[dict] | None = None, 
             raise UtgaveFeil(f"fikk ikke alt til å passe etter {FORSOK} forsøk: {feil[:5]}")
         nett.pdf(til, fmt)
         html_fil = nett.sist
+        # The same pages on a newsprint tone, for reading on screen.
+        skjerm = skjerm_sti(til)
+        nett.last(skjermkopi(maler.dokument(innhold["mote"], fontcss, sider=sider, papir=SKJERM_PAPIR)), arbeid)
+        if nett.sjekk():
+            raise UtgaveFeil("skjermkopien ble ikke lik trykkfilen")
+        nett.pdf(skjerm, fmt)
     sideboks(til, fmt)
+    sideboks(skjerm, fmt)
     info = sjekk_pdf(til, fmt, len(sider))
+    sjekk_pdf(skjerm, fmt, len(sider))
     info["html"] = str(html_fil)
+    info["skjerm"] = str(skjerm)
     if fmt.navn == "a5":
         info["hefte"] = str(hefte_sti(til))
         info["ark"] = hefte(til, hefte_sti(til))
@@ -1457,6 +1613,7 @@ def lag(mote: str, format_: str, til: Path, *, saker: list[dict] | None = None, 
         info["png"] = [str(p) for p in png(til, Path(forhandsvisning), dpi)]
         if info.get("hefte"):
             info["png"] += [str(p) for p in png(Path(info["hefte"]), Path(forhandsvisning), dpi)]
+        info["png"] += [str(p) for p in png(skjerm, Path(forhandsvisning), dpi)]
     info.update({
         "format": fmt.navn, "pdf": str(til), "sider": len(sider),
         "hele": list(dict.fromkeys(s["nr_etikett"] for sd in sider for s, t in sd.saker if t == "full")),
@@ -1480,27 +1637,72 @@ def ombrekk(fmt: Format, maler: Maler, maaling: Maaling, innhold: dict) -> list[
     lead = innhold["fulle"][0]
     beste = None
     planer: dict[int, tuple] = {}
-    for komplett in [*front_lead_former(lead, fmt), None]:
-        forste = 1 if komplett else 0
-        if forste not in planer:
-            pakker = Pakker(fmt, maler, maaling, innhold, forste)
+    for komplett in front_lead_former(lead, fmt):
+        if 1 not in planer:
+            pakker = Pakker(fmt, maler, maaling, innhold, 1)
             pakker.forhandsmaal()
             plan = pakker.plan(fmt.sider)
-            planer[forste] = (pakker, plan, sett_inne(pakker, plan))
-        pakker, plan, inne = planer[forste]
+            planer[1] = (pakker, plan, sett_inne(pakker, plan))
+        pakker, plan, inne = planer[1]
         front = sett_forside(pakker, innhold, inne, komplett)
-        if front is None:
-            continue
+        if front is not None:
+            nokkel = (len(inne), False, front.ledig)
+            if beste is None or nokkel < beste[0]:
+                beste = (nokkel, [front, *inne])
+    hopp = hoppsider(fmt, maler, maaling, innhold)
+    if hopp is not None:
         # Fewest pages first; then a complete lead; then the fuller front page.
-        nokkel = (len(inne), komplett is None, front.ledig)
+        nokkel = (len(hopp) - 1, True, hopp[0].ledig)
         if beste is None or nokkel < beste[0]:
-            beste = (nokkel, [front, *inne])
+            beste = (nokkel, hopp)
     if beste is None:
         raise UtgaveFeil("forsiden får ikke plass til hovedsaken og henvisningene")
     sider = beste[1]
     if len(sider) % 4:
         raise UtgaveFeil(f"{len(sider)} sider er ikke et multiplum av 4")
     return sider
+
+
+def hoppsider(fmt: Format, maler: Maler, maaling: Maaling, innhold: dict) -> list[Side] | None:
+    """The lead starts on the front page and jumps: the front takes its head,
+    deck, facts and as many of its card's fields as fit, whole, ending with
+    "Fortsettes på side N"; the story goes on inside under "Fra side 1" with the
+    rest of the fields, the figures, the background and the sources. Nothing
+    is printed twice and no sentence is split. The number of fields is chosen
+    first (the front page's other blocks don't depend on the inside pages),
+    then the inside is packed with the rest of the story first."""
+    lead = innhold["fulle"][0]
+    pakker = Pakker(fmt, maler, maaling, innhold, 0)
+    pakker.forhandsmaal()
+    forhand = sett_forside(pakker, innhold, [], None)
+    k = forhand.lead_felt if forhand is not None else 0
+    while k >= 0:
+        if k:
+            resten = {**lead, "_fra_felt": k}
+            vist = lead_figurer(lead, fmt.spenn(front_former(fmt)["lead"]), fmt)
+            if vist:  # figures printed on the front aren't repeated; their sources are
+                resten["figurer"] = [f for f in lead.get("figurer") or [] if f not in [x for x, _ in vist]]
+                resten["_ekstra_kilder"] = [kk for f, _ in vist for kk in f.get("kilder") or []]
+            inn = {**innhold, "fulle": [resten] + innhold["fulle"][1:]}
+        else:
+            inn = innhold
+        pk = Pakker(fmt, maler, maaling, inn, 0)
+        pk.forhandsmaal()
+        try:
+            plan = pk.plan(fmt.sider)
+        except UtgaveFeil:
+            k -= 1
+            continue
+        inne = sett_inne(pk, plan)
+        plassert = any(s_["kort"] == lead["kort"] for sd in inne for s_, t in sd.saker if t == "full")
+        if k and not plassert:
+            k = 0  # the rest of the story didn't find room inside: the front shows head and deck only
+            continue
+        front = sett_forside(pk, innhold, inne, None, n_felt=k)
+        if front is not None:
+            return [front, *inne]
+        k -= 1
+    return None
 
 
 PT_PER_MM = 72 / 25.4
@@ -1610,6 +1812,18 @@ def hefte(kilde: Path, til: Path) -> int:
     with open(til, "wb") as fil:
         skriver.write(fil)
     return n // 4
+
+
+def skjerm_sti(til: Path) -> Path:
+    """tingposten-2026-09-23-tabloid.pdf → tingposten-2026-09-23-tabloid-skjerm.pdf"""
+    return til.with_name(f"{til.stem}-skjerm{til.suffix}")
+
+
+def skjermkopi(html_text: str) -> str:
+    """The figures' paper-coloured strokes and halos on the screen copy's paper tone."""
+    hvit = FARGER["--tp-flate"]
+    return html_text.replace(f'stroke="{hvit}"', f'stroke="{SKJERM_PAPIR}"').replace(f'fill="{hvit}"',
+                                                                                     f'fill="{SKJERM_PAPIR}"')
 
 
 def hefte_sti(til: Path) -> Path:

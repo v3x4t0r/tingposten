@@ -39,8 +39,9 @@ def tekst(i, n):
 
 def kort(nr, i, lang=True):
     felt = {"hva_endres": f"Sak {nr} gjelder skole nummer {i}. " + tekst(i, 3 if lang else 1),
-            "hvem_pavirkes": tekst(i + 1, 2 if lang else 1), "hvorfor": tekst(i + 2, 2) if lang else "",
-            "status": "Vedtatt.", "nar_og_hvor": tekst(i + 3, 1)}
+            "hvem_pavirkes": f"Endringen i sak {nr} gjelder elevene. " + tekst(i + 1, 2 if lang else 1),
+            "hvorfor": f"Begrunnelsen i sak {nr} er plassmangel. " + tekst(i + 2, 2) if lang else "",
+            "status": f"Sak {nr} ble vedtatt.", "nar_og_hvor": f"Arbeidet med sak {nr} starter i 2027. " + tekst(i + 3, 1)}
     kilder = [{"felt": k, "dok": "saksframlegg", "side": 2 + j} for j, k in enumerate(felt) if felt[k]]
     kilder.append({"felt": "status", "dok": "protokoll", "side": 1})
     return {"nr": nr, "overskrift": f"Ny skole nummer {i} skal bygges i bydelen", "felt": felt, "kilder": kilder,
@@ -311,7 +312,7 @@ def test_whole_edition(tmp_path, saker, fmt, fontmappe, monkeypatch):
     til = tmp_path / f"utgave-{fmt}.pdf"
     info = utgave.lag(MOTE, fmt, til, saker=saker, forhandsvisning=tmp_path / "png", dpi=30)
     assert info["sider"] % 4 == 0 and info["sider"] >= 4
-    assert len([p for p in info["png"] if "hefte" not in p]) == info["sider"]
+    assert len([p for p in info["png"] if "hefte" not in p and "skjerm" not in p]) == info["sider"]
     # Fonts: embedded, TrueType, only the edition's own (sjekk_pdf fails otherwise)
     assert all(re.search(r"\+(TP|Unifraktur)", f) for f in info["fonter"])
     html = Path(info["html"]).read_text()
@@ -333,3 +334,45 @@ def test_whole_edition(tmp_path, saker, fmt, fontmappe, monkeypatch):
     assert "Prøveutgave" in html and "Utgitt av RO-Studio AS" in html
     if fmt == "a5":
         assert Path(info["hefte"]).exists() and info["ark"] == info["sider"] // 4
+    # The masthead and folios carry the meeting's weekday and date.
+    assert "Bergen, Onsdag 23. september 2026" in html and "Tingposten<span class=\"skille\">" in html
+    # The lead jumps: what the front page prints of it isn't printed again inside.
+    if "Fortsettes på side" in html:
+        assert "Fra side 1" in html
+        forside = html[:html.index('data-side="2"')]
+        for f in utgave.felt(innhold_lead(saker)):
+            start = f["tekst"].split(". ")[0]
+            if start in forside:
+                assert html.count(start) == 1, f["label"]
+    # A screen copy on a newsprint tone; the print file stays white.
+    import pymupdf
+
+    for sti, ventet in ((til, (255, 255, 255)), (Path(info["skjerm"]), utgave_farge(utgave.SKJERM_PAPIR))):
+        with pymupdf.open(sti) as doc:
+            assert doc.page_count == info["sider"]
+            pix = doc[0].get_pixmap(dpi=20)
+            assert all(abs(a - b) <= 2 for a, b in zip(pix.pixel(2, 2)[:3], ventet)), (sti, pix.pixel(2, 2))
+
+
+def innhold_lead(saker):
+    return utgave.velg(saker, MOTE)["fulle"][0]
+
+
+def utgave_farge(hex_):
+    return tuple(int(hex_[i:i + 2], 16) for i in (1, 3, 5))
+
+
+def test_map_labels_are_outlines_not_stroked_text(fontmappe, monkeypatch):
+    pytest.importorskip("fontTools")
+    monkeypatch.setattr(utgave, "font_mappe", lambda: fontmappe)
+    utgave.fonter(fontmappe)
+    svg = str(utgave.figur_svg(grafikk.bydelskart(["Fana"])["svg"]))
+    assert 'class="etikett-sti"' in svg and not re.search(r"<text[^>]*stroke=", svg)
+    assert re.search(r'<path class="etikett-sti" d="M[^"]+"', svg)
+
+
+def test_screen_copy_only_retints_the_paper():
+    html = '<svg><path fill="#ffffff" stroke="#ffffff"/><path fill="#333333"/></svg>'
+    ut = utgave.skjermkopi(html)
+    assert utgave.SKJERM_PAPIR in ut and "#ffffff" not in ut and "#333333" in ut
+    assert utgave.skjerm_sti(Path("a/tingposten-2026-09-23-a5.pdf")).name == "tingposten-2026-09-23-a5-skjerm.pdf"

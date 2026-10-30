@@ -16,12 +16,20 @@
 {% endfor %}
 }
 {{ css }}
-.rute { position: absolute; overflow: hidden; }
+{% if papir %}:root { --papir: {{ papir }}; }
+{% endif %}.rute { position: absolute; overflow: hidden; }
 .strek { position: absolute; }
 .maal { display: flow-root; margin: 0 0 20mm; }
 </style>
 </head>
 <body class="format-{{ fmt.navn }}">
+{# The site's icons (base.html), for the fact rows. #}
+<svg class="ikoner" width="0" height="0" aria-hidden="true">
+<symbol id="i-sted" viewBox="0 0 16 16"><path d="M8 14.6s4.6-4.3 4.6-8.1a4.6 4.6 0 0 0-9.2 0c0 3.8 4.6 8.1 4.6 8.1z"/><circle cx="8" cy="6.5" r="1.7"/></symbol>
+<symbol id="i-stemmer" viewBox="0 0 16 16"><path d="M2.5 3.5h8M2.5 8h11M2.5 12.5h5"/></symbol>
+<symbol id="i-kr" viewBox="0 0 16 16"><rect x="1.5" y="4" width="13" height="8" rx="1.5"/><circle cx="8" cy="8" r="1.9"/></symbol>
+<symbol id="i-bakgrunn" viewBox="0 0 16 16"><rect x="2.5" y="1.8" width="11" height="12.4" rx="1.6"/><path d="M5.2 5.3h5.6M5.2 8h5.6M5.2 10.7h3.4"/></symbol>
+</svg>
 {% if maal %}
 {% for m in maal %}<div class="maal" data-maal="{{ m.id }}" style="width: {{ '%.3f'|format(m.bredde) }}mm">{{ m.html }}</div>
 {% endfor %}
@@ -30,7 +38,11 @@
 <section class="side {{ 'hoyre' if side.nr is odd else 'venstre' }}{% if side.nr == 1 %} forside{% endif %}" data-side="{{ side.nr }}">
   <div class="sats">
     {% if side.folio %}
-    <header class="folio"><span class="folio-v">{% if side.nr is even %}<span class="folio-nr">{{ side.nr }}</span>&emsp;{% endif %}<span class="folio-del">{{ side.folio }}</span></span><span class="folio-navn">Tingposten</span><span class="folio-h">{{ mote.organ_kort }} {{ mote.dato_tekst }} · Prøveutgave nr. {{ nr }}{% if side.nr is odd %}&emsp;<span class="folio-nr">{{ side.nr }}</span>{% endif %}</span></header>
+    {% if side.nr is even %}
+    <header class="folio"><span class="folio-v"><span class="folio-nr">{{ side.nr }}</span><span class="skille">·</span>Tingposten<span class="skille">·</span>{{ dato_lang }}</span><span class="folio-del">{{ side.folio }}</span></header>
+    {% else %}
+    <header class="folio"><span class="folio-del">{{ side.folio }}</span><span class="folio-h">{{ dato_lang }}<span class="skille">·</span>Tingposten<span class="skille">·</span><span class="folio-nr">{{ side.nr }}</span></span></header>
+    {% endif %}
     {% endif %}
     <div class="innhold">
       {% for r in side.ruter %}<div class="rute rute-{{ r.klasse }}" data-boks="{{ r.id }}" data-blokk="{{ r.id }}" style="top: {{ '%.2f'|format(r.y) }}mm; left: {{ '%.2f'|format(r.x) }}mm; width: {{ '%.2f'|format(r.b) }}mm; height: {{ '%.2f'|format(r.h) }}mm">{{ r.html }}</div>

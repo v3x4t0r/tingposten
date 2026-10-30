@@ -21,7 +21,7 @@ uv run --extra utgave playwright install chromium   # én gang, hvis Playwright 
 uv run --extra utgave tingposten utgave --mote 571424-2026-09-23 --format tabloid --til utgave.pdf --png forhandsvisning/
 ```
 
-Formater: `tabloid` (280 × 400 mm, 5 spalter, avispapir), `a4` (A4-hefte, 3 spalter) og `a5` (A5-hefte, 2 spalter; skriver også `<fil>-hefte.pdf` med to sider per liggende A4-ark i heftrekkefølge, for tosidig utskrift med vending på kortsiden). Daglig kjøring på en Raspberry Pi: [`deploy/README.md`](deploy/README.md).
+Formater: `tabloid` (280 × 400 mm, 5 spalter, avispapir), `a4` (A4-hefte, 3 spalter) og `a5` (A5-hefte, 2 spalter; skriver også `<fil>-hefte.pdf` med to sider per liggende A4-ark i heftrekkefølge, for tosidig utskrift med vending på kortsiden). Hvert format får også en skjermkopi, `<fil>-skjerm.pdf`, med avispapirtone; trykkfilen er hvit. Daglig kjøring på en Raspberry Pi: [`deploy/README.md`](deploy/README.md).
 
 ## Kjøre lokalt
 
