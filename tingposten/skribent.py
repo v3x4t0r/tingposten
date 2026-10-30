@@ -241,17 +241,27 @@ def skriv_artikkel(item: dict, card: dict, data_dir: Path = config.DATA_DIR, llm
     return ("omskrevet" if feedback else "skrevet") + (" (over grensen)" if artikkel_grenser(answer) else "")
 
 
-def skriv_tittel(artikkel: dict, kort_overskrift: str, llm) -> dict:
+def skriv_tittel(artikkel: dict, kort_overskrift: str, llm, avvist: dict | None = None) -> dict:
     """Propose a headline for an EDITED article, from its text alone (and the
     card's headline, not to be repeated). One rewrite when the draft breaks
-    the limits. Returns {"tittel", "grenser", "blocked"}: "grenser" are the
+    the limits. With `avvist` ({"tittel", "begrunnelse"}: a headline the
+    fact-check rejected, and why), the writer gets one new try with that
+    objection. Returns {"tittel", "grenser", "blocked"}: "grenser" are the
     problems left after the rewrite; artikkeltittel.py stores and checks it."""
     shown = [{"avsnitt": n, "tekst": a.get("tekst", "")} for n, a in enumerate(artikkel.get("avsnitt") or [], start=1)]
-    prompt = "\n\n".join([
+    parts = [
         TITTEL_RULES,
         "THE CARD'S HEADLINE (shown above the card; do not repeat it):\n" + fence("KORTETS OVERSKRIFT", kort_overskrift or "(mangler)"),
         "THE ARTICLE (as published):\n" + fence("ARTIKKEL", json.dumps(shown, ensure_ascii=False, indent=1)),
-    ])
+    ]
+    if avvist:
+        parts.append(
+            "AN INDEPENDENT FACT-CHECK REJECTED YOUR EARLIER HEADLINE. Write a new one from scratch that says only\n"
+            "what the article and its sources support, keeping every limitation they put on the claim. If the\n"
+            "objection can't be met in a clear headline, choose a different fact from the article.\n"
+            "Rejected headline:\n" + fence("AVVIST TITTEL", avvist.get("tittel", "")) +
+            "\nThe fact-check's objection:\n" + fence("INNVENDING", avvist.get("begrunnelse", "")))
+    prompt = "\n\n".join(parts)
     answer = llm.ask(prompt, TITTEL_SCHEMA)
     if not answer["blocked"].strip() and (problems := tittel_grenser(answer["tittel"], kort_overskrift)):
         answer = llm.ask(prompt + _feedback(problems), TITTEL_SCHEMA)

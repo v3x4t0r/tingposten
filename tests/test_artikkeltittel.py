@@ -318,11 +318,12 @@ def kjor_dir(data_dir, monkeypatch):
 
 
 def test_kjor_titles_the_edited_articles_and_publishes_only_checked_ones(kjor_dir):
-    writer = FakeLLM([proposal(), proposal("SV ville planlegge sykkelbroen i indre trasé")])
-    checker = FakeLLM([verdict(), verdict(stottet=False)])
+    writer = FakeLLM([proposal(), proposal("SV ville planlegge sykkelbroen i indre trasé"),
+                      proposal("SV og MDG ville planlegge sykkelbroen i indre trasé")])  # its one new try
+    checker = FakeLLM([verdict(), verdict(stottet=False), verdict(stottet=False)])
     result = pipeline.kjor(kjor_dir, steg=("artikkelrediger", "artikkeltittel"), parallel=1,
                            llms={"skriv": writer, "sjekk": checker})
-    assert result["artikkeltittel"]["antall"] == {"støttet": 1, "ikke støttet": 1}
+    assert result["artikkeltittel"]["antall"] == {"støttet": 1, "ikke støttet (ny runde)": 1}
     assert result["artikkeltittel/rediger"]["tittel"] == 1
     titles = sorted(json.loads((kjor_dir / "artikler-redigert" / f"571424/2026-09-23/{t}.json").read_text())["tittel"]
                     for t in ("266-26", "267-26"))
@@ -351,3 +352,39 @@ def test_kjor_survives_a_broken_headline_step(kjor_dir, monkeypatch):
 
 def test_headline_step_is_last_and_listed():
     assert pipeline.STEG[-1] == "artikkeltittel"
+
+
+
+def test_a_rejected_headline_gets_one_new_try_with_the_objection(data_dir):
+    better = "Sju traseer for bybanen ble vurdert i konsekvensutredningen"
+    writer = FakeLLM([proposal(), proposal(better)], name="fake:opus")
+    checker = FakeLLM([verdict(stottet=False), verdict()], name="fake:codex")
+    assert artikkeltittel.lag(ITEM, data_dir, writer, checker) == "støttet (ny runde)"
+    assert "AN INDEPENDENT FACT-CHECK REJECTED" in writer.prompts[1] and TITLE in writer.prompts[1]
+    assert "Side 5 sier sju alternativer." in writer.prompts[1]  # the objection, fenced as data
+    r = record(data_dir)
+    assert r["tittel"] == better and r["forsok"] == 2 and r["forrige"]["tittel"] == TITLE
+    assert r["sjekk"]["tittel"] == better and r["sjekk"]["stottet"] is True
+    assert not artikkeltittel.trenger(ITEM, data_dir)
+
+
+def test_only_one_new_try_and_none_for_a_blocked_check(data_dir):
+    other = "Sju traseer for bybanen ble vurdert i konsekvensutredningen"
+    writer = FakeLLM([proposal(), proposal(other)])
+    checker = FakeLLM([verdict(stottet=False), verdict(noytral=False)])
+    assert artikkeltittel.lag(ITEM, data_dir, writer, checker) == "ikke støttet (ny runde)"
+    assert not artikkeltittel.trenger(ITEM, data_dir)  # no third try
+    assert artikkeltittel.lag(ITEM, data_dir, FakeLLM([]), FakeLLM([])) == "ikke støttet (ny runde)"
+
+
+def test_a_rejected_headline_from_before_the_retry_existed_gets_its_new_try(data_dir, monkeypatch):
+    # written by the version without the retry: rejected after one try, no "forsok" field
+    monkeypatch.setattr(artikkeltittel, "FORSOK", 1)
+    assert artikkeltittel.lag(ITEM, data_dir, FakeLLM([proposal()]), FakeLLM([verdict(stottet=False)])) == "ikke støttet"
+    monkeypatch.setattr(artikkeltittel, "FORSOK", 2)
+    assert "forsok" not in record(data_dir) and artikkeltittel.trenger(ITEM, data_dir)  # → the next run tries again
+
+
+def test_a_blocked_check_is_not_a_rejection(data_dir):
+    assert artikkeltittel.lag(ITEM, data_dir, FakeLLM([proposal()]), FakeLLM([verdict(blocked="mangler sider")])).startswith("blocked")
+    assert not artikkeltittel.trenger(ITEM, data_dir)
