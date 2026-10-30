@@ -68,7 +68,7 @@ def test_writer_prompt_states_the_rules_and_shows_only_the_edited_article():
     out = skribent.skriv_tittel(EDITED, CARD_HEADLINE, fake)
     assert out == {"tittel": TITLE, "grenser": [], "blocked": ""}
     prompt = fake.prompts[0]
-    for rule in ("At most 55 characters (hard limit 60)", 'NEVER start with "Bystyret" or "Byrådet"',
+    for rule in ("Clarity first, length second", "never over 90", "Ap, H, FrP", 'NEVER start with "Bystyret" or "Byrådet"',
                  "Do not repeat the card's headline", "No names of private persons", "Sentence case",
                  "Norwegian Bokmål", "Exactly as certain as the article", "Never evaluative or loaded",
                  '"Bakgrunn for saken"'):
@@ -78,7 +78,7 @@ def test_writer_prompt_states_the_rules_and_shows_only_the_edited_article():
 
 
 @pytest.mark.parametrize("tittel, problem", [
-    ("Konsekvensutredningen vurderte sju ulike traséalternativer for bybanen", "tegn (maks 55"),
+    ("Konsekvensutredningen for bybanen vurderte sju ulike traséalternativer i detalj", "tegn (maks 75"),
     ("Bystyret valgte trasé etter sju alternativer", "begynner med organet"),
     ("Byrådet la fram sju alternativer", "begynner med organet"),
     ("Bakgrunn for saken", "merkelapp"),
@@ -98,7 +98,7 @@ def test_tittel_grenser_passes_a_plain_headline():
 
 
 def test_writer_gets_one_rewrite_then_reports_what_is_left():
-    long = "Konsekvensutredningen vurderte sju ulike traséalternativer for bybanen"
+    long = "Konsekvensutredningen for bybanen vurderte sju ulike traséalternativer i detalj"
     fake = FakeLLM([proposal("Bystyret valgte trasé"), proposal()])
     assert skribent.skriv_tittel(EDITED, CARD_HEADLINE, fake)["tittel"] == TITLE
     assert "BROKE THE HARD LIMITS" in fake.prompts[1] and "begynner med organet" in fake.prompts[1]
@@ -182,7 +182,7 @@ def test_redaktor_drops_what_is_not_checked_as_supported(change, grunn):
 
 
 @pytest.mark.parametrize("tittel, grunn", [
-    ("Sju traseer ble vurdert før bystyret valgte tunnel under Dokken i 2026", "over 60 tegn"),
+    ("Sju traseer ble vurdert før bystyret valgte en lang tunnel under Dokken og Laksevåg i september 2026", "over 90 tegn"),
     ("Bystyret fikk sju traseer å velge mellom", "begynner med organet"),
     ("Byrådet vurderte sju traseer", "begynner med organet"),
     ("Bakgrunn for saken", "merkelapp"),
@@ -195,11 +195,11 @@ def test_redaktor_drops_headlines_over_the_hard_limits_even_when_checked(tittel,
     assert out["tittel"] == "" and grunn in out["tittel_grunn"]
 
 
-def test_hard_limit_is_60_characters_the_writer_aims_at_55():
-    t58 = "Sju traseer ble vurdert, og B1 kom best ut i analysen av dem"[:58]
-    assert len(t58) == 58 and redaktor.tittel_brudd(t58) == [] and skribent.tittel_grenser(t58)
-    assert redaktor.rediger_tittel(checked(t58), AVSNITT, CARD_HEADLINE)["tittel"] == t58
-    assert redaktor.MAX_TITTEL == skribent.MAX_TITTEL == 60 and skribent.MAL_TITTEL == 55
+def test_hard_limit_is_90_characters_the_writer_aims_under_75():
+    t = "Konsekvensutredningen for bybanen vurderte sju ulike traséalternativer i detalj"  # over the aim, under the hard limit: the writer is nudged, the editor keeps it
+    assert 75 < len(t) <= 90 and redaktor.tittel_brudd(t) == [] and skribent.tittel_grenser(t)
+    assert redaktor.rediger_tittel(checked(t), AVSNITT, CARD_HEADLINE)["tittel"] == t
+    assert redaktor.MAX_TITTEL == skribent.MAX_TITTEL == 90 and skribent.MAL_TITTEL == 75
 
 
 def test_no_headline_for_a_rejected_or_empty_article():

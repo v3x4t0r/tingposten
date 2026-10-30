@@ -32,7 +32,7 @@ MAX_HEADLINE = 65
 MAX_ARTICLE_WORDS = 250
 MAX_PARAGRAPHS = 5
 MIN_ARTICLE_WORDS = 40
-MAX_TITTEL = 60  # the article's own headline (the writer aims at 55)
+MAX_TITTEL = 90  # the article's own headline: clarity first (the writer aims under 75)
 
 # Rejection codes ("koder" in the output). Only these may be fixed by the
 # writer automatically; personvern always waits for a human, and checker

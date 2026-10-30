@@ -43,7 +43,9 @@ Hver sak har en lenke merket «Meld feil». Du kan melde feil på e-post til [e-
 
 ## Uavhengighet
 
-Tingposten har ingen annonser og følger ikke med på enkeltlesere. Vi teller besøk uten informasjonskapsler, som forklart under «Besøkstall». Tingposten er ikke knyttet til noe parti eller til Bergen kommune, og tar ikke imot betaling for omtale. Ansvarlig redaktør er [navn], som kan kontaktes på [e-post].
+Tingposten følger ikke med på enkeltlesere. Vi teller besøk uten informasjonskapsler, som forklart under «Besøkstall». Tingposten er ikke knyttet til noe parti eller til Bergen kommune, og tar ikke imot betaling for omtale.
+
+Tingposten utgis av [utgiver], som også står bak Freetime (freetime.no). Ansvarlig redaktør er Henrik Midttun, som kan kontaktes på [e-post].
 
 ## Kilder og gjenbruk
 
@@ -53,5 +55,5 @@ Dokumentene tilhører Bergen kommune. Vedtak og forslag fra offentlige myndighet
 
 ## Før publisering
 
-- Fyll inn [navn], [e-post] og [dato].
+- Fyll inn [utgiver] (RO-Studio AS eller Henrik Midttun), [e-post] og [dato].
 - «Rettelser gjøres synlig» forutsetter en rettelsesmerknad på sakssiden. Den finnes ikke ennå og må bygges før erklæringen publiseres.
