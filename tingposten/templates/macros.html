@@ -113,6 +113,8 @@
   {% if f.type == "kart" %}
   {% set grunn = (f.kilde or "").split(". ", 1)[1] if ". " in (f.kilde or "") else "" %}
   <figcaption>{% if s.bydeler %}<p class="tegnforklaring">{% for b in s.bydeler %}<span>{{ b }}</span>{% endfor %}</p>{% endif %}{{ grunn }} Kart: © OpenStreetMap (ODbL)</figcaption>
+  {% elif f.get("kilder") %}
+  <figcaption>{{ kildelinje(f.kilder, tag="span") }}</figcaption>
   {% elif f.type == "stemmer" %}
   <figcaption>Kilde: {{ f.kilde[:1]|lower }}{{ f.kilde[1:] }}.</figcaption>
   {% elif f.kilde %}

@@ -57,6 +57,7 @@ def parse_pages(pages: list[str]) -> dict:
         "saksnr": "",
         "vedtak": "",
         "vedtak_side": 0,
+        "votering_side": 0,  # where "Votering:" starts, for the vote chart's source link
         "talere": [],
         "voteringer": [],
         "til_stede": None,
@@ -95,6 +96,7 @@ def parse_pages(pages: list[str]) -> dict:
 
     result["talere"] = _talere(text[after : votering_at if votering_at >= 0 else section_end])
     if votering_at >= 0:
+        result["votering_side"] = sum(1 for s in starts if s <= votering_at)
         block = _flat(text[rest_start:section_end])
         result["voteringer"] = [_vote(m) for m in _VOTE.finditer(block)]
         if m := _TIL_STEDE.search(block):

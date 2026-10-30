@@ -351,12 +351,16 @@ a:hover { text-decoration-thickness: 2px; }
 .dateline .kicker::after { content: none !important; }
 .dateline .kicker a { color: inherit; text-decoration: none; }
 .dateline .kicker a:hover { text-decoration: underline; }
-.dateline > span:not(:last-child)::after { content: "·"; margin: 0 0.45em; color: var(--linje-2); }
+/* Organ and date link to the meeting. The " · " has a no-break space before
+   it, so it can end a line but never start one. */
+.dateline-mote { color: inherit; text-decoration-color: var(--linje-2); }
+.dateline-mote:hover { color: var(--blekk); text-decoration-color: currentColor; }
+.dateline .skille { color: var(--linje-2); }
 @media (min-width: 900px) {
   .dateline { margin: 10px 0 0; padding-top: 9px; border-top: 3px solid var(--sterk); }
   .dateline .kicker { display: block; margin-bottom: 4px; }
-  .dateline span { display: block; }
-  .dateline > span:not(:last-child)::after { content: none; }
+  .dateline-rad, .dateline-rad .nb { display: block; }
+  .dateline .skille { display: none; }
 }
 .sak-tittel { margin: 0; max-width: 21em; font: 700 clamp(2.05rem, 1.3rem + 3vw, 3.4rem)/1.05 var(--didone); letter-spacing: -0.012em; text-wrap: balance; }
 .sak-dek { margin: 1rem 0 0; max-width: 34em; font: 400 clamp(1.15rem, 1.05rem + 0.4vw, 1.33rem)/1.5 var(--serif); color: var(--blekk-2); text-wrap: pretty; }
@@ -366,17 +370,17 @@ a:hover { text-decoration-thickness: 2px; }
 .paa-siden { margin: 1.2rem 0 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font: 500 0.8125rem/1.3 var(--sans); color: var(--dempet); }
 .paa-siden a { font-weight: 600; }
 
+/* Below 1180px the page reads in DOM order (card, figures, documents,
+   background), so the visual order is the focus order. */
 .sak-oppsett { display: grid; grid-template-columns: minmax(0, 1fr); }
-.sak-oppsett > .kort { order: 1; }
 .sak-oppsett > .rail { display: contents; }
-.rail-figurer { order: 2; }
-.sak-oppsett > .bakgrunn { order: 3; }
-.rail-dok { order: 4; }
 @media (min-width: 1180px) {
   .sak-oppsett { grid-template-columns: minmax(0, 1fr) var(--rail); column-gap: 48px; align-items: start; }
-  .sak-oppsett > .kort { grid-column: 1; grid-row: 1; }
+  .sak-oppsett > .kort, .sak-oppsett > .sak-melding { grid-column: 1; grid-row: 1; }
   .sak-oppsett > .bakgrunn { grid-column: 1; grid-row: 2; }
-  .sak-oppsett > .rail { display: block; grid-column: 2; grid-row: 1 / span 2; }
+  /* The rail runs the full height, so the documents can follow the reader. */
+  .sak-oppsett > .rail { display: block; grid-column: 2; grid-row: 1 / span 2; align-self: stretch; }
+  .rail-dok { position: sticky; top: 24px; }
 }
 
 /* Kort fortalt: soft panel, thick rule, fixed five rows */
@@ -396,7 +400,11 @@ a:hover { text-decoration-thickness: 2px; }
 }
 .kilde { margin: 7px 0 0; font: 400 0.8125rem/1.45 var(--sans); color: var(--dempet); }
 .kilde-etikett { font-weight: 600; color: var(--blekk-2); margin-right: 0.3em; }
-.kilde a { padding: 0 1px; font-weight: 500; }
+/* Source page links: each a 24×24px target (WCAG 2.5.8) that still reads as
+   "s. 5, 6, 7". The right padding lies under the ", " that follows (pulled
+   back by the negative margin), so the comma sits tight and targets never overlap. */
+.kilde a, .fotnoter li > span a { display: inline-block; min-width: 24px; padding: 4px 5px 4px 12px; margin-right: -5px; font-weight: 500; }
+.kilde-etikett + a, .kilde-skille + a, .fotnoter li > span > a:first-child { margin-left: -11px; }
 .kilde-skille { margin: 0 0.45em; color: var(--linje-2); }
 
 /* Rail: figures with neat captions (C), documents */
@@ -431,18 +439,20 @@ a:hover { text-decoration-thickness: 2px; }
 .bakgrunn { padding: 40px 0 8px; scroll-margin-top: 12px; }
 .bakgrunn-etikett { margin: 0 0 10px; }
 @media (min-width: 900px) { .bakgrunn-etikett { margin: 12px 0 0; } }
-.bakgrunn-tittel { margin: 0; font: 700 clamp(1.85rem, 1.45rem + 1.4vw, 2.5rem)/1.1 var(--didone); letter-spacing: -0.01em; }
-.byline { margin: 10px 0 0; padding-bottom: 18px; border-bottom: 1px solid var(--linje); font: 400 0.8125rem/1.5 var(--sans); color: var(--dempet); }
+.byline { margin: 0; padding-bottom: 14px; border-bottom: 1px solid var(--linje); font: 400 0.8125rem/1.5 var(--sans); color: var(--dempet); }
 .byline span + span::before { content: "·"; margin: 0 0.45em; color: var(--linje-2); }
 .brodtekst { max-width: 33em; margin-top: 22px; }
 .brodtekst p { margin: 0 0 1.05em; font: 400 1.1875rem/1.62 var(--serif); color: var(--blekk); hanging-punctuation: first; }
 @media (min-width: 720px) { .brodtekst p { font-size: 1.25rem; line-height: 1.62; } }
 .brodtekst p:first-child { font-size: 1.3125rem; line-height: 1.55; }
 @media (min-width: 720px) { .brodtekst p:first-child { font-size: 1.375rem; } }
-.brodtekst p:first-child::first-letter { initial-letter: 3; -webkit-initial-letter: 3; font-family: var(--didone); font-weight: 700; margin-right: 0.09em; color: var(--blekk); }
+/* Only where initial-letter works: Firefox would show a normal-size bold letter. */
+@supports (initial-letter: 3) or (-webkit-initial-letter: 3) {
+  .brodtekst p:first-child::first-letter { initial-letter: 3; -webkit-initial-letter: 3; font-family: var(--didone); font-weight: 700; margin-right: 0.14em; color: var(--blekk); }
+}
 .brodtekst p:target { background: var(--merket); box-shadow: 0 0 0 8px var(--merket); }
 .fn { font: 600 0.68em/0 var(--sans); vertical-align: 0.55em; margin-left: 0.12em; }
-.fn a { text-decoration: none; padding: 0 2px; }
+.fn a { text-decoration: none; padding: 6px; margin: 0 -4px; }
 .fn a:hover { text-decoration: underline; }
 .fotnoter { max-width: 37em; margin: 18px 0 0; padding: 14px 0 0; border-top: 1px solid var(--linje); font-family: var(--sans); }
 .fotnoter h3 { margin: 0; font: 600 0.875rem/1.3 var(--sans); }
@@ -451,7 +461,7 @@ a:hover { text-decoration-thickness: 2px; }
 .fotnoter li { display: grid; grid-template-columns: 1.8em minmax(0, 1fr) auto; gap: 8px; padding: 5px 0; font: 400 0.8125rem/1.45 var(--sans); color: var(--dempet); scroll-margin-top: 12px; }
 .fotnoter li:target { background: var(--merket); box-shadow: 0 0 0 6px var(--merket); }
 .fotnoter .nr { font-weight: 700; color: var(--blekk); font-variant-numeric: tabular-nums; }
-.fotnoter .tilbake { text-decoration: none; }
+.fotnoter .tilbake { text-decoration: none; padding: 2px 8px; }
 
 /* More from the same meeting */
 .relaterte { margin-top: 44px; padding-top: 24px; border-top: 3px double var(--sterk); }
@@ -530,3 +540,46 @@ a:hover { text-decoration-thickness: 2px; }
 .intro { padding: 48px 0 64px; text-align: center; }
 .intro-ingress { margin: 0 auto; max-width: 24em; font: 400 clamp(1.45rem, 1.15rem + 1.3vw, 2.15rem)/1.3 var(--didone); word-spacing: 0.07em; text-wrap: balance; }
 .intro-lenke { margin: 26px 0 0; font: 600 1rem/1.3 var(--sans); }
+
+/* === Sakside (gjennomgang 30.10) === */
+/* Mobile: the dateline links to the meeting, so the breadcrumb would only repeat it. */
+@media (max-width: 899px) {
+  .sakside .brodsmule { display: none; }
+  .sakside .sak-topp { padding-top: 18px; }
+  /* tema link above, meeting link below: 24px apart (WCAG 2.5.8) */
+  .sakside .dateline .kicker { margin-bottom: 6px; }
+}
+
+/* The kommune's own title as h1 (no card, or over 90 characters): quieter, and
+   hyphenated, but only long words (the compounds that broke mid-word), not names. */
+.sak-tittel-raa { max-width: 28em; font-size: clamp(1.6rem, 1.2rem + 1.6vw, 2.2rem); line-height: 1.12; letter-spacing: -0.005em;
+  hyphens: auto; -webkit-hyphens: auto; hyphenate-limit-chars: 12 5 5; }
+.sak-dek-lang { font-size: clamp(1.0625rem, 0.98rem + 0.4vw, 1.2rem); }
+.sak-dek, .felt-tekst, .brodtekst p { hyphens: auto; -webkit-hyphens: auto; hyphenate-limit-chars: 8 4 3; }
+
+/* The key facts under the dek: the lists' fakta(), a little larger. */
+.sak-fakta { margin: 14px 0 0; gap: 6px 20px; font-size: 0.875rem; color: var(--blekk-2); }
+.sak-fakta .ikon { width: 15px; height: 15px; color: var(--dempet); }
+
+/* No summary: one notice in the card's place */
+.sak-melding { padding: 14px 0 4px; border-top: 1px solid var(--linje); }
+.sak-melding-tekst { margin: 0; max-width: 36em; font: italic 400 1.0625rem/1.55 var(--serif); color: var(--dempet); }
+.sak-melding-venter { background: var(--boks); border-top: 3px solid var(--sterk); margin: 0 calc(-1 * var(--gutter)); padding: 16px var(--gutter) 18px; }
+.sak-melding-venter .sak-melding-tekst { font: 400 1.125rem/1.55 var(--serif); color: var(--blekk-2); }
+@media (min-width: 720px) { .sak-melding-venter { margin: 0; padding: 18px 24px 20px; } }
+@media (min-width: 900px) {
+  .sak-melding-tekst { grid-column: 2; }
+  .sak-melding-venter { grid-template-columns: calc(var(--etikett) - 24px) minmax(0, 1fr); }
+}
+
+/* "Meld feil" where a reader finishes: under the card, after the article */
+.meld-feil { margin: 0; padding: 14px 0 10px; border-top: 1px solid var(--boks-kant); font: 400 0.875rem/1.45 var(--sans); color: var(--blekk-2); }
+.meld-feil a { font-weight: 600; }
+@media (min-width: 900px) { .kort .meld-feil { grid-template-columns: calc(var(--etikett) - 24px) minmax(0, 1fr); } }
+.bakgrunn .meld-feil { margin-top: 18px; border-top-color: var(--linje); }
+
+/* Figure sources are links like the card's */
+.figur figcaption .kilde { display: block; margin: 0; font-size: inherit; }
+
+/* Bakgrunn: the label is the heading; the byline and the drop cap lead */
+@media (min-width: 900px) { .bakgrunn .byline { margin-top: 12px; } }
