@@ -1,16 +1,25 @@
 {% extends "base.html" %}
 {% block title %}Om Tingposten{% endblock %}
+{% block hovedklasse %}omside{% endblock %}
 {% block main %}
-<h1>Om Tingposten</h1>
+<header class="sidehode">
+  <p class="kicker"><span class="kicker-tema">Om</span></p>
+  <h1 class="side-tittel">Om Tingposten</h1>
+  <p class="side-ingress">Tingposten viser hva Bergen kommune vedtar, i samme format for hver sak og med lenke til kommunens egne dokumenter.</p>
+</header>
 
-<section aria-labelledby="erklaering">
-  <h2 id="erklaering">Redaksjonell erklæring</h2>
+<section class="omdel lag" aria-labelledby="erklaering">
+  <h2 class="etikett etikett-strek" id="erklaering">Redaksjonell erklæring</h2>
+  <div class="lesetekst">
   {% include "erklaering.html" %}
+  </div>
 </section>
 
-<section aria-labelledby="rangering">
-  <h2 id="rangering">Slik rangerer vi</h2>
-  <p>Alle sakene er med. Poengsummen (0–100) bestemmer bare rekkefølgen. Saker med minst {{ terskel }} poeng blir fremhevet på forsiden. De tre viktigste grunnene står som små merker på hvert kort, slik at du kan se hvorfor en sak er rangert der den er, og være uenig.</p>
+<section class="omdel lag" aria-labelledby="rangering">
+  <h2 class="etikett etikett-strek" id="rangering">Slik rangerer vi</h2>
+  <div class="lesetekst">
+  <p>Alle sakene er med. Poengsummen (0–100) bestemmer bare rekkefølgen. Forsiden viser opptil 15 saker med ferdig sammendrag, de med høyest poengsum først. Saker med minst {{ terskel }} poeng kommer først; er det færre enn 15 av dem, fylles forsiden med de neste på listen.</p>
+  <p>Under hver sak står noen faste opplysninger, hentet rett fra dokumentene og valgt etter samme regel for alle saker: status når saken ikke bare ble vedtatt, hvilken del av byen den gjelder, stemmetallet når avstemningen var jevn (ellers hvor mange forslag som falt), beløpet i vedtaket, og om saken har en bakgrunnsartikkel.</p>
   <div class="tabellramme">
   <table>
     <caption>Signaler og vekter</caption>
@@ -23,10 +32,13 @@
   </table>
   </div>
   <p>Mangler et signal for en sak, regnes poengsummen ut fra de andre. Vektene justeres for hånd, og endringer står i kildekoden.</p>
+  </div>
 </section>
 
-<section aria-labelledby="kilder">
-  <h2 id="kilder">Kilder og feil</h2>
-  <p>Alt kommer fra Bergen kommunes egne saksframlegg og protokoller. Hver setning på et kort lenker til siden i dokumentet den bygger på. Finner du en feil, bruk «Meld feil» på kortet.</p>
+<section class="omdel lag" aria-labelledby="kilder">
+  <h2 class="etikett etikett-strek" id="kilder">Kilder og feil</h2>
+  <div class="lesetekst">
+  <p>Alt kommer fra Bergen kommunes egne saksframlegg og protokoller. Hver setning på et kort lenker til siden i dokumentet den bygger på. Finner du en feil, bruk «Meld feil» på saken.</p>
+  </div>
 </section>
 {% endblock %}

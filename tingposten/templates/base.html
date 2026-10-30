@@ -3,41 +3,54 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% block title %}Tingposten{% endblock %}</title>
+{% if skjult %}<meta name="robots" content="noindex, nofollow">
+{% endif %}<title>{% block title %}Tingposten{% endblock %}</title>
 <meta name="description" content="{% block description %}Hva Bergen kommune faktisk vedtar – hver sak i samme format, med lenke til kilden.{% endblock %}">
+{% if fonter %}<link rel="stylesheet" href="{{ root }}static/fonts.css">
+{% endif %}
 <link rel="stylesheet" href="{{ root }}static/style.css">
 <link rel="alternate" type="application/rss+xml" title="Tingposten Bergen" href="{{ root }}bergen/rss.xml">
 </head>
 <body class="side-{{ side }}">
+<svg class="ikoner" width="0" height="0" aria-hidden="true" focusable="false">
+<symbol id="i-sted" viewBox="0 0 16 16"><path d="M8 14.6s4.6-4.3 4.6-8.1a4.6 4.6 0 0 0-9.2 0c0 3.8 4.6 8.1 4.6 8.1z"/><circle cx="8" cy="6.5" r="1.7"/></symbol>
+<symbol id="i-stemmer" viewBox="0 0 16 16"><path d="M2.5 3.5h8M2.5 8h11M2.5 12.5h5"/></symbol>
+<symbol id="i-kr" viewBox="0 0 16 16"><rect x="1.5" y="4" width="13" height="8" rx="1.5"/><circle cx="8" cy="8" r="1.9"/></symbol>
+<symbol id="i-bakgrunn" viewBox="0 0 16 16"><rect x="2.5" y="1.8" width="11" height="12.4" rx="1.6"/><path d="M5.2 5.3h5.6M5.2 8h5.6M5.2 10.7h3.4"/></symbol>
+<symbol id="i-dok" viewBox="0 0 16 16"><path d="M4 1.8h5.2l3 3v9.4H4z"/><path d="M9 1.8v3.2h3.2"/></symbol>
+</svg>
 <a class="hopp" href="#innhold">Hopp til innholdet</a>
 {% set meny %}
-<nav class="meny" aria-label="Hovedmeny">
-  <a href="{{ root }}bergen/"{% if side == "forside" %} aria-current="page"{% endif %}>Forside</a>
-  <a href="{{ root }}bergen/moter/"{% if side in ("moter", "mote") %} aria-current="page"{% endif %}>Møter</a>
-  <a href="{{ root }}om/"{% if side == "om" %} aria-current="page"{% endif %}>Om</a>
-</nav>
+<a href="{{ root }}bergen/"{% if side == "forside" %} aria-current="page"{% endif %}>Forside</a><a href="{{ root }}bergen/moter/"{% if side in ("moter", "mote") %} aria-current="page"{% endif %}>Møter</a><a href="{{ root }}om/"{% if side == "om" %} aria-current="page"{% endif %}>Om</a>
 {% endset %}
-{% if side == "forside" and idag_tekst is defined %}
-<header class="masthead">
-  <div class="bred">
-    <p class="masthead-navn"><a href="{{ root }}bergen/">Tingposten <span aria-hidden="true">·</span> <span class="sted">Bergen</span></a></p>
-    <p class="masthead-linje"><span>{{ idag_tekst }}</span><span>Hva kommunen faktisk vedtar</span></p>
-    {{ meny }}
+{% if side in ("forside", "landing") %}
+<header class="masthode ramme">
+  <div class="masthode-topp">
+    <p class="ore ore-v"><strong>Bergen</strong>{% if idag_tekst is defined %}<span class="bred"><br></span><span class="smal"> · </span>{{ idag_tekst }}{% endif %}</p>
+    <p class="navnetrekk"><a href="{{ root }}bergen/">Tingposten</a></p>
+    <p class="ore ore-h">Hva kommunen<br> faktisk vedtar</p>
+  </div>
+  <div class="folio">
+    <nav class="meny" aria-label="Hovedmeny">{{ meny }}</nav>
   </div>
 </header>
 {% else %}
-<header class="topp">
-  <div class="bred">
-    <a class="logo" href="{{ root }}bergen/">Tingposten <span aria-hidden="true">·</span> <span class="sted">Bergen</span></a>
-    {{ meny }}
+<header class="masthode masthode-smal ramme">
+  <div class="masthode-topp">
+    <nav class="meny-smal" aria-label="Hovedmeny">{{ meny }}</nav>
+    <p class="navnetrekk"><a href="{{ root }}bergen/">Tingposten</a></p>
+    <p class="ore ore-h">Hva kommunen faktisk vedtar</p>
   </div>
+  <div class="folio"></div>
 </header>
 {% endif %}
-<main id="innhold" class="{% block bredde %}lesebredde{% endblock %}">
+{% block forhode %}{% endblock %}
+<main id="innhold" class="ramme {% block hovedklasse %}vanlig{% endblock %}">
 {% block main %}{% endblock %}
 </main>
 <footer class="bunn">
-  <div class="bred">
+  <div class="ramme">
+    <p class="bunn-navn">Tingposten</p>
     <p>Tingposten viser hva Bergen kommune vedtar. Hver setning bygger på kommunens egne dokumenter, og hver sak lenker til dem.</p>
     <p><a href="{{ root }}om/">Om Tingposten og rangeringen</a> · <a href="{{ root }}bergen/rss.xml">RSS</a> · <a href="https://github.com/{{ repo }}">Åpen kildekode</a></p>
   </div>

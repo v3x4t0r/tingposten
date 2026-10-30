@@ -1,15 +1,22 @@
 {% extends "base.html" %}
-{% from "macros.html" import overskrift %}
+{% from "macros.html" import rad %}
 {% block title %}Alle vedtak · {{ periode }} · Tingposten{% endblock %}
+{% block hovedklasse %}listeside{% endblock %}
 {% block main %}
-<p class="brodsmule"><a href="{{ root }}bergen/{{ visning }}">Forsiden, {{ periode|lower }}</a></p>
-<h1>Alle vedtak · {{ periode|lower }}</h1>
-<p class="sammendrag">{{ antall }} vedtak, samlet per møte. Sakene står i samme rekkefølge som i møtet.</p>
+<nav class="brodsmule" aria-label="Brødsmuler"><ol>
+  <li><a href="{{ root }}bergen/{{ visning }}">Forsiden, {{ periode|lower }}</a></li>
+  <li>Alle vedtak</li>
+</ol></nav>
+<header class="sidehode">
+  <p class="kicker"><span class="kicker-tema">Alle vedtak</span><span class="kicker-del">{{ periode }}</span></p>
+  <h1 class="side-tittel">Alle vedtak, {{ periode|lower }}</h1>
+  <p class="side-ingress">{{ antall }} vedtak, samlet per møte. Sakene står i samme rekkefølge som i møtet.</p>
+</header>
 {% for m in moter %}
 <section class="seksjon" aria-labelledby="m-{{ m.slug }}">
-  <h2 class="seksjonstittel" id="m-{{ m.slug }}"><a href="{{ root }}bergen/mote/{{ m.slug }}/">{{ m.organ }} · {{ m.dato_tekst }}</a></h2>
-  <ol class="overskrifter">
-    {% for s in m.saker %}{{ overskrift(s, root, meta="kort", nr=True) }}{% endfor %}
+  <div class="seksjon-hode"><h2 id="m-{{ m.slug }}"><a href="{{ root }}bergen/mote/{{ m.slug }}/">{{ m.organ_kort }} <span class="nb">{{ m.dato_tekst }}</span></a></h2><p>{{ m.saker|length }} {{ "sak" if m.saker|length == 1 else "saker" }}</p></div>
+  <ol class="rader">
+    {% for s in m.saker %}{{ rad(s, root, nr=True) }}{% endfor %}
   </ol>
 </section>
 {% else %}

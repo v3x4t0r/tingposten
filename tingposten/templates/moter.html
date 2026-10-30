@@ -1,15 +1,24 @@
 {% extends "base.html" %}
 {% block title %}Møter · Tingposten{% endblock %}
+{% block hovedklasse %}listeside{% endblock %}
 {% block main %}
-<h1>Alle møter</h1>
-<p class="sammendrag">Hvert møte har en egen side med alle sakene som ble avgjort. Rekkefølgen på forsiden endrer aldri hva som er med.</p>
-{% if moter %}
-<ul class="moteliste">
-  {% for m in moter %}
-  <li><a href="{{ root }}bergen/mote/{{ m.slug }}/">{{ m.organ }} · {{ m.dato_tekst }}</a> – {{ m.saker|length }} {{ "sak" if m.saker|length == 1 else "saker" }}, {{ m.fremhevet }} fremhevet</li>
-  {% endfor %}
-</ul>
+<nav class="brodsmule" aria-label="Brødsmuler"><ol>
+  <li><a href="{{ root }}bergen/">Bergen</a></li>
+  <li>Møter</li>
+</ol></nav>
+<header class="sidehode">
+  <p class="kicker"><span class="kicker-tema">Møter</span></p>
+  <h1 class="side-tittel">Alle møter</h1>
+  <p class="side-ingress">Hvert møte har en egen side med alle sakene som ble avgjort. Rekkefølgen på forsiden endrer aldri hva som er med.</p>
+</header>
+{% for maned in moter|groupby("maned_nr")|reverse %}
+<section class="seksjon" aria-labelledby="mnd-{{ maned.grouper }}">
+  <div class="seksjon-hode"><h2 id="mnd-{{ maned.grouper }}">{{ maned.list[0].maned }}</h2><p>{{ maned.list|length }} {{ "møte" if maned.list|length == 1 else "møter" }}</p></div>
+  <ul class="moterader">
+    {% for m in maned.list %}<li><a href="{{ root }}bergen/mote/{{ m.slug }}/">{{ m.organ_kort }} {{ m.dato|kort_dato(short=False) }}</a><span>{{ m.saker|length }} {{ "sak" if m.saker|length == 1 else "saker" }}</span></li>{% endfor %}
+  </ul>
+</section>
 {% else %}
 <p class="tomt">Ingen møter ennå.</p>
-{% endif %}
+{% endfor %}
 {% endblock %}

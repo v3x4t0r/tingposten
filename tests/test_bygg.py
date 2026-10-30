@@ -169,19 +169,24 @@ def test_links_resolve_are_relative_and_never_nested(site):
             assert target.exists(), (page.relative_to(site), ref)
 
 
+def lead_html(forside):
+    return re.search(r'<article class="blokk lead[^"]*">(.*?)</article>', forside, re.S).group(1)
+
+
 def test_lead_is_highest_score_with_a_summary(site):
     site, _ = site
     forside = (site / "bergen/index.html").read_text()
-    lead = re.search(r'<article class="blokk lead">(.*?)</article>', forside, re.S).group(1)
+    lead = lead_html(forside)
     # 243/26 scores 90 but has no card, so the lead is 238/26 (70)
     assert "Klarsignal til å bygge Eksempelhallen" in lead
-    assert "Sak med høy score men uten kort" in forside  # still listed, in its tema section
-    secondary = re.findall(r'<article class="blokk sekundaer">(.*?)</article>', forside, re.S)
-    assert len(secondary) == 1 and "Skolen rehabiliteres" in secondary[0]
-    annet = re.search(r'id="tema-annet">.*?</section>', forside, re.S).group(0)
-    # fremhevede without a summary: 243 (90, no card) before 241 (45, avvist)
+    assert "Sak med høy score men uten kort" in forside  # still listed, in its tema tile
+    secondary = re.findall(r'<article class="blokk sek">(.*?)</article>', forside, re.S)
+    # 239 is over the threshold; 240 (score 10) fills up because it has a summary
+    assert len(secondary) == 2 and "Skolen rehabiliteres" in secondary[0] and "Bofellesskapet" in secondary[1]
+    annet = re.search(r'id="tema-annet".*?</section>', forside, re.S).group(0)
+    # not among the stories: 243 (90, no card) before 241 (45, avvist)
     assert annet.index("Sak med høy score men uten kort") < annet.index("Sak som ble avvist av redaktøren")
-    assert "Alle 5 vedtak i perioden" in forside  # 240 (score 10) is in its section, so nothing is left over
+    assert "Alle 5 vedtak i perioden" in forside  # the rest are in their tiles, so nothing is left over
 
 
 def test_front_page_order_and_window(site):
@@ -203,26 +208,39 @@ def test_window_respects_idag(tmp_path, data_dir):
 def test_sak_page(site):
     site, _ = site
     page = sak_page(site, "238/26").read_text()
-    assert '<h1 class="artikkel-tittel">Klarsignal til å bygge Eksempelhallen</h1>' in page
+    assert '<h1 class="sak-tittel">Klarsignal til å bygge Eksempelhallen</h1>' in page
     # dek = first sentence, abbreviation "mill." doesn't end it; body keeps the rest, nothing repeated
-    assert '<p class="dek">Bystyret ga klarsignal for 69 mill. kroner til hallen.</p>' in page
+    assert '<p class="sak-dek">Bystyret ga klarsignal for 69 mill. kroner til hallen.</p>' in page
     body = page.split("<body", 1)[1]
     assert body.count("Bystyret ga klarsignal") == 1
     assert "Arbeidet starter i 2027." in page
     assert "<script>alert(1)</script>" not in page and "&lt;script&gt;" in page
     assert "https://www.bergen.kommune.no/politikere-utvalg/api/fil/bk360/222/Protokoll-x#page=1" in page
-    assert "Flere saker fra samme møte" in page and "Skolen rehabiliteres" in page
-    assert "github.com/v3x4t0r/tingposten/issues/new?title=Feil+i+sak+238%2F26" in page
+    # Kort fortalt: the same five rows in the same order; a missing field is a dash
+    rows = re.findall(r'<div class="felt lag"><h3>([^<]+)</h3>', page)
+    assert rows == ["Hva endres", "Hvem påvirkes", "Hvorfor", "Status", "Når og hvor"]
+    hvem = re.search(r'<h3>Hvem påvirkes</h3>(.*?)</div></div>', page, re.S).group(1)
+    assert 'class="felt-tom"' in hvem and "–" in hvem
+    # sources grouped per document, each page its own link
+    hvorfor = re.search(r'<h3>Hvorfor</h3>(.*?)</div></div>', page, re.S).group(1)
+    assert 'Saksframlegg s.&nbsp;<a href="https://www.bergen.kommune.no/politikere-utvalg/api/fil/bk360/111/Framstilling-x#page=3" aria-label="Saksframlegg, side 3">3</a>' in hvorfor
+    assert "Fra samme møte" in page and "Skolen rehabiliteres" in page
+    assert 'href="https://github.com/v3x4t0r/tingposten/issues/new?title=Feil+i+sak+238%2F26' in page
+    assert ">Meld feil</a>" in page
     assert 'href="../../../../../bergen/mote/' + MOTE + '/"' in page
 
 
 def test_one_sentence_dek_takes_its_sources_and_status(site):
     site, _ = site
     page = sak_page(site, "239/26").read_text()
-    dek = re.search(r'<p class="dek">(.*?)</p>', page, re.S).group(1)
+    dek = re.search(r'<p class="sak-dek">(.*?)</p>', page, re.S).group(1)
     assert dek.startswith("Skolen rehabiliteres for 876 millioner kroner.")
-    assert "protokoll s.&nbsp;1" in dek  # the hva_endres source moved with it
-    assert ">Hva endres<" not in page
+    # the hva_endres source moved with it, still a link
+    assert '<a href="https://www.bergen.kommune.no/politikere-utvalg/api/fil/bk360/222/Protokoll-x#page=1" aria-label="Protokoll, side 1">1</a>' in dek
+    # The row stays (same five rows on every sak) but doesn't repeat the sentence.
+    hva = re.search(r'<h3>Hva endres</h3>(.*?)</div></div>', page, re.S).group(1)
+    assert "Står i ingressen over." in hva
+    assert page.split("<body", 1)[1].count("876 millioner") == 1
     assert "Sendt tilbake – ikke avgjort ennå" in page and "status-apen" in page
     # The classifier's reasoning is not fact-checked, so it never reaches a reader.
     assert "Angår mange familier." not in page
@@ -232,7 +250,7 @@ def test_avvist_and_missing_cards(site):
     site, _ = site
     for nr, title in (("241/26", "Sak som ble avvist av redaktøren"), ("243/26", "Sak med høy score men uten kort")):
         page = sak_page(site, nr).read_text()
-        assert f'<h1 class="artikkel-tittel">{title}</h1>' in page
+        assert f'<h1 class="sak-tittel">{title}</h1>' in page
         assert "Sammendrag kommer." in page
         assert "Protokoll-x" in page
     everything = "".join(p.read_text() for p in site.rglob("*.html"))
@@ -246,7 +264,8 @@ def test_meeting_page_is_a_headline_list_in_agenda_order(site):
     order = [page.index(t) for t in ("Klarsignal til å bygge", "Skolen rehabiliteres", "Bofellesskapet blir dyrere",
                                      "Sak som ble avvist", "Sak med høy score")]
     assert order == sorted(order)
-    assert "Fremhevet" in page and "er-fremhevet" in page
+    # internal ranking words never reach readers
+    assert "fremhevet" not in page.lower()
 
 
 def test_rss_links_to_sak_pages(site):
@@ -275,12 +294,14 @@ def test_figures(monkeypatch, tmp_path, data_dir):
     site = tmp_path / "site-fig"
     bygg.build(site, data_dir, idag=date(2026, 10, 1))
     page = sak_page(site, "238/26").read_text()
-    assert page.count('<figure class="figur figur-') == 2 and 'figur-liten' not in page
-    assert "Kart: © OpenStreetMap-bidragsytere" in page
+    assert page.count('<figure class="figur figur-') == 2
+    assert "Kart: © OpenStreetMap (ODbL)" in page
     assert "tpf-0123abcd-571424-238-26-t" in page  # ids made unique per sak
     forside = (site / "bergen/index.html").read_text()
-    lead = re.search(r'<article class="blokk lead">(.*?)</article>', forside, re.S).group(1)
-    assert lead.count("<figure") == 1 and "OpenStreetMap" in lead  # map preferred on the front page
+    # the lead has key figures, no figure; the row of four shows the map as a small locator
+    assert "<figure" not in lead_html(forside) and "tp-figur" not in lead_html(forside)
+    sek = re.findall(r'<article class="blokk sek">(.*?)</article>', forside, re.S)[0]
+    assert 'class="minikart"' in sek and "OpenStreetMap" in sek and 'aria-hidden="true"' in sek
     # no figures for an avvist card
     assert "<figure" not in sak_page(site, "241/26").read_text()
     ids = re.findall(r'id="(tpf-[^"]+)"', forside)
@@ -293,9 +314,17 @@ def test_figures(monkeypatch, tmp_path, data_dir):
     ("Saken gjelder gnr. 173 bnr. 5 i Åsane. Resten.", "Saken gjelder gnr. 173 bnr. 5 i Åsane."),
     ("Fra 1. januar 2027 gjelder nye regler. Resten.", "Fra 1. januar 2027 gjelder nye regler."),
     ("Bare én setning.", "Bare én setning."),
+    ("Byrådet ga ledelsen til byrådsleder Chris Jørgen K. Rødland. Resten.", "Byrådet ga ledelsen til byrådsleder Chris Jørgen K. Rødland."),
+    ("Planen ble vedtatt i 2023. Tunnelene flyttes.", "Planen ble vedtatt i 2023. Tunnelene flyttes."),
 ])
 def test_split_first_sentence(text, first):
     assert bygg.split_first_sentence(text)[0] == first
+
+
+def test_front_page_first_sentence_may_end_after_a_year():
+    assert bygg.forste_setning("Planen ble vedtatt i 2023. Tunnelene flyttes.") == "Planen ble vedtatt i 2023."
+    assert bygg.forste_setning("Gjelder fra punkt 1. Bystyret vedtok.") == "Gjelder fra punkt 1. Bystyret vedtok."
+    assert bygg.forste_setning("Leiegården i St. Hansstredet 20. Den er taksert.") == "Leiegården i St. Hansstredet 20. Den er taksert."
 
 
 def test_rebuild_replaces_old_files_and_guard(tmp_path, data_dir):
@@ -318,18 +347,21 @@ def test_meld_feil_template(monkeypatch):
     assert bygg.meld_feil("238/26", "T", "https://x") == "mailto:feil@example.org?subject=Feil%20i%20sak%20238%2F26"
 
 
-def test_tema_sections_pages_and_breadcrumb(site):
+def test_tema_tiles_pages_and_breadcrumb(site):
     site, _ = site
     forside = (site / "bergen/index.html").read_text()
-    # sections ordered by best score: annet (243: 90) before okonomi (240: 10)
+    # one tile per tema, the biggest first: annet (3) before okonomi (1)
     assert forside.index('id="tema-annet"') < forside.index('id="tema-okonomi"')
-    assert "Flere vedtak" not in forside
-    annet = re.search(r'id="tema-annet">.*?</section>', forside, re.S).group(0)
-    assert 'href="../bergen/tema/annet/">Flere saker (3)</a>' in annet  # 238 is the lead, so 3 > 2 shown
-    okonomi = re.search(r'id="tema-okonomi">.*?</section>', forside, re.S).group(0)
-    assert "Bofellesskapet blir dyrere" in okonomi and "Flere saker" not in okonomi
+    assert "Flere vedtak" not in forside  # only 3 stories, so no list after the four
+    annet = re.search(r'id="tema-annet".*?</section>', forside, re.S).group(0)
+    assert 'href="../bergen/tema/annet/">Alle 3<' in annet
+    assert "Klarsignal" not in annet  # the lead isn't repeated in its tile
+    okonomi = re.search(r'id="tema-okonomi".*?</section>', forside, re.S).group(0)
+    assert "Vedtaket i temaet står lenger opp på siden." in okonomi  # 240 is a story
+    # "Perioden i tall": the tema bars link to the tiles
+    assert 'href="#tema-okonomi"' in forside
     page = (site / "bergen/tema/okonomi/index.html").read_text()
-    assert "<h1>Økonomi</h1>" in page and "Bofellesskapet blir dyrere" in page and "Andre temaer" in page
+    assert '<h1 class="side-tittel">Økonomi</h1>' in page and "Bofellesskapet blir dyrere" in page and "Andre temaer" in page
     assert (site / "bergen/i-ar/tema/annet/index.html").exists() and (site / "bergen/30-dager/tema/skole/index.html").exists()
     assert "Gammel sak fra januar" in (site / "bergen/i-ar/tema/annet/index.html").read_text()
     sak = sak_page(site, "238/26").read_text()
@@ -341,20 +373,22 @@ def test_tema_sections_pages_and_breadcrumb(site):
 def test_article_rendering_and_cue(site):
     site, _ = site
     page = sak_page(site, "238/26").read_text()
-    bakgrunn = re.search(r'<section class="bakgrunn".*?</section>', page, re.S).group(0)
-    assert ">Bakgrunn<" in bakgrunn
+    bakgrunn = re.search(r'<section class="bakgrunn lag".*?</section>', page, re.S).group(0)
+    assert ">Bakgrunn<" in bakgrunn and ">Saken bak vedtaket<" in bakgrunn
+    assert "Bygger på saksframlegget og protokollen" in bakgrunn and "Ca. 1 minutt å lese" in bakgrunn
     assert "Hallen har vært planlagt siden 2019. &lt;b&gt;fet&lt;/b&gt;" in bakgrunn  # escaped
+    # footnote numbers per paragraph, sources in the list below, every page a link
+    assert '<sup class="fn"><a href="#kilde-1"' in bakgrunn and 'id="kilde-2"' in bakgrunn
     assert "/fil/bk360/111/Framstilling-x#page=2" in bakgrunn and "/fil/bk360/222/Protokoll-x#page=1" in bakgrunn
     assert "bilag" not in bakgrunn  # only the two known documents become links
     assert bakgrunn.index("Hallen har vært") < bakgrunn.index("Byggestart")
-    assert page.index('class="brodtekst"') < page.index('class="bakgrunn"')
+    assert page.index('id="kort"') < page.index('id="bakgrunn"')
     assert "AVVIST ARTIKKEL" not in sak_page(site, "239/26").read_text()
-    assert 'class="bakgrunn"' not in sak_page(site, "240/26").read_text()
+    assert 'id="bakgrunn"' not in sak_page(site, "240/26").read_text()
     forside = (site / "bergen/index.html").read_text()
-    lead = re.search(r'<article class="blokk lead">(.*?)</article>', forside, re.S).group(1)
-    assert '<span class="cue">Les bakgrunn</span>' in lead
-    sekundaer = re.search(r'<article class="blokk sekundaer">(.*?)</article>', forside, re.S).group(1)
-    assert "Les bakgrunn" not in sekundaer
+    assert "Ca. 1 min lesing" in lead_html(forside)
+    sek = re.search(r'<article class="blokk sek">(.*?)</article>', forside, re.S).group(1)
+    assert "Bakgrunn" not in sek
 
 
 def test_rss_has_tema_category(site):
@@ -378,3 +412,158 @@ def test_rss_has_tema_category(site):
 ])
 def test_tema_fra_tittel(tittel, tema):
     assert bygg.tema_fra_tittel(tittel) == tema
+
+
+# --- facts under a story: one fixed rule (bygg.fakta) --------------------------
+
+def facts(**kw):
+    s = {"status_klasse": "", "status_tekst": "Vedtatt", "innstilling_falt": False, "bydeler": [],
+         "hele_byen": False, "hele_kommunen": False, "stemmer": None, "forslag_falt": 0, "belop": None,
+         "figurer": [], "har_artikkel": False, "lesetid": 0, **kw}
+    return [(f["type"], f["verdi"]) for f in bygg.fakta(s)]
+
+
+def test_fakta_never_say_vedtatt_and_keep_a_fixed_order():
+    assert facts() == []  # an ordinary adopted sak: nothing to say
+    assert facts(innstilling_falt=True) == [("status", "Innstillingen falt")]
+    assert facts(status_klasse="apen", status_tekst="Sendt tilbake – ikke avgjort ennå", innstilling_falt=True) == [
+        ("status", "Sendt tilbake – ikke avgjort ennå")]
+    full = facts(status_klasse="noytral", status_tekst="Tatt til orientering", bydeler=["Fana"],
+                 stemmer={"for": 36, "mot": 32, "jevn": True}, forslag_falt=4, belop=866_400_000,
+                 har_artikkel=True, lesetid=2)
+    assert full == [("status", "Tatt til orientering"), ("sted", "Fana"), ("stemmer", "36–32"),
+                    ("kr", "866 mill. kr"), ("bakgrunn", "Ca. 2 min lesing")]
+
+
+def test_fakta_place_vote_and_amount_rules():
+    assert facts(bydeler=["Arna", "Fana"]) == [("sted", "Arna og Fana")]
+    assert facts(bydeler=["Arna", "Fana", "Åsane"], hele_byen=True) == [("sted", "3 bydeler")]
+    assert facts(hele_byen=True, hele_kommunen=True) == [("sted", "Hele byen")]
+    assert facts(hele_kommunen=True) == [("sted", "Hele kommunen")]
+    # a lopsided vote isn't shown; then the number of proposals that fell, from two
+    assert facts(stemmer={"for": 60, "mot": 7, "jevn": False}, forslag_falt=3) == [("falt", "3")]
+    assert facts(stemmer={"for": 60, "mot": 7, "jevn": False}, forslag_falt=1) == []
+    assert facts(stemmer={"for": 35, "mot": None, "jevn": True}) == [("stemmer", "35 stemmer for")]
+    assert facts(belop=900_000) == []  # under 1 mill. kr
+    assert facts(belop=3_600_000) == [("kr", "3,6 mill. kr")]
+    assert facts(belop=1_250_000_000) == [("kr", "1,2 mrd. kr")]
+    meter = {"type": "belop", "svg": "", "belop": {"type": "økning", "del": "1 mill.", "total": "3,6 mill.",
+                                                   "tekst": "Ny sum: 3,6 mill."}}
+    assert facts(figurer=[meter]) == [("kr", "Ny sum: 3,6 mill.")]
+
+
+def test_structured_facts_come_from_the_signals(site):
+    site, _ = site
+    saker = {s["nr"]: s for s in bygg.load(site.parent / "data")}
+    s = saker["238/26"]
+    assert {k: s[k] for k in ("stemmer", "forslag_falt", "innstilling_falt", "bydeler", "hele_byen", "belop")} == {
+        "stemmer": None, "forslag_falt": 0, "innstilling_falt": False, "bydeler": [], "hele_byen": False, "belop": None}
+    assert s["lesetid"] == 1 and s["fakta"] == [{"type": "bakgrunn", "etikett": "Bakgrunn", "verdi": "Ca. 1 min lesing"}]
+
+
+def test_score_signals_expose_the_vote_as_numbers():
+    p = {"vedtak": "Bystyret vedtar planen.", "voteringer": [
+        {"forslag": "Innstillingen", "resultat": "falt", "stemmer": 31, "partier": [], "enstemmig": False},
+        {"forslag": "Alternativforslag", "resultat": "vedtatt", "stemmer": 36, "partier": [], "enstemmig": False}],
+        "innstilling_falt": True}
+    sig = score.signals({"tittel": "Plan", "utvalgId": BYSTYRET}, p, {})
+    assert (sig["split"], sig["stemmer_for"], sig["stemmer_mot"]) == ("36–31", 36, 31)
+    assert sig["innstilling_falt"] and sig["forslag_falt"] == 1
+
+
+# --- front page: 15 stories ----------------------------------------------------
+
+def fake_sak(i, score_, sammendrag=True, mote=f"{BYSTYRET}-2026-09-23", tema="annet"):
+    d = date.fromisoformat(mote.split("-", 1)[1])
+    return {"nr": f"{i}/26", "score": score_, "dato": d, "dato_tekst": bygg.nb_date(d), "seq": i,
+            "fremhevet": score_ >= 40, "har_sammendrag": sammendrag, "tema": tema, "mote": mote,
+            "organ": "Bergen bystyre", "organ_kort": "Bystyret"}
+
+
+def test_front_page_fills_to_15_stories():
+    window = [fake_sak(i, 90 - i) for i in range(5)]                       # 5 over the threshold
+    window += [fake_sak(10 + i, 30 - i) for i in range(15)]               # 15 below, with a summary
+    window += [fake_sak(40, 85, sammendrag=False), fake_sak(41, 0)]       # no card / valg
+    front = bygg.front_page(window)
+    stories = [front["lead"], *front["sekundaer"], *front["liste"]]
+    assert len(front["sekundaer"]) == 4 and len(front["liste"]) == 10 and len(stories) == 15
+    assert [s["nr"] for s in stories[:5]] == ["0/26", "1/26", "2/26", "3/26", "4/26"]  # over the threshold first
+    assert [s["score"] for s in stories[5:]] == sorted((s["score"] for s in stories[5:]), reverse=True)
+    assert all(s["har_sammendrag"] and s["score"] > 0 for s in stories)
+    # the rest go to the tiles (3 per tema) and the "andre" count
+    assert len(front["fliser"]) == 1 and len(front["fliser"][0]["saker"]) == 3
+    assert front["fliser"][0]["saker"][0]["nr"] == "40/26"  # high score, no card: in its tile
+    assert front["andre"] == len(window) - 15 - 3
+
+
+def test_front_page_with_few_saker_and_standard_meeting():
+    window = [fake_sak(1, 70), fake_sak(2, 10), fake_sak(3, 50, mote=f"{BYSTYRET}-2026-09-30")]
+    front = bygg.front_page(window)
+    assert [s["nr"] for s in [front["lead"], *front["sekundaer"]]] == ["1/26", "3/26", "2/26"] and front["liste"] == []
+    assert front["standard"]["slug"] == f"{BYSTYRET}-2026-09-23"  # most saker come from it
+    assert [m["slug"] for m in front["panel_moter"]][0] == front["standard"]["slug"]
+    assert bygg.front_page([])["lead"] is None
+
+
+def test_organ_and_date_only_off_the_standard_meeting(monkeypatch, tmp_path, data_dir):
+    items = ITEMS + [item("250/26", "Ekstra sak fra et annet møte", dato="2026-09-30", seq=2)]
+    (data_dir / "agendapunkter" / f"{BYSTYRET}.json").write_text(json.dumps({i["id"]: i for i in items}))
+    red = data_dir / "redigert" / BYSTYRET / "2026-09-30"
+    red.mkdir(parents=True)
+    (red / "250-26.json").write_text(json.dumps({**CARD, "nr": "250/26", "overskrift": "Ekstra sak fra et annet møte"}))
+    monkeypatch.setitem(SCORES, "250/26", 50)
+    site = tmp_path / "site-std"
+    bygg.build(site, data_dir, idag=date(2026, 10, 1))
+    forside = (site / "bergen/index.html").read_text()
+    assert "Fra bystyret 23. september 2026 der ikke annet står" in forside
+    sek = {re.search(r'<h3 class="sek-tittel"><a[^>]*>([^<]+)<', b).group(1): b
+           for b in re.findall(r'<article class="blokk sek">(.*?)</article>', forside, re.S)}
+    assert '<span class="kicker-del">Bystyret, <time datetime="2026-09-30">30. sep.</time></span>' in sek["Ekstra sak fra et annet møte"]
+    assert "kicker-del" not in sek["Skolen rehabiliteres"]
+    # the lead always says where and when
+    assert '<span class="kicker-del">Bystyret, <time datetime="2026-09-23">23. september</time></span>' in lead_html(forside)
+
+
+def test_static_folder_is_copied_and_fonts_linked(site):
+    site, _ = site
+    src = Path(bygg.__file__).parent / "static"
+    for f in src.rglob("*"):
+        if f.is_file():
+            assert (site / "static" / f.relative_to(src)).exists(), f
+    forside = (site / "bergen/index.html").read_text()
+    if (src / "fonts.css").exists():
+        assert forside.index('href="../static/fonts.css"') < forside.index('href="../static/style.css"')
+    css = (site / "static/style.css").read_text()
+    assert "fonts.googleapis" not in css and "@import" not in css
+    assert all("googleapis" not in p.read_text() for p in site.rglob("*.html"))
+
+
+def test_no_jargon_or_unchecked_text_on_public_pages(site):
+    site, _ = site
+    for page in site.rglob("*.html"):
+        text = page.read_text()
+        low = text.lower()
+        for word in ("fremhevet", "angår mange", "maskinvurdering"):
+            assert word not in low, (page, word)
+        assert ">Vedtatt<" not in text and "Status: </span>Vedtatt<" not in text, page
+        # classifier reasoning is never fact-checked, so it never reaches a reader
+        assert "Investeringsramme." not in text and "Angår mange familier." not in text
+
+
+def test_window_leaves_out_saker_waiting_for_their_protokoll():
+    venter = {**fake_sak(1, 80), "venter_protokoll": True}
+    klar = {**fake_sak(2, 20), "venter_protokoll": False}
+    assert bygg._window([venter, klar], date(2026, 9, 30), 14) == [klar]
+    assert bygg._window([venter, klar], date(2026, 9, 30), None) == [klar]
+
+
+def test_hidden_from_search_until_launch(tmp_path, data_dir, monkeypatch):
+    monkeypatch.setattr(config, "SKJUL_FOR_SOK", True)
+    bygg.build(tmp_path / "skjult", data_dir, idag=date(2026, 10, 1))
+    pages = list((tmp_path / "skjult").rglob("*.html"))
+    assert pages and all('<meta name="robots" content="noindex, nofollow">' in p.read_text() for p in pages)
+    assert (tmp_path / "skjult" / "robots.txt").read_text() == "User-agent: *\nDisallow: /\n"
+    monkeypatch.setattr(config, "SKJUL_FOR_SOK", False)
+    bygg.build(tmp_path / "apen", data_dir, idag=date(2026, 10, 1))
+    assert not (tmp_path / "apen" / "robots.txt").exists()
+    assert "noindex" not in (tmp_path / "apen" / "bergen" / "index.html").read_text()

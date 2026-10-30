@@ -6,12 +6,16 @@ plain HTML to site/: no JavaScript, no external assets, relative links only,
 so the same files work under v3x4t0r.github.io/tingposten/ and at the root
 of tingposten.no. Source links go to Bergen kommune's own PDFs.
 
-Laid out like a newspaper: front pages with a lead story, a few secondary
-stories and sections by topic (tema); one page per sak with the full card
-and, for the top saker, a background article. Every sentence shown is from
-the edited card or the edited article; the dek is the card's first sentence.
+Laid out like a newspaper: front pages with a lead story, a row of four,
+a two-column list (15 stories in all) and a tile per topic (tema); one page
+per sak with the full card and, for the top saker, a background article.
+Every sentence shown is from the edited card or the edited article; the dek
+is the card's first sentence. The small facts under a story (where, the
+vote, the amount) are mechanical values read off the documents, chosen by
+one fixed rule in fakta().
 """
 
+import html
 import json
 import logging
 import re
@@ -23,9 +27,11 @@ from pathlib import Path
 from urllib.parse import quote, urlencode
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
+from markupsafe import Markup, escape
 
 from . import config, grafikk, pdf, score
 from .klassifiserer import TEMA
+from .saksframlegg import saksbydeler
 from . import status as status_mod
 from .status import IKKE_AVGJORT
 
@@ -41,13 +47,23 @@ FIELDS = (
 )
 MONTHS = ("januar", "februar", "mars", "april", "mai", "juni", "juli",
           "august", "september", "oktober", "november", "desember")
+MONTHS_SHORT = ("jan.", "feb.", "mars", "apr.", "mai", "juni", "juli", "aug.", "sep.", "okt.", "nov.", "des.")
 WEEKDAYS = ("mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag", "søndag")
-SECONDARY = 4       # stories in the grid under the lead
-SEKSJON = 4         # headlines per tema section on a front page
-RELATED = 6         # "Flere saker fra samme møte" on a sak page
+SECONDARY = 4       # the row of four under the lead
+LISTE = 10          # "Flere vedtak": the two-column list after the four (1 + 4 + 10 = 15 stories)
+FLIS = 3            # headlines per topic tile ("Alle temaer")
+PANEL_MOTER = 6     # meetings listed in "Perioden i tall" before "og N møter til"
+RELATED = 6         # "Fra samme møte" on a sak page
 # Short organ names for kickers and breadcrumbs.
 ORGAN_KORT = {"571424": "Bystyret", "900101": "Byrådet (innstilling)", "900102": "Byrådet"}
-FRONT_FIGURE = ("kart", "stemmer")  # front pages show at most one figure, in this preference
+DOK_NAVN = {"saksframlegg": "Saksframlegg", "protokoll": "Protokoll"}
+DOK_BESTEMT = {"saksframlegg": "saksframlegget", "protokoll": "protokollen"}
+ORD_PER_MINUTT = 200  # reading time of a background article
+# Facts under a story (fakta()): proposals that fell are counted from two, as
+# the score's "N forslag falt"; an amount from 1 mill. kr, where the score's
+# money scale starts.
+FAKTA_FORSLAG_FALT = 2
+FAKTA_BELOP_KRONER = 1_000_000
 VIEWS = {           # front-page views: path, days back (None = this year), label
     "": (14, "Siste 14 dager"),
     "30-dager/": (30, "Siste 30 dager"),
@@ -87,7 +103,7 @@ SIGNALS = {
     "varighet": ("Varighet", "Langvarige vedtak som planer, strategier, avtaler og salg, mot engangstiltak."),
     "endelighet": ("Endelighet", "Endelig vedtak, eller bare en innstilling til et annet organ."),
     "hverdag": ("Hverdag", "Om en vanlig innbygger merker vedtaket i hverdagen. Vurderes av en språkmodell."),
-    "angar": ("Angår mange", "Hvor mange saken til slutt angår, direkte eller indirekte. Vurderes av en språkmodell."),
+    "angar": ("Hvor mange det angår", "Hvor mange saken til slutt angår, direkte eller indirekte. Vurderes av en språkmodell."),
     "konkret": ("Konkret endring", "Om noe konkret endrer seg for innbyggerne nå. Vurderes av en språkmodell."),
     "debatt": ("Debatt", "Hvor omstridt saken var i bystyret: forslag som falt og antall avstemninger."),
 }
@@ -115,18 +131,19 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
 
     moter = _meetings(saker)
     by_meeting = {m["slug"]: m for m in moter}
-    write("index.html", "landing.html", side="landing")
+    idag_tekst = nb_weekday_date(idag)
+    write("index.html", "landing.html", side="landing", idag_tekst=idag_tekst)
     for slug, (days, label) in VIEWS.items():
         window = _window(saker, idag, days)
         front = front_page(window)
         write(f"bergen/{slug}index.html", "forside.html", side="forside", visning=slug, periode=label,
-              idag_tekst=nb_weekday_date(idag), **front)
-        write(f"bergen/{slug}alle/index.html", "alle.html", side="forside", visning=slug, periode=label,
+              idag_tekst=idag_tekst, **front)
+        write(f"bergen/{slug}alle/index.html", "alle.html", side="alle", visning=slug, periode=label,
               moter=_meetings(window), antall=len(window))
         temaer = tema_counts(window)
         for t in temaer:
             in_tema = [s_ for s_ in window if s_["tema"] == t["tema"]]
-            write(f"bergen/{slug}tema/{t['tema']}/index.html", "tema.html", side="forside", visning=slug,
+            write(f"bergen/{slug}tema/{t['tema']}/index.html", "tema.html", side="tema", visning=slug,
                   periode=label, tema=t["tema"], navn=t["navn"], moter=_meetings(in_tema), antall=len(in_tema),
                   temaer=[x for x in temaer if x["tema"] != t["tema"]])
         if slug == "i-ar/":
@@ -146,9 +163,10 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
     (tmp / "bergen" / "rss.xml").write_text(env.get_template("rss.xml").render(
         saker=rss, site_url=_site_url(), bygget=_rfc822(idag)))
 
-    (tmp / "static").mkdir()
-    shutil.copy(HERE / "static" / "style.css", tmp / "static" / "style.css")
+    shutil.copytree(HERE / "static", tmp / "static")
     (tmp / ".nojekyll").write_text("")
+    if getattr(config, "SKJUL_FOR_SOK", False):
+        (tmp / "robots.txt").write_text("User-agent: *\nDisallow: /\n")
     if config.CNAME:
         (tmp / "CNAME").write_text(config.CNAME + "\n")
 
@@ -240,18 +258,17 @@ def _figure_type(fig: dict) -> str:
     return "belop"
 
 
-def front_figure(sak: dict) -> dict | None:
-    for kind in FRONT_FIGURE:
-        for f in sak["figurer"]:
-            if f.get("type") == kind:
-                return f
-    return None
+def figur(sak: dict, kind: str) -> dict | None:
+    """The sak's figure of one type (kart, stemmer, belop), if any."""
+    return next((f for f in sak["figurer"] if f.get("type") == kind), None)
 
 
 def _sak(item: dict, ranked: dict, data_dir: Path, parsers: "_Parsers | None" = None) -> dict:
+    parsers = parsers or _Parsers()
     card_path = data_dir / "redigert" / f"{pdf.key(item)}.json"
     card = json.loads(card_path.read_text()) if card_path.exists() else None
-    usable = bool(card) and not card.get("avvist") and _protokoll_klar(item, data_dir, parsers or _Parsers())
+    klar = _protokoll_klar(item, data_dir, parsers)
+    usable = bool(card) and not card.get("avvist") and klar
     dato = date.fromisoformat(item["moteDato"])
     uid = item["utvalgId"]
     slug = f"{uid}-{item['moteDato']}"
@@ -283,17 +300,107 @@ def _sak(item: dict, ranked: dict, data_dir: Path, parsers: "_Parsers | None" = 
         "tema_navn": TEMA[tema],
         "tema_side": None,
         "artikkel": _article(item, data_dir) if usable else [],
-        "figurer": (_figures(item, data_dir, parsers or _Parsers()) or list(card.get("figurer", []))) if usable else [],
+        "figurer": (_figures(item, data_dir, parsers) or list(card.get("figurer", []))) if usable else [],
         "pdf": {k: u for k, _, _ in pdf.KINDS if (u := pdf.url(item, k))},
         "mote": slug,
         "anker": anchor,
         "side": side,
         "lenke": side,
+        "venter_protokoll": not klar,
     }
     sak["har_artikkel"] = bool(sak["artikkel"])
+    sak["lesetid"] = lesetid(sak["artikkel"])
     sak["fremhevet"] = sak["score"] >= _terskel()
     sak["meld_feil"] = meld_feil(sak["nr"], sak["tittel"], _site_url() + sak["lenke"])
+    sak.update(_facts(item, ranked.get("signaler") or {}, data_dir, parsers))
+    sak["fakta"] = fakta(sak)
     return sak
+
+
+def _facts(item: dict, sig: dict, data_dir: Path, parsers: "_Parsers") -> dict:
+    """Mechanical facts about the sak, from the same parsed documents as the
+    score (score.signals) and the figures (grafikk): numbers, never prose."""
+    sf = parsers.saksframlegg(data_dir / "pdf" / pdf.filename(item, "saksframlegg"))
+    stemmer = None
+    if sig.get("stemmer_for"):
+        stemmer = {"for": sig["stemmer_for"], "mot": sig.get("stemmer_mot"),
+                   # a close vote, not a lopsided one: the score's own bar for showing it
+                   "jevn": sig.get("uenighet", 0.0) >= score.BADGE_MIN["uenighet"]}
+    return {
+        "stemmer": stemmer,
+        "forslag_falt": sig.get("forslag_falt") or 0,
+        "innstilling_falt": bool(sig.get("innstilling_falt")),
+        # the bydeler the map shows: same function, same saksframlegg
+        "bydeler": saksbydeler(item, sf)[0],
+        "hele_byen": bool(sig.get("hele_byen")),
+        "hele_kommunen": bool(sig.get("hele_kommunen")),
+        "belop": sig.get("belop_kroner"),
+    }
+
+
+def fakta(s: dict) -> list[dict]:
+    """The small facts under a story, by one fixed rule and in a fixed order:
+    status, where, the vote (or how many proposals fell), amount, Bakgrunn.
+
+    "Vedtatt" is the normal case and never a fact: the status is shown only
+    when it says something else, or when the innstilling fell. Organ and date
+    are not facts here; the templates show them only off the period's
+    standard meeting. Every value is a mechanical one: no model text.
+    """
+    out = []
+
+    def add(kind, etikett, verdi):
+        out.append({"type": kind, "etikett": etikett, "verdi": verdi})
+
+    if s["status_klasse"]:
+        add("status", "Status", s["status_tekst"])
+    elif s["innstilling_falt"]:
+        add("status", "Status", "Innstillingen falt")
+    if sted := _sted(s):
+        add("sted", "Gjelder", sted)
+    st = s["stemmer"]
+    if st and st["jevn"]:
+        add("stemmer", "Avstemning", f"{st['for']}–{st['mot']}" if st["mot"] is not None else f"{st['for']} stemmer for")
+    elif s["forslag_falt"] >= FAKTA_FORSLAG_FALT:
+        add("falt", "Forslag som falt", str(s["forslag_falt"]))
+    belop_figur = figur(s, "belop")
+    if s["belop"] and s["belop"] >= FAKTA_BELOP_KRONER:
+        add("kr", "Beløp", belop_tekst(s["belop"]))
+    elif belop_figur and belop_figur.get("belop"):
+        add("kr", "Beløp", belop_figur["belop"]["tekst"])
+    if s["har_artikkel"]:
+        add("bakgrunn", "Bakgrunn", f"Ca. {s['lesetid']} min lesing")
+    return out
+
+
+def _sted(s: dict) -> str:
+    by = s["bydeler"]
+    if len(by) == 1:
+        return by[0]
+    if len(by) == 2:
+        return f"{by[0]} og {by[1]}"
+    if by:
+        return f"{len(by)} bydeler"
+    if s["hele_byen"]:
+        return "Hele byen"
+    if s["hele_kommunen"]:
+        return "Hele kommunen"
+    return ""
+
+
+def belop_tekst(kr: float) -> str:
+    """866 mill. kr, 3,6 mill. kr, 1,2 mrd. kr (the score's rounding, reader's units)."""
+    if kr >= 1e9:
+        return f"{kr / 1e9:.1f}".rstrip("0").rstrip(".").replace(".", ",") + " mrd. kr"
+    mill = kr / 1e6
+    text = f"{mill:.1f}".rstrip("0").rstrip(".") if mill < 10 else f"{mill:.0f}"
+    return text.replace(".", ",") + " mill. kr"
+
+
+def lesetid(artikkel: list[dict]) -> int:
+    """Minutes to read the background article (0 without one)."""
+    words = sum(len(a["tekst"].split()) for a in artikkel)
+    return max(1, round(words / ORD_PER_MINUTT)) if words else 0
 
 
 def _protokoll_klar(item: dict, data_dir: Path, parsers: "_Parsers") -> bool:
@@ -386,7 +493,11 @@ def _dek(felt: list[dict]) -> tuple[str, list[dict], list[dict]]:
     return first, hva["kilder"], [f for f in felt if f is not hva]
 
 
-def split_first_sentence(text: str) -> tuple[str, str]:
+def split_first_sentence(text: str, years: bool = False) -> tuple[str, str]:
+    """(first sentence, rest). A stop after an abbreviation, an initial or a
+    number never ends the sentence ("punkt 1. Bystyret"), except, with
+    years=True, after a year or other number of three or more digits
+    ("vedtatt i 2023. Tunnelene …")."""
     text = " ".join(text.split())
     i = 0
     while True:
@@ -395,47 +506,71 @@ def split_first_sentence(text: str) -> tuple[str, str]:
             return text, ""
         word = text[:i].rsplit(" ", 1)[-1]
         nxt = text[i + 2:i + 3]
-        if word not in ABBREVIATIONS and not word[-1:].isdigit() and nxt.isupper():
+        number = word[-1:].isdigit() and not (years and re.search(r"\d{3,}$", word))
+        initial = len(word) == 1 and word.isupper()  # "Chris Jørgen K. Rødland"
+        if word not in ABBREVIATIONS and not number and not initial and nxt.isupper():
             return text[:i + 1], text[i + 2:]
         i += 2
 
 
-def front_page(window: list[dict]) -> dict:
-    """Lead, secondary stories, sections by tema, and the rest.
+def forste_setning(dek: str) -> str:
+    """The dek cut to one sentence for the smaller stories on a front page.
+    The text is the edited card's own: cut, never rewritten."""
+    return split_first_sentence(dek, years=True)[0]
 
-    The lead and the grid take fremhevede saker that have a summary; a
-    fremhevet sak whose card isn't ready goes to its tema section instead of
-    leading with "Sammendrag kommer". Each section shows its fremhevede saker
-    first, then the highest scores; sections are ordered by their best score.
-    Saker scoring 0 (valg, fritak) appear only in the full lists.
+
+def front_page(window: list[dict]) -> dict:
+    """Lead, the row of four, the list of ten, one tile per tema, and the rest.
+
+    The 15 stories are the fremhevede saker that have a summary, by score;
+    when fewer than 15 are over the threshold, the next best saker with a
+    summary fill up (a fremhevet sak whose card isn't ready never leads with
+    "Sammendrag kommer"). Saker scoring 0 (valg, fritak) are never stories.
+    Each tile shows the tema's best saker not already among the stories.
     """
     ordered = sorted(window, key=lambda s: (-s["score"], -s["dato"].toordinal(), s["seq"]))
-    fremhevet = [s for s in ordered if s["fremhevet"]]
-    stories = [s for s in fremhevet if s["har_sammendrag"]]
+    antall = 1 + SECONDARY + LISTE
+    stories = [s for s in ordered if s["fremhevet"] and s["har_sammendrag"]][:antall]
+    stories += [s for s in ordered if s["score"] > 0 and s["har_sammendrag"] and s not in stories][:antall - len(stories)]
     if not stories:
-        stories = [s for s in ordered if s["har_sammendrag"]][:1] or ordered[:1]
-    shown = stories[:1 + SECONDARY]
-    groups = defaultdict(list)
-    for s in ordered:
-        if s not in shown and s["score"] > 0:
-            groups[s["tema"]].append(s)
-    totals = {t["tema"]: t["antall"] for t in tema_counts(window)}
-    order = list(TEMA)
-    seksjoner = []
-    for tema, items in groups.items():
-        items.sort(key=lambda s: (not s["fremhevet"], -s["score"], -s["dato"].toordinal(), s["seq"]))
-        picked = items[:SEKSJON]
-        seksjoner.append({"tema": tema, "navn": TEMA[tema], "saker": picked,
-                          "flere": totals[tema] > len(picked), "antall": totals[tema]})
-    seksjoner.sort(key=lambda x: (-x["saker"][0]["score"], order.index(x["tema"])))
-    i_seksjoner = sum(len(x["saker"]) for x in seksjoner)
+        stories = ordered[:1]
+    moter = _meetings(window)
+    standard = standard_mote(moter)
+    temaer = sorted(tema_counts(window), key=lambda t: -t["antall"])
+    fliser, i_fliser = [], 0
+    for t in temaer:
+        rest = [s for s in ordered if s["tema"] == t["tema"] and s not in stories][:FLIS]
+        i_fliser += len(rest)
+        fliser.append({**t, "saker": rest})
     return {
-        "lead": shown[0] if shown else None,
-        "sekundaer": shown[1:],
-        "seksjoner": seksjoner,
-        "andre": len(window) - len(shown) - i_seksjoner,
+        "lead": stories[0] if stories else None,
+        "sekundaer": stories[1:1 + SECONDARY],
+        "liste": stories[1 + SECONDARY:],
+        "fliser": fliser,
+        "temaer": temaer,
+        "standard": standard,
+        "moter": moter,
+        "panel_moter": panel_moter(moter, standard),
+        "andre": len(window) - len(stories) - i_fliser,
         "antall": len(window),
     }
+
+
+def standard_mote(moter: list[dict]) -> dict | None:
+    """The meeting most of the period's saker come from (the latest on a tie).
+    Stories from it don't repeat organ and date; the front page says so once."""
+    return max(moter, key=lambda m: len(m["saker"]), default=None)
+
+
+def panel_moter(moter: list[dict], standard: dict | None) -> list[dict]:
+    """Meetings for "Perioden i tall": the standard meeting first, then the
+    biggest others, listed by organ and date."""
+    if not moter:
+        return []
+    others = sorted((m for m in moter if m is not standard), key=lambda m: (-len(m["saker"]), -m["dato"].toordinal()))
+    picked = others[:PANEL_MOTER - 1]
+    picked.sort(key=lambda m: (m["organ_kort"], m["dato"]))
+    return [standard, *picked]
 
 
 def tema_counts(saker: list[dict]) -> list[dict]:
@@ -447,7 +582,7 @@ def tema_counts(saker: list[dict]) -> list[dict]:
 
 
 def related(sak: dict, meeting: dict) -> list[dict]:
-    others = [s for s in meeting["saker"] if s is not sak]
+    others = [s for s in meeting["saker"] if s is not sak and s["har_sammendrag"]]
     return sorted(others, key=lambda s: (-s["score"], s["seq"]))[:RELATED]
 
 
@@ -486,12 +621,17 @@ def _meetings(saker: list[dict]) -> list[dict]:
             "dato_tekst": first["dato_tekst"],
             "saker": items,
             "fremhevet": sum(s["fremhevet"] for s in items),
+            "maned": f"{MONTHS[first['dato'].month - 1].capitalize()} {first['dato'].year}",
+            "maned_nr": first["dato"].strftime("%Y-%m"),
         })
     moter.sort(key=lambda m: (m["dato"], m["organ"]), reverse=True)
     return moter
 
 
 def _window(saker: list[dict], idag: date, days: int | None) -> list[dict]:
+    """The period's vedtak. A sak whose meeting is held but whose protokoll
+    doesn't cover it yet is left out: its outcome isn't known (meeting page only)."""
+    saker = [s for s in saker if not s.get("venter_protokoll")]
     if days is None:
         return [s for s in saker if s["dato"].year == idag.year and s["dato"] <= idag]
     start = idag - timedelta(days=days)
@@ -524,6 +664,50 @@ def nb_weekday_date(d: date) -> str:
     return f"{WEEKDAYS[d.weekday()].capitalize()} {nb_date(d)}"
 
 
+def nb_date_short(d: date, year: bool = False, short: bool = True) -> str:
+    """23. sep. (or 23. september, with or without the year)."""
+    return f"{d.day}. {(MONTHS_SHORT if short else MONTHS)[d.month - 1]}" + (f" {d.year}" if year else "")
+
+
+def tittel_html(text: str) -> Markup:
+    """A headline, escaped, with 'Dokken–Lyngbø'-style compounds kept on one line."""
+    return Markup(re.sub(r"(\w+–\w+)", r'<span class="nb">\1</span>', str(escape(text))))
+
+
+def minikart(svg: str) -> Markup:
+    """The bydel map as a small decorative locator: the bydel's name is in the
+    text beside it, so the SVG drops its title, description and role."""
+    svg = re.sub(r'\s(role|aria-labelledby)="[^"]*"', "", svg, count=2)
+    svg = re.sub(r"<svg\b", '<svg aria-hidden="true" focusable="false"', svg, count=1)
+    svg = re.sub(r"<title id=[^>]*>.*?</title><desc[^>]*>.*?</desc>", "", svg, count=1)
+    return Markup(svg)
+
+
+def figur_tittel(svg: str) -> str:
+    m = re.search(r"<title id=[^>]*>([^<]+)</title>", svg)
+    return html.unescape(m.group(1)) if m else ""
+
+
+def kildegrupper(kilder: list[dict]) -> list[dict]:
+    """Sources grouped per document, pages sorted: Saksframlegg s. 1, 3, 8."""
+    groups: dict[str, dict] = {}
+    for k in kilder or []:
+        groups.setdefault(k["dok"], {}).setdefault(k["side"], k["href"])
+    return [{"dok": dok, "navn": DOK_NAVN.get(dok, dok.capitalize()),
+             "sider": [{"side": n, "href": sider[n]} for n in sorted(sider)]} for dok, sider in groups.items()]
+
+
+def artikkel_dokumenter(artikkel: list[dict]) -> str:
+    """"saksframlegget og protokollen": the documents a background article builds on."""
+    docs = []
+    for a in artikkel:
+        for k in a["kilder"]:
+            if k["dok"] not in docs:
+                docs.append(k["dok"])
+    names = [DOK_BESTEMT.get(d, d) for d in docs]
+    return " og ".join([", ".join(names[:-1]), names[-1]]) if len(names) > 1 else "".join(names)
+
+
 def _rfc822(d: date) -> str:
     return format_datetime(datetime.combine(d, time(12), tzinfo=timezone.utc))
 
@@ -537,8 +721,17 @@ def _env() -> Environment:
         lstrip_blocks=True,
     )
     env.filters["rfc822"] = _rfc822
+    env.filters["kort_dato"] = nb_date_short
+    env.filters["tittel"] = tittel_html
+    env.filters["minikart"] = minikart
+    env.filters["figur_tittel"] = figur_tittel
+    env.filters["kildegrupper"] = kildegrupper
+    env.filters["forste_setning"] = forste_setning
     env.globals["repo"] = config.REPO
-    env.globals["front_figure"] = front_figure
+    env.globals["figur"] = figur
+    env.globals["artikkel_dokumenter"] = artikkel_dokumenter
+    env.globals["fonter"] = (HERE / "static" / "fonts.css").exists()
+    env.globals["skjult"] = getattr(config, "SKJUL_FOR_SOK", False)
     return env
 
 

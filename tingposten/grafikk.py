@@ -275,7 +275,9 @@ def _meter(part: dict, total: dict, kind: str, kilde: str, sentence: str) -> dic
     doc = "Vedtaket" if kilde.startswith("Vedtak") else "Saksframlegget"
     alt = (f"{doc} beskriver en økning på {part['tekst']} til totalt {total['tekst']}."
            if kind == "økning" else f"{doc} oppgir {part['tekst']} av totalt {total['tekst']}.")
-    return {"svg": _svg("Beløp i sammenheng", alt, parts, y + 64), "alt": alt, "kilde": kilde}
+    return {"svg": _svg("Beløp i sammenheng", alt, parts, y + 64), "alt": alt, "kilde": kilde,
+            # The same two amounts as data, for the facts under a story.
+            "belop": {"type": kind, "del": part["tekst"], "total": total["tekst"], "tekst": head}}
 
 
 def _sentences(text: str) -> list[str]:

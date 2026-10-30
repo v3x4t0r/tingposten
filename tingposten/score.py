@@ -126,7 +126,7 @@ def signals(item: dict, protokoll: dict, saksframlegg: dict, modell: dict | None
         or "økonomiske perspektiver" in tittel.lower()
     )
 
-    split, closeness = _split(protokoll, SEATS.get(item.get("utvalgId")))
+    split, closeness, stemmer_for, stemmer_mot = _split(protokoll, SEATS.get(item.get("utvalgId")))
     falt, delvis = _innstilling_falt(protokoll)
     votes = protokoll.get("voteringer") or []
     return {
@@ -143,6 +143,9 @@ def signals(item: dict, protokoll: dict, saksframlegg: dict, modell: dict | None
         "enstemmig": bool(protokoll.get("enstemmig")),
         "har_votering": bool(protokoll.get("voteringer")),
         "split": split,
+        # The same vote as numbers (mot is None when the protokoll states only the votes for).
+        "stemmer_for": stemmer_for,
+        "stemmer_mot": stemmer_mot,
         "uenighet": closeness,
         "innstilling_falt": falt,
         "innstilling_delvis_falt": delvis,
@@ -372,11 +375,12 @@ def _sakstype(tittel: str, vedtak: str) -> tuple[str, float, float]:
     return DEFAULT_TYPE
 
 
-def _split(p: dict, seats: int | None = None) -> tuple[str | None, float]:
-    """Badge and closeness (0..1) of the most contested binding vote."""
+def _split(p: dict, seats: int | None = None) -> tuple[str | None, float, int | None, int | None]:
+    """Badge, closeness (0..1) and the stated votes for/against of the most
+    contested binding vote. Against is None when only the votes for are stated."""
     votes = [v for v in p.get("voteringer", []) if not v["forslag"].lower().startswith("merknad")]
     if not votes or p.get("enstemmig"):
-        return None, 0.0
+        return None, 0.0, None, None
     won = [v for v in votes if v["resultat"] == "vedtatt" and v["stemmer"]]
     lost = [v["stemmer"] for v in votes if v["resultat"] == "falt" and v["stemmer"]]
     # Only competing main proposals (innstilling vs alternativ) can be read
@@ -385,30 +389,32 @@ def _split(p: dict, seats: int | None = None) -> tuple[str | None, float]:
     if not won:
         # Main decision unanimous (or nothing adopted), but proposals fell.
         if lost and any(v["resultat"] == "vedtatt" for v in votes):
-            return None, 0.3
-        return None, 0.2 if lost else 0.0
+            return None, 0.3, None, None
+        return None, 0.2 if lost else 0.0, None, None
     til_stede = p.get("til_stede")
     best = None
     for v in won:
         n = v["stemmer"]
         if til_stede:
-            mot, badge = til_stede - n, f"{n}–{til_stede - n}"
+            mot, shown = til_stede - n, til_stede - n
         elif lost_main and _is_main(v):
-            mot, badge = max(lost_main), f"{n}–{max(lost_main)}"
+            mot, shown = max(lost_main), max(lost_main)
         elif seats:
             # Against-votes not stated: judge closeness from the seat count,
             # but show only the stated number.
-            mot, badge = seats - n, f"{n} stemmer for"
+            mot, shown = seats - n, None
         else:
             continue
         if mot <= 0:
             continue
         c = 1 - abs(n - mot) / (n + mot)
         if best is None or c > best[1]:
-            best = (badge, c)
+            best = (n, c, shown)
     if best is None:
-        return f"{min(v['stemmer'] for v in won)} stemmer for", 0.5
-    return best[0], max(0.3, best[1])
+        n = min(v["stemmer"] for v in won)
+        return f"{n} stemmer for", 0.5, n, None
+    n, c, shown = best
+    return (f"{n}–{shown}" if shown is not None else f"{n} stemmer for"), max(0.3, c), n, shown
 
 
 def _is_main(vote: dict) -> bool:

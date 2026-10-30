@@ -1,63 +1,91 @@
 {% extends "base.html" %}
-{% from "macros.html" import status, grunner, figur, overskrift %}
+{% from "macros.html" import ikon, kicker, kildelinje, kildegrupper_html, figur_sak, rad %}
 {% block title %}{{ s.overskrift }} · Tingposten{% endblock %}
 {% block description %}{{ s.dek or s.tittel }}{% endblock %}
+{% block hovedklasse %}sakside{% endblock %}
 {% block main %}
-<nav class="brodsmule" aria-label="Brødsmuler">
-  <a href="{{ root }}bergen/">Bergen</a> <span aria-hidden="true">›</span>
-  {% if s.tema_side %}<a href="{{ root }}{{ s.tema_side }}">{{ s.tema_navn }}</a>{% else %}{{ s.tema_navn }}{% endif %} <span aria-hidden="true">›</span>
-  <a href="{{ root }}bergen/mote/{{ s.mote }}/">{{ s.organ_kort }} {{ s.dato_tekst }}</a>
-</nav>
-<article class="artikkel">
-  <header class="artikkel-topp">
-    <p class="kicker"><span class="kicker-tema">{{ s.tema_navn }}</span> · {{ s.organ }} · <time datetime="{{ s.dato.isoformat() }}">{{ s.dato_tekst }}</time> · sak {{ s.nr }}</p>
-    <h1 class="artikkel-tittel">{{ s.overskrift }}</h1>
-    {% if s.dek %}
-    <p class="dek">{{ s.dek }}{% for k in s.dek_kilder %} <a class="kilde" href="{{ k.href }}">{{ k.dok }} s.&nbsp;{{ k.side }}</a>{% endfor %}</p>
-    {% endif %}
-    <div class="blokk-meta">{{ status(s) }}{% if s.fremhevet %}<span class="flagg">Fremhevet</span>{% endif %}{{ grunner(s) }}</div>
-    {% if s.har_sammendrag and s.overskrift != s.tittel %}<p class="tittel">Sakens tittel: {{ s.tittel }}</p>{% endif %}
+{% set FELT = (("hva_endres", "Hva endres"), ("hvem_pavirkes", "Hvem påvirkes"), ("hvorfor", "Hvorfor"), ("status", "Status"), ("nar_og_hvor", "Når og hvor")) %}
+{% set tema_href = (root ~ s.tema_side) if s.tema_side else none %}
+<nav class="brodsmule" aria-label="Brødsmuler"><ol>
+  <li><a href="{{ root }}bergen/">Bergen</a></li>
+  <li>{% if tema_href %}<a href="{{ tema_href }}">{{ s.tema_navn }}</a>{% else %}{{ s.tema_navn }}{% endif %}</li>
+  <li><a href="{{ root }}bergen/mote/{{ s.mote }}/">{{ s.organ_kort }} {{ s.dato_tekst }}</a></li>
+</ol></nav>
+<article class="sak">
+  <header class="sak-topp lag">
+    <p class="dateline"><span class="kicker">{% if tema_href %}<a href="{{ tema_href }}"><span class="kicker-tema">{{ s.tema_navn }}</span></a>{% else %}<span class="kicker-tema">{{ s.tema_navn }}</span>{% endif %}</span><span class="nb">{{ s.organ_kort }}</span><span class="nb"><time datetime="{{ s.dato.isoformat() }}">{{ s.dato_tekst }}</time></span><span class="nb">Sak {{ s.nr }}</span></p>
+    <div>
+      {% if s.status_klasse %}<p class="sak-status"><span class="faktum-status status-{{ s.status_klasse }}"><span class="vh">Status: </span>{{ s.status_tekst }}</span></p>{% endif %}
+      <h1 class="sak-tittel">{{ s.overskrift|tittel }}</h1>
+      {% if s.dek %}<p class="sak-dek">{{ s.dek }}{{ kildelinje(s.dek_kilder, tag="span") }}</p>{% endif %}
+      {% if s.har_sammendrag and s.tittel != s.overskrift %}<p class="kommunetittel"><strong>Kommunens tittel:</strong> {{ s.tittel }}</p>{% endif %}
+      <p class="paa-siden"><span>På siden:</span><a href="#kort">Kort fortalt</a>{% if s.artikkel %}<span><a href="#bakgrunn">Bakgrunn</a>, ca. {{ s.lesetid }} min</span>{% endif %}<a href="#dokumenter">Dokumenter</a></p>
+    </div>
   </header>
-
-  {% for f in s.figurer %}{{ figur(f) }}{% endfor %}
-
-  {% if s.har_sammendrag %}
-  <div class="brodtekst">
-    {% for f in s.felt %}
-    <h2 class="mellomtittel">{{ f.label }}</h2>
-    <p>{{ f.tekst }}{% for k in f.kilder %} <a class="kilde" href="{{ k.href }}">{{ k.dok }} s.&nbsp;{{ k.side }}</a>{% endfor %}</p>
-    {% endfor %}
+  <div class="sak-oppsett">
+    <section class="kort" id="kort" aria-labelledby="kort-tittel">
+      <div class="kort-hode lag"><h2 id="kort-tittel">Kort fortalt</h2><p>De samme fem punktene for hver sak, med kilde til hvert punkt.</p></div>
+      {% if s.har_sammendrag %}
+      {% for key, label in FELT %}
+      {% set f = (s.felt|selectattr("key", "eq", key)|list or [none])[0] %}
+      <div class="felt lag"><h3>{{ label }}</h3><div>
+        {% if f %}
+        <p class="felt-tekst">{{ f.tekst }}</p>{{ kildelinje(f.kilder) }}
+        {% elif key == "hva_endres" and s.dek_kilder %}
+        <p class="felt-tom">Står i ingressen over.</p>
+        {% else %}
+        <p class="felt-tom"><span aria-hidden="true">–</span><span class="vh">Ingen opplysning i kortet</span></p>
+        {% endif %}
+      </div></div>
+      {% endfor %}
+      {% else %}
+      <div class="felt lag"><h3>Sammendrag</h3><div><p class="felt-tom">Sammendrag kommer. Til da finner du vedtaket i protokollen under Dokumenter.</p></div></div>
+      {% endif %}
+    </section>
+    <div class="rail">
+      {% if s.figurer %}
+      <div class="rail-figurer figurer-{{ s.figurer|length }}">{% for f in s.figurer %}{{ figur_sak(s, f) }}{% endfor %}</div>
+      {% endif %}
+      <section class="rail-dok" id="dokumenter" aria-labelledby="dok-tittel">
+        <h2 id="dok-tittel">Dokumenter</h2>
+        <ul class="dokliste">
+          {% for dok, href in s.pdf.items() %}<li><a href="{{ href }}">{{ ikon("dok") }}{{ dok|capitalize }}<span class="dok-type">PDF</span></a></li>{% endfor %}
+        </ul>
+        <p class="smaatekst">Alt på denne siden bygger på Bergen kommunes egne dokumenter. Ser du en feil? <a href="{{ s.meld_feil }}">Meld feil</a>.</p>
+      </section>
+    </div>
+    {% if s.artikkel %}
+    {% set bygger = artikkel_dokumenter(s.artikkel) %}
+    <section class="bakgrunn lag" id="bakgrunn" aria-labelledby="bakgrunn-tittel">
+      <p class="etikett etikett-strek bakgrunn-etikett">Bakgrunn</p>
+      <div>
+        <h2 class="bakgrunn-tittel" id="bakgrunn-tittel">{{ "Saken så langt" if s.status_klasse == "apen" else "Saken bak vedtaket" }}</h2>
+        <p class="byline">{% if bygger %}<span>Bygger på {{ bygger }}</span>{% endif %}<span class="nb">Ca. {{ s.lesetid }} {{ "minutt" if s.lesetid == 1 else "minutter" }} å lese</span></p>
+        <div class="brodtekst">
+          {% for a in s.artikkel %}
+          <p id="avsnitt-{{ loop.index }}">{{ a.tekst }}{% if a.kilder %}<sup class="fn"><a href="#kilde-{{ loop.index }}" aria-label="Kilder til avsnitt {{ loop.index }}">{{ loop.index }}</a></sup>{% endif %}</p>
+          {% endfor %}
+        </div>
+        <div class="fotnoter">
+          <h3>Kilder til bakgrunnen</h3>
+          <p>Tallet etter hvert avsnitt viser til sidene i kommunens dokumenter som avsnittet bygger på.</p>
+          <ol>
+            {% for a in s.artikkel %}{% if a.kilder %}
+            <li id="kilde-{{ loop.index }}"><span class="nr">{{ loop.index }}</span><span>{{ kildegrupper_html(a.kilder) }}</span><a class="tilbake" href="#avsnitt-{{ loop.index }}" aria-label="Tilbake til avsnitt {{ loop.index }}">↑</a></li>
+            {% endif %}{% endfor %}
+          </ol>
+        </div>
+      </div>
+    </section>
+    {% endif %}
   </div>
-  {% else %}
-  <p class="kommer">Sammendrag kommer.</p>
-  {% endif %}
-
-  {% if s.artikkel %}
-  <section class="bakgrunn" aria-labelledby="bakgrunn">
-    <h2 class="seksjonstittel" id="bakgrunn">Bakgrunn</h2>
-    {% for a in s.artikkel %}
-    <p>{{ a.tekst }}{% for k in a.kilder %} <a class="kilde" href="{{ k.href }}">{{ k.dok }} s.&nbsp;{{ k.side }}</a>{% endfor %}</p>
-    {% endfor %}
-  </section>
-  {% endif %}
-
-  <aside class="kildeboks" aria-labelledby="kilder">
-    <h2 class="seksjonstittel" id="kilder">Kilder</h2>
-    <p>Alt på denne siden bygger på Bergen kommunes egne dokumenter:</p>
-    <ul>
-      {% for dok, href in s.pdf.items() %}<li><a href="{{ href }}">{{ dok|capitalize }}</a></li>{% endfor %}
-    </ul>
-    <p>Ser du en feil? <a href="{{ s.meld_feil }}">Meld feil</a>.</p>
-  </aside>
 </article>
-
 {% if relaterte %}
-<section class="seksjon" aria-labelledby="relaterte">
-  <h2 class="seksjonstittel" id="relaterte">Flere saker fra samme møte</h2>
-  <ul class="overskrifter">
-    {% for r in relaterte %}{{ overskrift(r, root, meta="kort") }}{% endfor %}
+<section class="relaterte lag" aria-labelledby="relaterte-tittel">
+  <div class="relaterte-hode"><h2 id="relaterte-tittel">Fra samme møte</h2><p><a class="pil" href="{{ root }}bergen/mote/{{ mote.slug }}/">Alle {{ mote.saker|length }} saker fra møtet</a></p></div>
+  <ul class="rader">
+    {% for r in relaterte %}{{ rad(r, root, med_dek=False) }}{% endfor %}
   </ul>
-  <p class="andre-lenke"><a href="{{ root }}bergen/mote/{{ mote.slug }}/">Alle {{ mote.saker|length }} saker fra møtet</a></p>
 </section>
 {% endif %}
 {% endblock %}

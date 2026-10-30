@@ -1,62 +1,122 @@
 {# Story building blocks. One link per story: the headline. A CSS overlay on
-   that link makes the whole block clickable without nesting links. #}
+   that link makes the whole block clickable without nesting links.
+   Facts under a story come from bygg.fakta(): mechanical values only. #}
 
-{% macro status(s) %}
-{% if s.status_tekst %}<span class="status{% if s.status_klasse %} status-{{ s.status_klasse }}{% endif %}">{{ s.status_tekst }}</span>{% endif %}
+{% macro ikon(navn) %}<svg class="ikon" aria-hidden="true" focusable="false"><use href="#i-{{ navn }}"/></svg>{% endmacro %}
+
+{% set FAKTA_IKON = {"sted": "sted", "stemmer": "stemmer", "falt": "stemmer", "kr": "kr", "bakgrunn": "bakgrunn"} %}
+
+{# Tema, then organ and date only when the story isn't from the period's standard meeting. #}
+{% macro kicker(s, vis_mote=False, kort=True, nr=False, tema=True) %}
+<p class="kicker"><span class="kicker-rad">{% if tema %}<span class="kicker-tema">{{ s.tema_navn }}</span><wbr>{% endif %}{% if vis_mote %}<span class="kicker-del">{{ s.organ_kort }}, <time datetime="{{ s.dato.isoformat() }}">{{ s.dato|kort_dato(short=kort) }}</time></span><wbr>{% endif %}{% if nr %}<span class="kicker-del">Sak {{ s.nr }}</span>{% endif %}</span></p>
 {% endmacro %}
 
-{% macro grunner(s) %}
-{% if s.grunner %}
-<ul class="grunner" aria-label="Hvorfor saken er rangert slik">
-  {% for g in s.grunner %}<li>{{ g }}</li>{% endfor %}
-</ul>
+{% macro faktum(f) %}
+{% if f.type == "status" %}<li class="faktum faktum-status"><span class="vh">Status: </span>{{ f.verdi }}</li>
+{% elif f.type == "falt" %}<li class="faktum">{{ ikon("stemmer") }}{{ f.verdi }} forslag falt</li>
+{% elif f.type == "bakgrunn" %}<li class="faktum faktum-bakgrunn">{{ ikon("bakgrunn") }}Bakgrunn</li>
+{% else %}<li class="faktum">{{ ikon(FAKTA_IKON[f.type]) }}<span class="vh">{{ f.etikett }}: </span>{{ f.verdi }}</li>
 {% endif %}
 {% endmacro %}
 
-{% macro kicker(s) %}
-<p class="kicker"><span class="kicker-tema">{{ s.tema_navn }}</span> · {{ s.organ_kort }} · <time datetime="{{ s.dato.isoformat() }}">{{ s.dato_tekst }}</time></p>
+{# The facts row: at most `maks` facts, then the Bakgrunn cue. Kept even when
+   empty, so the rows of a grid line up. #}
+{% macro fakta_rad(s, maks=3, uten=()) %}
+<ul class="fakta">{% for f in (s.fakta|rejectattr("type", "in", uten)|rejectattr("type", "eq", "bakgrunn")|list)[:maks] %}{{ faktum(f) }}{% endfor %}{% if s.har_artikkel %}{{ faktum({"type": "bakgrunn"}) }}{% endif %}</ul>
 {% endmacro %}
 
-{# A cue, not a link: the whole story block already links to the sak page. #}
-{% macro bakgrunn_cue(s) %}
-{% if s.har_artikkel %}<span class="cue">Les bakgrunn</span>{% endif %}
-{% endmacro %}
-
-{% macro figur(f, liten=False) %}
-<figure class="figur figur-{{ f.type|default('annen') }}{% if liten %} figur-liten{% endif %}">
-  {{ f.svg|safe }}
-  {% if f.kilde %}<figcaption>{{ f.kilde }}</figcaption>{% endif %}
-</figure>
+{# Tiles stay terse: an informative status, the organ off the standard meeting, and the Bakgrunn cue. #}
+{% macro flis_meta(s, standard) %}
+{% set status = (s.fakta|selectattr("type", "eq", "status")|list or [none])[0] %}
+{% if status or s.mote != standard or s.har_artikkel %}
+<ul class="fakta">{% if status %}{{ faktum(status) }}{% endif %}{% if s.mote != standard %}<li class="faktum">{{ s.organ_kort }}, {{ s.dato|kort_dato }}</li>{% endif %}{% if s.har_artikkel %}{{ faktum({"type": "bakgrunn"}) }}{% endif %}</ul>
+{% endif %}
 {% endmacro %}
 
 {% macro lead(s, root) %}
-<article class="blokk lead">
-  {{ kicker(s) }}
-  <h2 class="lead-tittel"><a class="blokklenke" href="{{ root }}{{ s.side }}">{{ s.overskrift }}</a></h2>
-  {% if s.dek %}<p class="dek">{{ s.dek }}</p>{% elif not s.har_sammendrag %}<p class="dek kommer">Sammendrag kommer.</p>{% endif %}
-  <div class="blokk-meta">{{ status(s) }}{{ grunner(s) }}{{ bakgrunn_cue(s) }}</div>
-  {% set f = front_figure(s) %}
-  {% if f %}{{ figur(f, liten=True) }}{% endif %}
+<article class="blokk lead {{ 'lead-kort' if s.overskrift|length <= 48 else 'lead-lang' }}">
+  {{ kicker(s, vis_mote=True, kort=False) }}
+  <h2 class="lead-tittel"><a class="blokklenke" href="{{ root }}{{ s.side }}">{{ s.overskrift|tittel }}</a></h2>
+  {% if s.dek %}
+  <p class="lead-dek">{{ s.dek }}</p>
+  {# A short lead would leave its column half empty beside "Perioden i tall":
+     then the card's next fields follow the dek, verbatim. #}
+  {% set ns = namespace(tegn=s.overskrift|length + s.dek|length) %}
+  {% for f in s.felt if f.key in ("hva_endres", "hvem_pavirkes") %}
+  {% if ns.tegn < 300 %}
+  <p class="lead-felt"><span class="lead-felt-etikett">{{ f.label }}</span> {{ f.tekst }}</p>
+  {% set ns.tegn = ns.tegn + f.tekst|length %}
+  {% endif %}
+  {% endfor %}
+  {% elif not s.har_sammendrag %}
+  <p class="lead-dek kommer">Sammendrag kommer.</p>
+  {% endif %}
+  {% if s.fakta %}
+  <dl class="nokkeltall">{% for f in s.fakta[:4] %}<div><dt>{% if f.type in FAKTA_IKON %}{{ ikon(FAKTA_IKON[f.type]) }}{% endif %}{{ f.etikett }}</dt><dd>{{ f.verdi }}</dd></div>{% endfor %}</dl>
+  {% endif %}
 </article>
 {% endmacro %}
 
-{% macro sekundaer(s, root) %}
-<article class="blokk sekundaer">
-  {{ kicker(s) }}
-  <h3 class="sekundaer-tittel"><a class="blokklenke" href="{{ root }}{{ s.side }}">{{ s.overskrift }}</a></h3>
-  {% if s.dek %}<p class="dek">{{ s.dek }}</p>{% endif %}
-  <div class="blokk-meta">{{ status(s) }}{{ bakgrunn_cue(s) }}</div>
-  {% set f = front_figure(s) %}
-  {% if f %}{{ figur(f, liten=True) }}{% endif %}
+{% macro sek(s, root, standard) %}
+{% set kart = figur(s, "kart") %}
+{% set belop = figur(s, "belop") if not kart else none %}
+<article class="blokk sek">
+  {{ kicker(s, vis_mote=s.mote != standard) }}
+  <div class="sek-tekst">
+    <h3 class="sek-tittel"><a class="blokklenke" href="{{ root }}{{ s.side }}">{{ s.overskrift|tittel }}</a></h3>
+    {% if s.dek %}<p class="sek-dek">{{ s.dek|forste_setning }}</p>{% endif %}
+  </div>
+  {{ fakta_rad(s, uten=(("sted",) if kart else ()) + (("kr",) if belop else ())) }}
+  <div class="sek-figur">{% if kart %}<p class="minikart">{{ kart.svg|minikart }}<span><span class="minikart-navn"><span class="vh">Gjelder: </span>{{ (s.fakta|selectattr("type", "eq", "sted")|map(attribute="verdi")|list or [s.bydeler|join(", ")])[0] }}</span><span class="minikart-kilde">Kart: © OpenStreetMap (ODbL)</span></span></p>{% elif belop %}<div class="minibelop">{{ belop.svg|safe }}</div>{% endif %}</div>
 </article>
 {% endmacro %}
 
-{# A headline in a list. meta: "full" shows organ and date, "kort" only the status. #}
-{% macro overskrift(s, root, meta="full", nr=False, flagg=True) %}
-<li class="overskrift{% if s.fremhevet %} er-fremhevet{% endif %}">
-  <a href="{{ root }}{{ s.side }}">{% if nr %}<span class="nr">{{ s.nr }}</span> {% endif %}{{ s.overskrift }}</a>
-  <span class="linje-meta">
-    {% if meta == "full" %}{{ s.organ_kort }} · {{ s.dato_tekst }}{% if s.status_tekst %} · {% endif %}{% endif %}{{ s.status_tekst }}{% if flagg and s.fremhevet %}<span class="flagg">Fremhevet</span>{% endif %}{% if s.har_artikkel %}<span class="cue">Bakgrunn</span>{% endif %}
-  </span>
+{# A story in a list. vis_mote: show organ and date (off the standard meeting). #}
+{% macro rad(s, root, vis_mote=False, med_dek=True, nr=False, tema=True) %}
+<li class="blokk rad">
+  {{ kicker(s, vis_mote=vis_mote, nr=nr, tema=tema) }}
+  <div class="rad-tekst">
+    <h3 class="rad-tittel"><a class="blokklenke" href="{{ root }}{{ s.side }}">{{ s.overskrift|tittel }}</a></h3>
+    {% if med_dek and s.dek %}<p class="rad-dek">{{ s.dek|forste_setning }}</p>{% endif %}
+  </div>
+  {{ fakta_rad(s) }}
 </li>
+{% endmacro %}
+
+{% macro flis(t, root, visning, standard) %}
+<section class="flis" id="tema-{{ t.tema }}" aria-labelledby="flis-{{ t.tema }}">
+  <div class="flis-hode"><h3 id="flis-{{ t.tema }}">{{ t.navn }}</h3><p><a class="pil" href="{{ root }}bergen/{{ visning }}tema/{{ t.tema }}/">{% if t.antall == 1 %}1 vedtak{% else %}Alle {{ t.antall }}{% endif %}<span class="vh"> vedtak om {{ t.navn|lower }}</span></a></p></div>
+  {% if t.saker %}
+  <ul>
+    {% for s in t.saker %}
+    <li class="blokk"><h4 class="flis-tittel"><a class="blokklenke" href="{{ root }}{{ s.side }}">{{ s.overskrift|tittel }}</a></h4>{{ flis_meta(s, standard) }}</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="flis-tom">{% if t.antall == 1 %}Vedtaket i temaet står{% else %}Alle {{ t.antall }} vedtakene i temaet står{% endif %} lenger opp på siden.</p>
+  {% endif %}
+</section>
+{% endmacro %}
+
+{# Sources, grouped per document, every page its own link: "Saksframlegg s. 1, 3, 8". #}
+{% macro kildegrupper_html(kilder) %}{% for g in kilder|kildegrupper %}{% if not loop.first %}<span class="kilde-skille" aria-hidden="true">·</span>{% endif %}{{ g.navn }} s.&nbsp;{% for k in g.sider %}<a href="{{ k.href }}" aria-label="{{ g.navn }}, side {{ k.side }}">{{ k.side }}</a>{% if not loop.last %}, {% endif %}{% endfor %}{% endfor %}{% endmacro %}
+
+{% macro kildelinje(kilder, etikett="Kilde", tag="p") %}
+{% if kilder %}<{{ tag }} class="kilde"><span class="kilde-etikett">{{ etikett }}:</span>{{ kildegrupper_html(kilder) }}</{{ tag }}>{% endif %}
+{% endmacro %}
+
+{% macro figur_sak(s, f) %}
+<figure class="figur figur-{{ f.type|default('annen') }}">
+  {% if f.svg|figur_tittel %}<h2 class="figur-tittel" aria-hidden="true">{{ f.svg|figur_tittel }}</h2>{% endif %}
+  {% if f.type == "stemmer" %}<p class="figur-forklaring">Stolpene viser stemmer for hvert forslag. Under hver stolpe står partiene som stemte for.</p>{% endif %}
+  {{ f.svg|safe }}
+  {% if f.type == "kart" %}
+  {% set grunn = (f.kilde or "").split(". ", 1)[1] if ". " in (f.kilde or "") else "" %}
+  <figcaption>{% if s.bydeler %}<p class="tegnforklaring">{% for b in s.bydeler %}<span>{{ b }}</span>{% endfor %}</p>{% endif %}{{ grunn }} Kart: © OpenStreetMap (ODbL)</figcaption>
+  {% elif f.type == "stemmer" %}
+  <figcaption>Kilde: {{ f.kilde[:1]|lower }}{{ f.kilde[1:] }}.</figcaption>
+  {% elif f.kilde %}
+  <figcaption>Kilde: {{ f.kilde }}.</figcaption>
+  {% endif %}
+</figure>
 {% endmacro %}

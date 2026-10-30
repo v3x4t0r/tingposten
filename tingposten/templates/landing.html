@@ -1,8 +1,9 @@
 {% extends "base.html" %}
+{% block hovedklasse %}landing{% endblock %}
 {% block main %}
-<section class="intro">
-  <h1>Tingposten</h1>
-  <p class="ingress">Hva kommunen faktisk vedtar, uten politisk prat: hver sak i samme lesbare format, de viktigste først, alt dokumentert med kilde.</p>
-  <p><a class="knapp" href="{{ root }}bergen/">Se vedtakene i Bergen</a></p>
+<section class="intro" aria-labelledby="intro-tittel">
+  <h1 class="vh" id="intro-tittel">Tingposten</h1>
+  <p class="intro-ingress">Hva kommunen faktisk vedtar, uten politisk prat: hver sak i samme lesbare format, de viktigste først, alt dokumentert med kilde.</p>
+  <p class="intro-lenke"><a class="pil" href="{{ root }}bergen/">Se vedtakene i Bergen</a></p>
 </section>
 {% endblock %}

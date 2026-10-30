@@ -65,6 +65,9 @@ STATICHOST_BUILDER = "https://builder.statichost.eu"
 # Public site
 SITE_URL = (f"https://{STATICHOST_SITE}.statichost.page/" if PUBLISER_TIL.startswith("statichost")
             else "https://v3x4t0r.github.io/tingposten/")
+# Until launch the site is online but kept out of search engines: noindex on
+# every page and a robots.txt that disallows everything (user's choice, 2026-10-30).
+SKJUL_FOR_SOK = True
 FREMHEVET_TERSKEL = 40  # score at or above this is highlighted on the front page
 MELD_FEIL = None  # None → GitHub issue on REPO, prefilled with the sak
 
