@@ -2,8 +2,10 @@
 
 Targets (config.PUBLISER_TIL):
 - "statichost-git" / "github-pages": mirror site/ into PAGES_BRANCH and
-  push it; statichost.eu (webhook) or GitHub Pages serves that branch. For
-  statichost the branch also gets statichost.yml ("public: ." = no build).
+  push it; statichost or GitHub Pages serves that branch. For statichost the
+  branch also gets statichost.yml ("public: ." = no build), and publiser asks
+  statichost to deploy it (POST to the builder, with the key if there is one),
+  so no GitHub webhook is needed.
   The branch lives in its own worktree under data/ (ignored by git), so the
   main working tree and the main branch are never touched or pushed.
 - "statichost-upload": zip site/ and upload it to statichost.eu (direct
@@ -32,6 +34,7 @@ PLACEHOLDER = """<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
 <title>Tingposten</title>
 <style>
 :root { --bg: #fbfaf7; --fg: #1d1d1b; --muted: #5f5e5a; }
@@ -73,7 +76,26 @@ def publiser(message: str = "Publiser") -> bool:
     """Publish site/ to the configured target. False if the kill switch stopped it."""
     if config.PUBLISER_TIL == "statichost-upload":
         return publish_statichost()
-    return publish(message=message, statichost=config.PUBLISER_TIL == "statichost-git")
+    statichost = config.PUBLISER_TIL == "statichost-git"
+    if not publish(message=message, statichost=statichost):
+        return False
+    if statichost:
+        trigger_build()
+    return True
+
+
+def trigger_build(site: str | None = None, apikey: str | None = None, session=None) -> None:
+    """Ask statichost to deploy PAGES_BRANCH now. The key is sent when there is one,
+    so "Enforce authentication" can be on. Raises RuntimeError if statichost says no."""
+    site = site or config.STATICHOST_SITE
+    apikey = apikey if apikey is not None else os.environ.get("STATICHOST_APIKEY", "")
+    headers = {"Accept": "text/plain", "User-Agent": config.USER_AGENT}
+    if apikey:
+        headers["Authorization"] = f"Bearer {apikey}"
+    response = (session or requests).post(f"{config.STATICHOST_BUILDER}/{site}", data=b"", headers=headers, timeout=60)
+    if not 200 <= response.status_code < 300:
+        raise RuntimeError(f"statichost svarte {response.status_code} på bygg-forespørselen: {response.text.strip()[:300]}")
+    log.info("asked statichost to deploy %s: %s", site, response.text.strip()[:200])
 
 
 def publish_statichost(

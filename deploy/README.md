@@ -17,16 +17,16 @@ Docker er allerede installert på Pi-en, så en container er et alternativ hvis 
 
 ## Publisering på statichost.eu
 
-Siden bygges lokalt (eller på Pi-en), og `publiser` committer den ferdige siden til grenen `nettside` og pusher den. statichost.eu publiserer grenen når den får beskjed fra GitHub (webhook). Koden på `main` pushes ikke.
+Siden bygges lokalt (eller på Pi-en), og `publiser` committer den ferdige siden til grenen `nettside` og pusher den. Etterpå ber `publiser` statichost om å publisere grenen (en POST til `https://builder.statichost.eu/tingposten`, med API-nøkkelen fra `.env`), så det trengs ingen webhook hos GitHub. Koden på `main` pushes ikke.
 
 Gratisplanen (Hobby) gir ett nettsted, 10 GB trafikk og eget domene. Siden er liten (rundt 7 KB per side), så det holder lenge. Serverne står i Stockholm og eies av et europeisk selskap.
 
 Oppsett, én gang:
 
 1. **statichost:** lag nettstedet, koble det til repoet `v3x4t0r/tingposten` og velg grenen **`nettside`** (ikke `main`). Byggeoppsett trengs ikke: grenen har en `statichost.yml` med `public: .`, som betyr «publiser filene som de er».
-2. **GitHub:** Settings → Webhooks → Add webhook. Payload URL: `https://builder.statichost.eu/<navnet på nettstedet>`, «Just the push event».
+2. **statichost → Settings → Automatic deployment:** slå på «Enforce authentication». Da kan bare den som har API-nøkkelen (`STATICHOST_APIKEY` i `.env`) starte en publisering. En GitHub-webhook trengs ikke, og den ville uansett ikke virket med autentisering på, siden GitHub ikke kan sende nøkkelen.
 3. Grenen heter `nettside`, ikke `gh-pages`: så lenge det finnes en `gh-pages`-gren, holder GitHub Pages siden ute, og da ligger den ute to steder.
-4. Test: `uv run tingposten bygg && uv run tingposten publiser`. Siden ligger da på `https://<navnet>.statichost.eu/`.
+4. Test: `uv run tingposten bygg && uv run tingposten publiser`. Siden ligger da på `https://<navnet>.statichost.page/` (Tingposten: https://tingposten.statichost.page/).
 5. Eget domene (tingposten.no) legges inn hos statichost og hos domeneregistraren; se statichost.eu/docs/domains/.
 
 Vil du heller laste opp direkte uten git, sett `PUBLISER_TIL = "statichost-upload"` i `tingposten/config.py` og legg en API-nøkkel i `.env` (`STATICHOST_APIKEY`).

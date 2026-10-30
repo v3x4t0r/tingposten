@@ -2,7 +2,7 @@ import subprocess
 
 import pytest
 
-from tingposten import publiserer
+from tingposten import config, publiserer
 from tingposten.publiserer import build_placeholder, publish
 
 BRANCH = "gh-pages"
@@ -169,3 +169,25 @@ def test_statichost_git_branch_gets_no_build_config(repo, origin, site):
     shown = subprocess.run(["git", "-C", str(origin), "show", f"{BRANCH}:statichost.yml"],
                            capture_output=True, text=True, check=True).stdout
     assert shown == "public: .\n"
+
+
+def test_trigger_build_posts_to_the_site_with_the_key():
+    s = FakeSession(200, "Build queued")
+    publiserer.trigger_build(site="tingposten", apikey="hemmelig", session=s)
+    assert s.calls[0]["url"] == "https://builder.statichost.eu/tingposten"
+    assert s.calls[0]["headers"]["Authorization"] == "Bearer hemmelig"
+    s = FakeSession()
+    publiserer.trigger_build(site="tingposten", apikey="", session=s)
+    assert "Authorization" not in s.calls[0]["headers"]
+    with pytest.raises(RuntimeError, match="401"):
+        publiserer.trigger_build(site="tingposten", apikey="feil", session=FakeSession(401, "Unauthorized"))
+
+
+def test_publiser_git_triggers_a_build_but_not_when_stopped(monkeypatch):
+    calls = []
+    monkeypatch.setattr(config, "PUBLISER_TIL", "statichost-git")
+    monkeypatch.setattr(publiserer, "trigger_build", lambda: calls.append("bygg"))
+    monkeypatch.setattr(publiserer, "publish", lambda message, statichost: statichost)
+    assert publiserer.publiser() is True and calls == ["bygg"]
+    monkeypatch.setattr(publiserer, "publish", lambda message, statichost: False)
+    assert publiserer.publiser() is False and calls == ["bygg"]

@@ -59,11 +59,11 @@ ARTIKKEL_ANDEL = 0.25
 # - "statichost-upload": upload a zip straight to statichost (STATICHOST_APIKEY in .env).
 # - "github-pages": push PAGES_BRANCH and let GitHub Pages serve it (set Pages to that branch).
 PUBLISER_TIL = "statichost-git"
-STATICHOST_SITE = os.environ.get("STATICHOST_SITE", "tingposten")  # → https://<site>.statichost.eu/
+STATICHOST_SITE = os.environ.get("STATICHOST_SITE", "tingposten")  # → https://<site>.statichost.page/
 STATICHOST_BUILDER = "https://builder.statichost.eu"
 
 # Public site
-SITE_URL = (f"https://{STATICHOST_SITE}.statichost.eu/" if PUBLISER_TIL.startswith("statichost")
+SITE_URL = (f"https://{STATICHOST_SITE}.statichost.page/" if PUBLISER_TIL.startswith("statichost")
             else "https://v3x4t0r.github.io/tingposten/")
 FREMHEVET_TERSKEL = 40  # score at or above this is highlighted on the front page
 MELD_FEIL = None  # None → GitHub issue on REPO, prefilled with the sak
