@@ -48,7 +48,44 @@
 <section class="omdel lag" aria-labelledby="erklaering">
   <h2 class="etikett etikett-strek" id="erklaering">Redaksjonell erklæring</h2>
   <div class="lesetekst">
-<p class="plassholder"><strong>Plassholder:</strong> Den redaksjonelle erklæringen er ikke ferdig ennå. Her kommer det hva Tingposten gjengir, hva vi ikke vurderer, hvordan vi bruker språkmodeller, og hvordan feil rettes.</p>  </div>
+<p class="erklaering-dato">Sist oppdatert 30. oktober 2026</p>
+
+<h3>Hva Tingposten er</h3>
+<p>Tingposten er en gratis og ikke-kommersiell nettside som viser hva Bergen kommune vedtar. Hver sak får et kort i samme format: hva endres, hvem påvirkes, hvorfor, status og når og hvor. Hvert kort har lenke til kommunens egne dokumenter. Koden er åpen og ligger på <a href="https://github.com/v3x4t0r/tingposten">GitHub</a>.</p>
+
+<h3>Hva som dekkes</h3>
+<p>Tingposten dekker sakene som behandles i Bergen bystyre og i byrådet. Alle sakene fra disse organene vises. Poengsummen bestemmer bare rekkefølgen og hvilke saker som løftes fram, ikke hvilke saker som er med. Rene formalia, som godkjenning av protokoll, vises ikke som egne saker. Hver møteside viser alle sakene fra møtet og hvordan de endte.</p>
+<p>Sammendrag skrives for saker fra de siste tre månedene. Eldre saker vises med kommunens egen tittel og lenke til dokumentene.</p>
+
+<h3>Slik lages kortene</h3>
+<p>Kortene skrives av KI-modeller ut fra kommunens egne dokumenter, saksframlegget og protokollen fra møtet. De viktigste sakene får i tillegg en kort bakgrunnsartikkel. Deretter går teksten gjennom to kontroller:</p>
+<ul>
+  <li>En faktasjekk gjort av en annen KI-modell, som bare ser kildedokumentene og den ferdige teksten. Setninger og titler som ikke er dekket av kildene, slettes.</li>
+  <li>Et redigeringssteg som håndhever lengdegrenser og språkregler. Dette steget kan bare slette tekst, aldri legge til eller skrive om.</li>
+</ul>
+<p>Hver setning lenker til siden i dokumentet den bygger på, slik at leseren selv kan kontrollere den. Maskinskrevet tekst kan likevel inneholde feil. Ved tvil er det kommunens dokumenter som gjelder.</p>
+
+<h3>Når vi ikke vet</h3>
+<p>Er protokollen fra et møte ikke publisert ennå, står det «Venter på protokoll». Har vi ikke lest dokumentene til en sak, står det «Ikke oppsummert ennå». Tingposten gjetter ikke på utfallet av en sak.</p>
+
+<h3>Nøytralitet</h3>
+<p>Tingposten gjengir hva som ble foreslått, hva som ble vedtatt og hvem som stemte for og imot, også forslagene som falt. Tingposten vurderer ikke om et vedtak er bra eller dårlig. Feltet «Hvorfor» gjengir kommunens eller byrådets egen begrunnelse, ikke Tingpostens. Figurer bruker ikke partifarger.</p>
+
+<h3>Rangering</h3>
+<p>Rekkefølgen på forsiden bestemmes av en poengsum som kan forklares. Under hver sak står noen faste opplysninger hentet rett fra dokumentene, valgt etter samme regel for alle saker: status når den sier noe mer enn «vedtatt», hvilken del av byen saken gjelder, stemmetall og beløp. Vektene bak poengsummen er offentlige under <a href="#rangering">«Slik rangerer vi»</a>. Leseren skal kunne være uenig i rekkefølgen og se hvorfor den ble som den ble.</p>
+
+<h3>Personvern</h3>
+<p>Tingposten publiserer ikke navn på privatpersoner, selv om navnene står i offentlige dokumenter. Det gjelder for eksempel naboer, klagere og søkere. Folkevalgte omtales i kraft av vervet sitt. Når en folkevalgt får fritak fra et verv, oppgir Tingposten ikke den personlige begrunnelsen.</p>
+
+<h3>Feil og rettelser</h3>
+<p>Hver sak har en lenke merket «Meld feil». Du kan melde feil som en offentlig sak på GitHub. Rettelser gjøres synlig: saken får en merknad om hva som ble endret og når.</p>
+
+<h3>Uavhengighet</h3>
+<p>Tingposten følger ikke med på enkeltlesere. Vi teller besøk uten informasjonskapsler, som forklart under <a href="#besok">«Besøkstall»</a>. Tingposten er ikke knyttet til noe parti eller til Bergen kommune, og tar ikke imot betaling for omtale.</p>
+<p>Tingposten utgis av RO-Studio AS (org.nr. 938 625 999), som også står bak <a href="https://freetime.no/">Freetime</a>. Ansvarlig redaktør er Henrik Midttun.</p>
+
+<h3>Kilder og gjenbruk</h3>
+<p>Dokumentene tilhører Bergen kommune. Vedtak og forslag fra offentlige myndigheter er fritt tilgjengelige for gjenbruk (åndsverkloven § 14). Vedlegg laget av andre, som rapporter fra konsulenter, kart og bilder, kan være vernet. Tingposten lenker derfor til originalene i kommunens system i stedet for å legge ut kopier av dem.</p>  </div>
 </section>
 
 <section class="omdel lag" aria-labelledby="rangering">
@@ -96,7 +133,7 @@
   <div class="bunn-innhold">
     <p class="bunn-navn">Tingposten</p>
     <p>Tingposten viser hva Bergen kommune vedtar. Hver setning bygger på kommunens egne dokumenter, og hver sak lenker til dem.</p>
-    <p class="bunn-lenker"><a href="../om/">Om Tingposten og rangeringen</a> · <a href="../bergen/rss.xml">RSS</a> · <a href="https://github.com/v3x4t0r/tingposten">Åpen kildekode</a></p>
+<p class="bunn-utgiver">Utgitt av RO-Studio AS · Ansvarlig redaktør: Henrik Midttun</p>    <p class="bunn-lenker"><a href="../om/">Om Tingposten og rangeringen</a> · <a href="../bergen/rss.xml">RSS</a> · <a href="https://github.com/v3x4t0r/tingposten">Åpen kildekode</a></p>
   </div>
 </footer>
 </body>

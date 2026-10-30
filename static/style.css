@@ -576,6 +576,25 @@ a:hover { text-decoration-thickness: 2px; }
 @media (min-width: 900px) { .kort .meld-feil { grid-template-columns: calc(var(--etikett) - 24px) minmax(0, 1fr); } }
 .bakgrunn .meld-feil { margin-top: 18px; border-top-color: var(--linje); }
 
+/* Rettelser: the editor's dated notes, right under the top block. A rule and
+   a label like the card's, in ink: calm, never an alarm colour. On wide
+   screens the label sits in the label column, the notes under the dek. */
+.rettelser { margin: 0 0 28px; padding: 10px 0 13px; border-top: 1px solid var(--sterk); border-bottom: 1px solid var(--linje); }
+.rettelser-etikett { margin: 0 0 4px; font: 700 0.75rem/1.3 var(--sans); letter-spacing: 0.1em; text-transform: uppercase; color: var(--blekk); }
+.rettelser-liste { list-style: none; margin: 0; padding: 0; max-width: 40em; font: 400 0.9375rem/1.5 var(--sans); color: var(--blekk-2); }
+.rettelser-liste li + li { margin-top: 6px; }
+.rettelser-liste time { font-weight: 600; color: var(--blekk); }
+@media (min-width: 900px) { .rettelser-etikett { margin: 2px 0 0; } }
+/* "Rettet" on what was changed (a field, a paragraph, the article's title) and in the lists */
+.rettet-merke { font: 500 0.75rem/1.3 var(--sans); letter-spacing: 0.02em; color: var(--dempet); white-space: nowrap;
+  text-decoration-color: var(--linje-2); text-underline-offset: 0.18em; }
+.rettet-merke:hover { color: var(--blekk); text-decoration-color: currentColor; }
+.felt h3 .rettet-merke { margin-left: 4px; }
+@media (min-width: 900px) { .felt h3 .rettet-merke { display: block; width: fit-content; margin: 4px 0 0; } }
+.brodtekst .rettet-merke { font-size: 0.75rem; }
+.byline .rettet-merke { font-size: inherit; letter-spacing: 0; }
+.faktum-rettet { color: var(--dempet); font-weight: 500; }
+
 /* Figure sources are links like the card's */
 .figur figcaption .kilde { display: block; margin: 0; font-size: inherit; }
 
@@ -775,3 +794,11 @@ main > .sidehode:first-child { padding-top: 38px; }
   a { text-decoration: none; }
   .kilde a, .fn a { text-decoration: underline; }
 }
+
+/* === Om og bunn: utgiver, redaktør, erklæring (30.10) === */
+.bunn-utgiver { margin: 10px 0 6px; font: 400 0.875rem/1.45 var(--sans); color: var(--dempet); }
+.erklaering-dato { margin: 0 0 18px; font: 400 0.875rem/1.45 var(--sans); color: var(--dempet); }
+.omside .lesetekst h3 { margin: 28px 0 8px; font: 700 1.125rem/1.3 var(--sans); }
+.omside .lesetekst h3:first-of-type { margin-top: 0; }
+.omside .lesetekst ul { padding-left: 1.2em; }
+.omside .lesetekst li { margin: 6px 0; }
