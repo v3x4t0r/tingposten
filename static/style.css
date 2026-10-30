@@ -581,6 +581,13 @@ a:hover { text-decoration-thickness: 2px; }
 
 /* Bakgrunn: the label is the heading; the byline and the drop cap lead */
 @media (min-width: 900px) { .bakgrunn .byline { margin-top: 12px; } }
+/* With its own (fact-checked) headline: "Bakgrunn" becomes the kicker — above it on
+   narrow screens, in the label column beside it like the dateline beside the h1 —
+   and the headline is set in the headline face, between the field labels and the h1. */
+.bakgrunn-tittel { margin: 0; max-width: 20em; font: 700 clamp(1.625rem, 1.35rem + 0.9vw, 2rem)/1.12 var(--didone);
+  letter-spacing: -0.005em; word-spacing: 0.07em; color: var(--blekk); text-wrap: balance; }
+.bakgrunn-med-tittel .byline { margin-top: 12px; }
+@media (max-width: 899px) { .bakgrunn-med-tittel .bakgrunn-etikett { margin-bottom: 12px; } }
 
 /* === Forside, lister, møter (gjennomgang 30.10) === */
 
