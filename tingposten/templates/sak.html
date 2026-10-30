@@ -14,14 +14,14 @@
 {# The kommune's own title as h1 (no card) or a very long one: set quieter. #}
 {% set raa_tittel = not s.har_sammendrag or s.overskrift|length > 90 %}
 <nav class="brodsmule" aria-label="Brødsmuler"><ol>
-  <li><a href="{{ root }}bergen/">Bergen</a></li>
+  <li><a href="{{ root }}bergen/">Forsiden</a></li>
   <li>{% if tema_href %}<a href="{{ tema_href }}">{{ s.tema_navn }}</a>{% else %}{{ s.tema_navn }}{% endif %}</li>
   <li><a href="{{ mote_href }}">{{ s.organ_kort }} {{ s.dato_tekst }}</a></li>
 </ol></nav>
 <article class="sak">
   <header class="sak-topp lag">
     <p class="dateline"><span class="kicker">{% if tema_href %}<a href="{{ tema_href }}"><span class="kicker-tema">{{ s.tema_navn }}</span></a>{% else %}<span class="kicker-tema">{{ s.tema_navn }}</span>{% endif %}</span>
-      <span class="dateline-rad"><a class="dateline-mote" href="{{ mote_href }}"><span class="nb">{{ s.organ_kort }}</span><span class="skille" aria-hidden="true">&nbsp;· </span><span class="nb"><time datetime="{{ s.dato.isoformat() }}">{{ s.dato_tekst }}</time></span></a><span class="skille" aria-hidden="true">&nbsp;· </span><span class="nb">Sak {{ s.nr }}</span>{% if s.status_kode == "valg" %}<span class="skille" aria-hidden="true">&nbsp;· </span><span class="nb">{{ s.status_tekst }}</span>{% endif %}</span></p>
+      <span class="dateline-rad"><a class="dateline-mote" href="{{ mote_href }}"><span class="nb">{{ s.organ_kort }}</span><span class="skille" aria-hidden="true">&nbsp;· </span><span class="nb"><time datetime="{{ s.dato.isoformat() }}">{{ s.dato_tekst }}</time></span></a><span class="skille" aria-hidden="true">&nbsp;· </span><span class="nb">{{ s.nr_etikett }}</span>{% if s.status_kode == "valg" %}<span class="skille" aria-hidden="true">&nbsp;· </span><span class="nb">{{ s.status_tekst }}</span>{% endif %}</span></p>
     <div>
       {% if status %}<p class="sak-status"><span class="faktum-status status-{{ s.status_klasse or 'innstilling' }}"><span class="vh">Status: </span>{{ status.verdi }}</span></p>{% endif %}
       <h1 class="sak-tittel{% if raa_tittel %} sak-tittel-raa{% endif %}">{{ s.overskrift|tittel }}</h1>
@@ -103,7 +103,7 @@
 </article>
 {% if relaterte %}
 <section class="relaterte lag" aria-labelledby="relaterte-tittel">
-  <div class="relaterte-hode"><h2 id="relaterte-tittel">Fra samme møte</h2><p><a class="pil" href="{{ root }}bergen/mote/{{ mote.slug }}/">Alle {{ mote.saker|length }} saker fra møtet</a></p></div>
+  <div class="relaterte-hode"><h2 id="relaterte-tittel">Fra samme møte</h2><p class="andre"><a class="pil" href="{{ root }}bergen/mote/{{ mote.slug }}/">Alle {{ mote.saker|length }} saker fra møtet</a></p></div>
   <ul class="rader">
     {% for r in relaterte %}{{ rad(r, root, med_dek=False) }}{% endfor %}
   </ul>

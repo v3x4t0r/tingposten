@@ -175,7 +175,7 @@ def test_dek_takes_the_field_sources_without_a_checked_sentence():
 def test_key_facts_and_status_pill_come_from_fakta(side):
     page = side(0)
     fakta = re.search(r'<ul class="fakta sak-fakta">(.*?)</ul>', page, re.S).group(1)
-    assert "Hele byen" in fakta and "36–31" in fakta and f"866{NB}mill. kr" in fakta
+    assert "Hele kommunen" in fakta and "36–31" in fakta and f"866{NB}mill. kr" in fakta
     assert "Bakgrunn" not in fakta and "Status" not in fakta
     assert page.index('class="sak-dek"') < page.index("sak-fakta") < page.index('id="kort"')
     assert "faktum-status" not in body(page)  # "Vedtatt" is never a pill

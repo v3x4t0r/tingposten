@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{# Served by the host for any missing path at any depth: every link starts at
+   the site's root path (root is "/", not "../"). #}
+{% block title %}Fant ikke siden · Tingposten{% endblock %}
+{% block description %}Siden finnes ikke på Tingposten.{% endblock %}
+{% block hovedklasse %}omside ikkefunnet{% endblock %}
+{% block main %}
+<header class="sidehode">
+  <h1 class="side-tittel">Vi finner ikke denne siden</h1>
+  <p class="side-ingress">Adressen kan være skrevet feil, eller siden kan ha flyttet. Alle saker ligger under møtet der de ble behandlet.</p>
+</header>
+<nav class="ikkefunnet-lenker" aria-label="Videre">
+  <ul>
+    <li><a class="pil" href="{{ root }}bergen/">Til forsiden</a></li>
+    <li><a class="pil" href="{{ root }}bergen/moter/">Alle møter</a></li>
+    <li><a class="pil" href="{{ root }}om/">Om Tingposten</a></li>
+  </ul>
+</nav>
+{% endblock %}

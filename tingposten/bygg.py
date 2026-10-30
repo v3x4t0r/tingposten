@@ -4,11 +4,14 @@ Reads data/bergen/: agendapunkter/ (metadata), redigert/ (cards after the
 fact-checker and the delete-only editor) and pdf/ (for the score). Writes
 plain HTML to site/: no JavaScript, no external assets, relative links only,
 so the same files work under v3x4t0r.github.io/tingposten/ and at the root
-of tingposten.no. Source links go to Bergen kommune's own PDFs.
+of tingposten.no (404.html is the exception: it links from the site's root
+path, since it's served at any depth). Source links go to Bergen kommune's
+own PDFs.
 
 Laid out like a newspaper: front pages with a lead story, a row of four,
-a two-column list (15 stories in all) and a tile per topic (tema); one page
-per sak with the full card and, for the top saker, a background article.
+a two-column list (15 stories in all) and a tile per topic (tema) with saker
+left over; one page per meeting in agenda order and one page per sak with
+the full card and, for the top saker, a background article.
 Every sentence shown is from the edited card or the edited article; the dek
 is the card's first sentence. The small facts under a story (where, the
 vote, the amount) are mechanical values read off the documents, chosen by
@@ -24,7 +27,7 @@ from collections import defaultdict
 from datetime import date, datetime, time, timedelta, timezone
 from email.utils import format_datetime
 from pathlib import Path
-from urllib.parse import quote, urlencode
+from urllib.parse import quote, urlencode, urlsplit
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 from markupsafe import Markup, escape
@@ -53,10 +56,30 @@ WEEKDAYS = ("mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag", "søn
 SECONDARY = 4       # the row of four under the lead
 LISTE = 10          # "Flere vedtak": the two-column list after the four (1 + 4 + 10 = 15 stories)
 FLIS = 3            # headlines per topic tile ("Alle temaer")
-PANEL_MOTER = 6     # meetings listed in "Perioden i tall" before "og N møter til"
+PANEL_MOTER = 4     # meetings listed in "Perioden i tall" before "og N møter til"
+PANEL_TEMAER = 6    # temaer with a bar in "Perioden i tall" before "og N temaer til"
+STANDARD_ANDEL = 0.5  # the standard meeting holds at least this share of the stories
 RELATED = 6         # "Fra samme møte" on a sak page
+BYSTYRET = "571424"
 # Short organ names for kickers and breadcrumbs.
-ORGAN_KORT = {"571424": "Bystyret", "900101": "Byrådet (innstilling)", "900102": "Byrådet"}
+ORGAN_KORT = {BYSTYRET: "Bystyret", "900101": "Byrådet (innstilling)", "900102": "Byrådet"}
+# The meeting page's outcome line ("26 vedtatt · 3 tatt til orientering …"), in this
+# order. Keys are status codes (status.LABELS); "innstilling_falt" is a sak that was
+# adopted with another proposal than the innstilling, as in fakta().
+UTFALL = (
+    ("vedtatt", "vedtatt"),
+    ("innstilling_falt", "der innstillingen falt"),
+    ("orientering", "tatt til orientering"),
+    ("falt", "der forslaget falt"),
+    ("sendt_tilbake", "sendt tilbake"),
+    ("utsatt", "utsatt"),
+    ("ikke_behandlet", "ikke behandlet"),
+    ("overlevert", "overlevert, behandles senere"),
+    ("valg", "valg og fritak"),
+)
+# Statuses rare and telling enough to be boxed under a story; the rest
+# (under behandling, venter på protokoll, tatt til orientering …) are plain text.
+STATUS_BOKS = ("innstillingen falt", "forslaget falt", "sendt tilbake", "utsatt", "ikke behandlet")
 DOK_NAVN = {"saksframlegg": "Saksframlegg", "protokoll": "Protokoll"}
 DOK_BESTEMT = {"saksframlegg": "saksframlegget", "protokoll": "protokollen"}
 ORD_PER_MINUTT = 200  # reading time of a background article
@@ -97,7 +120,7 @@ ABBREVIATIONS = {"ca", "mill", "mrd", "nr", "kr", "jf", "pkt", "bl.a", "f.eks", 
 # Published explanation of each score signal (plan: "vekter publisert").
 SIGNALS = {
     "belop": ("Beløp", "Penger vedtaket selv binder, på en logaritmisk skala fra 1 million til 1 milliard kroner."),
-    "rekkevidde": ("Rekkevidde", "Hvor stor del av byen saken gjelder: én eiendom, én bydel eller hele byen."),
+    "rekkevidde": ("Rekkevidde", "Hvor stor del av kommunen saken gjelder: én eiendom, én bydel eller hele kommunen."),
     "juridisk_vekt": ("Juridisk vekt", "Planer, budsjett og forskrifter binder i mange år. Valg til verv gjør det ikke."),
     "uenighet": ("Uenighet", "Hvor jevn avstemningen var. 36–31 teller mer enn 60–5."),
     "innstilling_falt": ("Innstillingen falt", "Flertallet stemte ned hele eller deler av forslaget som ble lagt fram."),
@@ -127,7 +150,10 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
         path = tmp / rel
         path.parent.mkdir(parents=True, exist_ok=True)
         depth = len(Path(rel).parts) - 1
-        path.write_text(env.get_template(template).render(root="../" * depth, **ctx))
+        ctx.setdefault("root", "../" * depth)
+        # The page's own address, for <link rel="canonical"> and og:url.
+        ctx.setdefault("sti", rel.removesuffix("index.html"))
+        path.write_text(env.get_template(template).render(**ctx))
         pages += 1
 
     moter = _meetings(saker)
@@ -139,14 +165,16 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
         front = front_page(window)
         write(f"bergen/{slug}index.html", "forside.html", side="forside", visning=slug, periode=label,
               idag_tekst=idag_tekst, **front)
+        # The year's lists are long: month subheads and headlines only.
+        aar = days is None
         write(f"bergen/{slug}alle/index.html", "alle.html", side="alle", visning=slug, periode=label,
-              moter=_meetings(window), antall=len(window))
+              moter=_meetings(window), antall=len(window), aar=aar)
         temaer = tema_counts(window)
         for t in temaer:
             in_tema = [s_ for s_ in window if s_["tema"] == t["tema"]]
             write(f"bergen/{slug}tema/{t['tema']}/index.html", "tema.html", side="tema", visning=slug,
                   periode=label, tema=t["tema"], navn=t["navn"], moter=_meetings(in_tema), antall=len(in_tema),
-                  temaer=[x for x in temaer if x["tema"] != t["tema"]])
+                  temaer=[x for x in temaer if x["tema"] != t["tema"]], aar=aar)
         if slug == "i-ar/":
             # A sak page's breadcrumb links to its tema for the year, when the sak is in it.
             for s_ in window:
@@ -159,12 +187,18 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
         write(s_["side"] + "index.html", "sak.html", side="sak", s=s_, mote=meeting,
               relaterte=related(s_, meeting))
     write("om/index.html", "om.html", side="om", signaler=_weights(), terskel=_terskel())
+    # statichost serves /404.html for a missing path at any depth, so its links
+    # can't be relative: they start at the site's own root path ("/").
+    write("404.html", "404.html", side="404", root=urlsplit(_site_url()).path, sti=None, noindex=True)
     rss = [s_ for s_ in _window(saker, idag, 30)]
     rss.sort(key=lambda x: (x["dato"], x["score"]), reverse=True)
     (tmp / "bergen" / "rss.xml").write_text(env.get_template("rss.xml").render(
         saker=rss, site_url=_site_url(), bygget=_rfc822(idag)))
 
     shutil.copytree(HERE / "static", tmp / "static")
+    # Browsers ask for /favicon.ico whatever the page links to.
+    if (HERE / "static" / "favicon.ico").exists():
+        shutil.copy(HERE / "static" / "favicon.ico", tmp / "favicon.ico")
     (tmp / ".nojekyll").write_text("")
     if getattr(config, "GOATCOUNTER", None) and getattr(config, "GOATCOUNTER_VIA_SIDEN", False):
         # statichost: a 200 rule proxies /count to GoatCounter (query string included).
@@ -209,6 +243,14 @@ def load(data_dir: Path) -> list[dict]:
 
 def _nr(item: dict) -> str:
     return item.get("referansenr") or pdf.tag(item)
+
+
+def nr_etikett(item: dict) -> str:
+    """"Sak 235/26", or "Interpellasjon 28/26": interpellasjoner are numbered
+    in their own series, so "Sak 28/26" would point at another sak."""
+    interpellasjon = item.get("kategori") == "Interpellasjon" or \
+        (item.get("tittel") or "").lower().startswith("interpellasjon")
+    return f"{'Interpellasjon' if interpellasjon else 'Sak'} {_nr(item)}"
 
 
 class _Parsers:
@@ -299,6 +341,7 @@ def _sak(item: dict, ranked: dict, data_dir: Path, parsers: "_Parsers | None" = 
     tema = _tema(item, data_dir)
     sak = {
         "nr": _nr(item),
+        "nr_etikett": nr_etikett(item),
         "tittel": item.get("tittel", ""),
         "overskrift": (card.get("overskrift") if usable else "") or item.get("tittel", ""),
         "organ": config.TIER1.get(uid, item.get("utvalgsNavn", uid)),
@@ -419,9 +462,9 @@ def _sted(s: dict) -> str:
         return f"{by[0]} og {by[1]}"
     if by:
         return f"{len(by)} bydeler"
-    if s["hele_byen"]:
-        return "Hele byen"
-    if s["hele_kommunen"]:
+    # One wording for the whole municipality: the documents say "hele byen" and
+    # "hele kommunen" about the same thing.
+    if s["hele_byen"] or s["hele_kommunen"]:
         return "Hele kommunen"
     return ""
 
@@ -585,13 +628,16 @@ def forste_setning(dek: str) -> str:
 
 
 def front_page(window: list[dict]) -> dict:
-    """Lead, the row of four, the list of ten, one tile per tema, and the rest.
+    """Lead, the row of four, the list of ten, a tile per tema with saker
+    left over, and the rest.
 
     The 15 stories are the fremhevede saker that have a summary, by score;
     when fewer than 15 are over the threshold, the next best saker with a
     summary fill up (a fremhevet sak whose card isn't ready never leads with
     "Sammendrag kommer"). Saker scoring 0 (valg, fritak) are never stories.
-    Each tile shows the tema's best saker not already among the stories.
+    Each tile shows the tema's best saker not already among the stories,
+    those with a summary first. A tema whose saker are all among the stories
+    gets no tile, only a link in one line under the tiles ("ogsa").
     """
     ordered = sorted(window, key=lambda s: (-s["score"], -s["dato"].toordinal(), s["seq"]))
     antall = 1 + SECONDARY + LISTE
@@ -599,51 +645,105 @@ def front_page(window: list[dict]) -> dict:
     stories += [s for s in ordered if s["score"] > 0 and s["har_sammendrag"] and s not in stories][:antall - len(stories)]
     if not stories:
         stories = ordered[:1]
+    shown = {id(s) for s in stories}
     moter = _meetings(window)
-    standard = standard_mote(moter)
-    temaer = sorted(tema_counts(window), key=lambda t: -t["antall"])
-    fliser, i_fliser = [], 0
+    standard = standard_mote(stories, moter)
+    temaer = tema_counts(window)
+    fliser, ogsa, i_fliser = [], [], 0
     for t in temaer:
-        rest = [s for s in ordered if s["tema"] == t["tema"] and s not in stories][:FLIS]
-        i_fliser += len(rest)
-        fliser.append({**t, "saker": rest})
+        rest = [s for s in ordered if s["tema"] == t["tema"] and id(s) not in shown]
+        rest.sort(key=lambda s: not s["har_sammendrag"])  # stable: by score within each group
+        if rest:
+            fliser.append({**t, "saker": rest[:FLIS]})
+            i_fliser += len(rest[:FLIS])
+        else:
+            ogsa.append(t)
     return {
         "lead": stories[0] if stories else None,
         "sekundaer": stories[1:1 + SECONDARY],
         "liste": stories[1 + SECONDARY:],
         "fliser": fliser,
+        "ogsa": ogsa,
         "temaer": temaer,
+        # Without tiles there's nothing to point "og N temaer til" at: show every bar.
+        "panel_temaer": _kapp(temaer, PANEL_TEMAER) if fliser else temaer,
         "standard": standard,
         "moter": moter,
-        "panel_moter": panel_moter(moter, standard),
+        "panel_moter": panel_moter(moter),
         "andre": len(window) - len(stories) - i_fliser,
         "antall": len(window),
     }
 
 
-def standard_mote(moter: list[dict]) -> dict | None:
-    """The meeting most of the period's saker come from (the latest on a tie).
-    Stories from it don't repeat organ and date; the front page says so once."""
-    return max(moter, key=lambda m: len(m["saker"]), default=None)
+def _kapp(items: list, maks: int) -> list:
+    """The first `maks`, but never cut a single one off: "og 1 til" takes the
+    room the last one would."""
+    return items if len(items) <= maks + 1 else items[:maks]
 
 
-def panel_moter(moter: list[dict], standard: dict | None) -> list[dict]:
-    """Meetings for "Perioden i tall": the standard meeting first, then the
-    biggest others, listed by organ and date."""
-    if not moter:
-        return []
-    others = sorted((m for m in moter if m is not standard), key=lambda m: (-len(m["saker"]), -m["dato"].toordinal()))
-    picked = others[:PANEL_MOTER - 1]
-    picked.sort(key=lambda m: (m["organ_kort"], m["dato"]))
-    return [standard, *picked]
+def standard_mote(stories: list[dict], moter: list[dict]) -> dict | None:
+    """The meeting at least half of the shown stories come from (the latest on
+    a tie), or None. Stories from it don't repeat organ and date; the front
+    page says so once ("Fra bystyret … der ikke annet står")."""
+    if not stories:
+        return None
+    counts = defaultdict(int)
+    for s in stories:
+        counts[s["mote"]] += 1
+    best = max(moter, key=lambda m: (counts[m["slug"]], m["dato"]), default=None)
+    if best is None or counts[best["slug"]] < STANDARD_ANDEL * len(stories):
+        return None
+    return best
+
+
+def panel_moter(moter: list[dict]) -> list[dict]:
+    """Meetings for "Perioden i tall": the newest first (bystyret before byrådet
+    on the same day), at most PANEL_MOTER, then "og N møter til"."""
+    return _kapp(moter, PANEL_MOTER)
 
 
 def tema_counts(saker: list[dict]) -> list[dict]:
-    """Every tema present, with its number of saker, in TEMA order."""
+    """Every tema present, with its number of saker: the biggest first, "Annet" always last."""
     counts = defaultdict(int)
     for s in saker:
         counts[s["tema"]] += 1
-    return [{"tema": t, "navn": TEMA[t], "antall": counts[t]} for t in TEMA if counts[t]]
+    temaer = [{"tema": t, "navn": TEMA[t], "antall": counts[t]} for t in TEMA if counts[t]]
+    return sorted(temaer, key=lambda t: (t["tema"] == "annet", -t["antall"]))
+
+
+def utfall(saker: list[dict]) -> list[str]:
+    """The meeting page's outcome line, from the statuses the stories show:
+    "26 vedtatt", "3 tatt til orientering", … then "8 med bakgrunnsartikkel"
+    and "2 uten sammendrag ennå". A status without a label (outcome unknown)
+    isn't counted; a label this list doesn't know is counted under its own name."""
+    kode_for = {tekst: kode for kode, tekst in status_mod.LABELS.items()}
+    frase_for = dict(UTFALL)
+    order = list(frase_for.values())
+    counts: dict[str, int] = defaultdict(int)
+    for s in saker:
+        tekst = s.get("status_tekst") or ""
+        kode = kode_for.get(tekst)
+        if kode == "vedtatt" and s.get("innstilling_falt"):
+            kode = "innstilling_falt"
+        if kode in frase_for:
+            counts[frase_for[kode]] += 1
+        elif tekst:
+            counts[tekst.split(" – ")[0].lower()] += 1
+    out = [f"{counts[f]} {f}" for f in sorted(counts, key=lambda f: order.index(f) if f in order else len(order))]
+    if n := sum(1 for s in saker if s.get("har_artikkel")):
+        out.append(f"{n} med bakgrunnsartikkel")
+    if n := sum(1 for s in saker if not s.get("har_sammendrag")):
+        out.append(f"{n} uten sammendrag ennå")
+    return out
+
+
+def er_valg(s: dict) -> bool:
+    """Valg, fritak, nyvalg: grouped compactly at the end of a meeting page."""
+    return s.get("status_tekst") == status_mod.LABELS.get("valg") or bool(status_mod.VALG.search(s.get("tittel", "")))
+
+
+def status_boks(tekst: str) -> bool:
+    return (tekst or "").lower().startswith(STATUS_BOKS)
 
 
 def related(sak: dict, meeting: dict) -> list[dict]:
@@ -684,18 +784,23 @@ def _meetings(saker: list[dict]) -> list[dict]:
     for slug, items in groups.items():
         items.sort(key=lambda s: s["seq"])
         first = items[0]
+        bystyret = slug.startswith(f"{BYSTYRET}-")
         moter.append({
             "slug": slug,
             "organ": first["organ"],
             "organ_kort": first["organ_kort"],
+            "bystyret": bystyret,
             "dato": first["dato"],
             "dato_tekst": first["dato_tekst"],
             "saker": items,
             "fremhevet": sum(s["fremhevet"] for s in items),
             "maned": f"{MONTHS[first['dato'].month - 1].capitalize()} {first['dato'].year}",
             "maned_nr": first["dato"].strftime("%Y-%m"),
+            # Held, but the protokoll isn't out: nothing is known about the outcome.
+            "venter_protokoll": all(s.get("venter_protokoll") for s in items),
         })
-    moter.sort(key=lambda m: (m["dato"], m["organ"]), reverse=True)
+    # Newest first; on the same day bystyret before byrådet.
+    moter.sort(key=lambda m: (m["dato"], m["bystyret"], m["organ"]), reverse=True)
     return moter
 
 
@@ -805,6 +910,12 @@ def _env() -> Environment:
     env.filters["kildegrupper"] = kildegrupper
     env.filters["forste_setning"] = forste_setning_html
     env.filters["typo"] = typo
+    env.filters["ukedag"] = lambda d: WEEKDAYS[d.weekday()]
+    env.globals["utfall"] = utfall
+    env.globals["er_valg"] = er_valg
+    env.globals["status_boks"] = status_boks
+    env.tests["status_boks"] = status_boks
+    env.globals["site_url"] = _site_url()
     env.globals["repo"] = config.REPO
     env.globals["figur"] = figur
     env.globals["artikkel_dokumenter"] = artikkel_dokumenter

@@ -1,20 +1,42 @@
 {% extends "base.html" %}
 {% from "macros.html" import rad %}
 {% block title %}{{ mote.organ_kort }} {{ mote.dato_tekst }} · Tingposten{% endblock %}
-{% block description %}Alle saker {{ mote.organ_kort|lower }} avgjorde {{ mote.dato_tekst }}.{% endblock %}
-{% block hovedklasse %}listeside{% endblock %}
+{% block description %}{% if mote.venter_protokoll %}Sakene som sto på sakslisten da {{ mote.organ_kort|lower }} møttes {{ mote.dato_tekst }}. Kommunen har ikke lagt ut protokollen ennå.{% else %}Alle sakene {{ mote.organ_kort|lower }} behandlet {{ mote.dato_tekst }}, i samme rekkefølge som i møtet.{% endif %}{% endblock %}
+{% block hovedklasse %}listeside moteside{% endblock %}
 {% block main %}
+{# Agenda order; valg and fritak grouped compactly at the end. #}
+{% set ns = namespace(saker=[], valg=[]) %}
+{% for s in mote.saker %}{% if er_valg(s) %}{% set ns.valg = ns.valg + [s] %}{% else %}{% set ns.saker = ns.saker + [s] %}{% endif %}{% endfor %}
 <nav class="brodsmule" aria-label="Brødsmuler"><ol>
-  <li><a href="{{ root }}bergen/">Bergen</a></li>
+  <li><a href="{{ root }}bergen/">Forsiden</a></li>
   <li><a href="{{ root }}bergen/moter/">Møter</a></li>
   <li>{{ mote.organ_kort }} {{ mote.dato_tekst }}</li>
 </ol></nav>
 <header class="sidehode">
   <p class="kicker"><span class="kicker-tema">Møte</span><span class="kicker-del">{{ mote.organ }}</span></p>
   <h1 class="side-tittel">{{ mote.organ_kort }} <time datetime="{{ mote.dato.isoformat() }}">{{ mote.dato_tekst }}</time></h1>
-  <p class="side-ingress">{{ mote.saker|length }} {{ "sak" if mote.saker|length == 1 else "saker" }}. Sakene står i samme rekkefølge som i møtet.</p>
+  {% if mote.venter_protokoll %}
+  <p class="side-ingress">Kommunen har ikke lagt ut protokollen fra møtet ennå, så vi vet ikke hva som ble vedtatt. Her er sakene som sto på sakslisten. Sammendragene kommer når protokollen er ute.</p>
+  {% else %}
+  <p class="side-ingress">{{ mote.saker|length }} {{ "sak" if mote.saker|length == 1 else "saker" }}, i samme rekkefølge som i møtet.</p>
+  {% set linje = utfall(mote.saker) %}
+  {% if linje %}<p class="utfall"><span class="vh">Utfall: </span>{% for u in linje %}<span class="nb">{{ u }}</span>{% if not loop.last %}<span class="vh">,</span> {% endif %}{% endfor %}</p>{% endif %}
+  {% endif %}
 </header>
-<ol class="rader rader-mote">
-  {% for s in mote.saker %}{{ rad(s, root, nr=True) }}{% endfor %}
-</ol>
+{% if ns.saker %}
+<section class="motedel" aria-labelledby="sakene">
+  <h2 class="etikett etikett-strek" id="sakene">{{ "Sakslisten" if mote.venter_protokoll else "Sakene" }}</h2>
+  <ol class="rader rader-mote">
+    {% for s in ns.saker %}{{ rad(s, root, nr=True, nr_kolonne=True, uten=(("status",) if mote.venter_protokoll else ())) }}{% endfor %}
+  </ol>
+</section>
+{% endif %}
+{% if ns.valg %}
+<section class="motedel" aria-labelledby="valg">
+  <h2 class="etikett etikett-strek" id="valg">Valg og fritak</h2>
+  <ol class="valgliste">
+    {% for s in ns.valg %}<li class="blokk"><p class="rad-nr">{{ s.nr_etikett }}</p><h3 class="valg-tittel{% if not s.har_sammendrag %} raatittel{% endif %}"><a class="blokklenke" href="{{ root }}{{ s.side }}">{{ s.overskrift|tittel }}</a></h3></li>{% endfor %}
+  </ol>
+</section>
+{% endif %}
 {% endblock %}

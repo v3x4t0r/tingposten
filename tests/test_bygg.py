@@ -155,15 +155,20 @@ def test_every_sak_has_a_page(site):
 
 def test_links_resolve_are_relative_and_never_nested(site):
     site, _ = site
+    root_path = bygg.urlsplit(bygg._site_url()).path
     for page in sorted(site.rglob("*.html")):
         p = Links()
         p.feed(page.read_text())
         assert p.nested == 0, page.relative_to(site)
+        # 404.html is served at any depth: its links start at the site's root path instead.
+        absolute = page == site / "404.html"
         for ref in p.refs:
-            assert not ref.startswith("/"), (page, ref)
             if re.match(r"^[a-z]+:", ref) or ref.startswith("#"):
                 continue
-            target = (page.parent / ref.split("#")[0]).resolve()
+            assert ref.startswith(root_path) if absolute else not ref.startswith("/"), (page, ref)
+            if absolute:
+                ref = ref[len(root_path):]
+            target = ((site if absolute else page.parent) / ref.split("#")[0]).resolve()
             if ref.split("#")[0].endswith("/") or target.is_dir():
                 target = target / "index.html"
             assert target.exists(), (page.relative_to(site), ref)
@@ -303,7 +308,9 @@ def test_figures(monkeypatch, tmp_path, data_dir):
     # the lead has key figures, no figure; the row of four shows the map as a small locator
     assert "<figure" not in lead_html(forside) and "tp-figur" not in lead_html(forside)
     sek = re.findall(r'<article class="blokk sek">(.*?)</article>', forside, re.S)[0]
-    assert 'class="minikart"' in sek and "OpenStreetMap" in sek and 'aria-hidden="true"' in sek
+    assert 'class="minikart"' in sek and 'aria-hidden="true"' in sek
+    fire = re.search(r'<section class="fire.*?</section>', forside, re.S).group(0)
+    assert fire.count("OpenStreetMap") == 1 and "OpenStreetMap" not in sek  # one credit under the row
     # no figures for an avvist card
     assert "<figure" not in sak_page(site, "241/26").read_text()
     ids = re.findall(r'id="(tpf-[^"]+)"', forside)
@@ -352,16 +359,17 @@ def test_meld_feil_template(monkeypatch):
 def test_tema_tiles_pages_and_breadcrumb(site):
     site, _ = site
     forside = (site / "bergen/index.html").read_text()
-    # one tile per tema, the biggest first: annet (3) before okonomi (1)
-    assert forside.index('id="tema-annet"') < forside.index('id="tema-okonomi"')
+    # a tile only for a tema with saker left over: annet; okonomi's one sak (240) is a story
+    assert 'id="tema-annet"' in forside and 'id="tema-okonomi"' not in forside
     assert "Flere vedtak" not in forside  # only 3 stories, so no list after the four
     annet = re.search(r'id="tema-annet".*?</section>', forside, re.S).group(0)
-    assert 'href="../bergen/tema/annet/">Alle 3<' in annet
+    assert 'href="../bergen/tema/annet/">Alle 3 vedtak<' in annet  # the count link at the tile's foot
     assert "Klarsignal" not in annet  # the lead isn't repeated in its tile
-    okonomi = re.search(r'id="tema-okonomi".*?</section>', forside, re.S).group(0)
-    assert "Vedtaket i temaet står lenger opp på siden." in okonomi  # 240 is a story
-    # "Perioden i tall": the tema bars link to the tiles
-    assert 'href="#tema-okonomi"' in forside
+    ogsa = re.search(r'<p class="ogsa">.*?</p>', forside, re.S).group(0)
+    assert "Også i perioden:" in ogsa and 'href="../bergen/tema/okonomi/">Økonomi</a>' in ogsa
+    # "Perioden i tall": the tema bars link to the tema pages, never to anchors on the page
+    assert 'href="../bergen/tema/okonomi/"><span class="stolpe-navn">' in forside
+    assert 'href="#tema-' not in forside
     page = (site / "bergen/tema/okonomi/index.html").read_text()
     assert '<h1 class="side-tittel">Økonomi</h1>' in page and "Bofellesskapet blir dyrere" in page and "Andre temaer" in page
     assert (site / "bergen/i-ar/tema/annet/index.html").exists() and (site / "bergen/30-dager/tema/skole/index.html").exists()
@@ -389,7 +397,7 @@ def test_article_rendering_and_cue(site):
     assert "AVVIST ARTIKKEL" not in sak_page(site, "239/26").read_text()
     assert 'id="bakgrunn"' not in sak_page(site, "240/26").read_text()
     forside = (site / "bergen/index.html").read_text()
-    assert "Ca. 1 min lesing" in lead_html(forside)
+    assert "min lesing" not in lead_html(forside) and "faktum-bakgrunn" in lead_html(forside)
     sek = re.search(r'<article class="blokk sek">(.*?)</article>', forside, re.S).group(1)
     assert "Bakgrunn" not in sek
 
@@ -441,7 +449,8 @@ def test_fakta_never_say_vedtatt_and_keep_a_fixed_order():
 def test_fakta_place_vote_and_amount_rules():
     assert facts(bydeler=["Arna", "Fana"]) == [("sted", "Arna og Fana")]
     assert facts(bydeler=["Arna", "Fana", "Åsane"], hele_byen=True) == [("sted", "3 bydeler")]
-    assert facts(hele_byen=True, hele_kommunen=True) == [("sted", "Hele byen")]
+    assert facts(hele_byen=True, hele_kommunen=True) == [("sted", "Hele kommunen")]
+    assert facts(hele_byen=True) == [("sted", "Hele kommunen")]
     assert facts(hele_kommunen=True) == [("sted", "Hele kommunen")]
     # a lopsided vote isn't shown; then the number of proposals that fell, from two
     assert facts(stemmer={"for": 60, "mot": 7, "jevn": False}, forslag_falt=3) == [("falt", "3")]
@@ -493,9 +502,10 @@ def test_front_page_fills_to_15_stories():
     assert [s["nr"] for s in stories[:5]] == ["0/26", "1/26", "2/26", "3/26", "4/26"]  # over the threshold first
     assert [s["score"] for s in stories[5:]] == sorted((s["score"] for s in stories[5:]), reverse=True)
     assert all(s["har_sammendrag"] and s["score"] > 0 for s in stories)
-    # the rest go to the tiles (3 per tema) and the "andre" count
+    # the rest go to the tiles (3 per tema) and the "andre" count; in a tile the
+    # saker with a summary come first, a high score without a card only after them
     assert len(front["fliser"]) == 1 and len(front["fliser"][0]["saker"]) == 3
-    assert front["fliser"][0]["saker"][0]["nr"] == "40/26"  # high score, no card: in its tile
+    assert [s["nr"] for s in front["fliser"][0]["saker"]] == ["20/26", "21/26", "22/26"]
     assert front["andre"] == len(window) - 15 - 3
 
 
@@ -503,8 +513,8 @@ def test_front_page_with_few_saker_and_standard_meeting():
     window = [fake_sak(1, 70), fake_sak(2, 10), fake_sak(3, 50, mote=f"{BYSTYRET}-2026-09-30")]
     front = bygg.front_page(window)
     assert [s["nr"] for s in [front["lead"], *front["sekundaer"]]] == ["1/26", "3/26", "2/26"] and front["liste"] == []
-    assert front["standard"]["slug"] == f"{BYSTYRET}-2026-09-23"  # most saker come from it
-    assert [m["slug"] for m in front["panel_moter"]][0] == front["standard"]["slug"]
+    assert front["standard"]["slug"] == f"{BYSTYRET}-2026-09-23"  # 2 of the 3 stories come from it
+    assert [m["slug"] for m in front["panel_moter"]] == [f"{BYSTYRET}-2026-09-30", f"{BYSTYRET}-2026-09-23"]  # newest first
     assert bygg.front_page([])["lead"] is None
 
 
@@ -521,8 +531,9 @@ def test_organ_and_date_only_off_the_standard_meeting(monkeypatch, tmp_path, dat
     assert "Fra bystyret 23. september 2026 der ikke annet står" in forside
     sek = {re.search(r'<h3 class="sek-tittel"><a[^>]*>([^<]+)<', b).group(1): b
            for b in re.findall(r'<article class="blokk sek">(.*?)</article>', forside, re.S)}
-    assert '<span class="kicker-del">Bystyret, <time datetime="2026-09-30">30. sep.</time></span>' in sek["Ekstra sak fra et annet møte"]
-    assert "kicker-del" not in sek["Skolen rehabiliteres"]
+    assert '<li class="faktum faktum-mote"><span>Bystyret, <time datetime="2026-09-30">30. sep.</time></span></li>' in sek["Ekstra sak fra et annet møte"]
+    assert "kicker-del" not in sek["Ekstra sak fra et annet møte"]  # the kicker is the tema alone
+    assert "faktum-mote" not in sek["Skolen rehabiliteres"]
     # the lead always says where and when
     assert '<span class="kicker-del">Bystyret, <time datetime="2026-09-23">23. september</time></span>' in lead_html(forside)
 

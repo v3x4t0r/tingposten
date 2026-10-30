@@ -54,7 +54,7 @@
     --dempet: #a9a69d;
     --linje: #34332f;
     --linje-2: #504e48;
-    --sterk: #ecebe5;
+    --sterk: #c8c5bc;  /* softer than the text: 3 px rules glare in full white */
     --lenke: #9cc3ec;
     --fokus: #f0b85a;
     --stolpe: #cfccc3;
@@ -109,7 +109,7 @@ a:hover { text-decoration-thickness: 2px; }
 .etikett-strek { padding-top: 9px; border-top: 3px solid var(--sterk); }
 
 /* Libre Bodoni sets a narrow word space; open it a little in every headline */
-.lead-tittel, .sek-tittel, .rad-tittel, .sak-tittel, .bakgrunn-tittel, .seksjon-hode h2, .temaer-hode h2,
+.lead-tittel, .sek-tittel, .rad-tittel, .sak-tittel, .seksjon-hode h2, .temaer-hode h2,
 .flis-hode h3, .relaterte-hode h2, .andre-lenke, .nokkeltall dd { word-spacing: 0.07em; }
 
 /* ---------- Masthead ---------- */
@@ -161,7 +161,7 @@ a:hover { text-decoration-thickness: 2px; }
 .faner a { color: var(--dempet); text-decoration: none; padding: 4px 0; }
 .faner a:hover { color: var(--blekk); text-decoration: underline; }
 .faner a[aria-current="page"] { color: var(--blekk); font-weight: 700; box-shadow: inset 0 -2px 0 var(--sterk); }
-.periode-merk { margin: 0; font: italic 400 0.9375rem/1.4 var(--serif); color: var(--dempet); }
+.periode-merk { margin: 0; font: italic 400 1rem/1.4 var(--didone); color: var(--dempet); }
 
 /* ---------- Story blocks: the headline is the one link, the block is clickable ---------- */
 .blokk { position: relative; min-width: 0; }
@@ -175,8 +175,9 @@ a:hover { text-decoration-thickness: 2px; }
 .fakta { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; font: 500 0.8125rem/1.35 var(--sans); color: var(--dempet); }
 .faktum { display: inline-flex; align-items: center; gap: 6px; }
 .faktum .ikon { width: 14px; height: 14px; }
-.faktum-status { color: var(--blekk); font-weight: 600; padding: 1px 7px 2px; border: 1px solid var(--linje-2); border-radius: 2px; }
-.faktum-bakgrunn { color: var(--blekk); font-weight: 600; }
+.faktum-status { color: var(--blekk-2); font-weight: 600; padding: 0 6px 1px; border: 1px solid var(--linje-2); border-radius: 2px; }
+.faktum-statustekst { color: var(--blekk-2); }
+.faktum-bakgrunn { color: var(--dempet); font-weight: 500; }
 
 /* Mini map: the same SVG as a locator, bydel name beside it */
 .minikart { display: flex; align-items: center; gap: 12px; margin: 0; }
@@ -214,16 +215,13 @@ a:hover { text-decoration-thickness: 2px; }
   .toppsone { display: contents; }
   .lead { order: 1; padding: 24px 0 28px; border-bottom: 1px solid var(--sterk); }
   .fire { order: 2; }
-  .periode { order: 3; margin: 30px 0 6px; }
-  .flere { order: 4; }
+  .flere { order: 3; }
+  .periode { order: 4; margin: 30px 0 6px; }
   .temaer { order: 5; }
   .andre { order: 6; }
 }
 @media (min-width: 960px) {
   .toppsone { grid-template-columns: minmax(0, 1fr) 316px; column-gap: 52px; padding-top: 30px; padding-bottom: 32px; }
-  .lead .nokkeltall { margin-top: auto; }
-  .lead-dek, .lead-felt { margin-bottom: 1.7rem; }
-  .lead-dek:has(+ .lead-felt), .lead-felt:has(+ .lead-felt) { margin-bottom: 0; }
 }
 
 .periode { font-family: var(--sans); border-top: 3px solid var(--sterk); padding-top: 9px; }
@@ -311,7 +309,7 @@ a:hover { text-decoration-thickness: 2px; }
 .flis > ul > li:first-child { border-top: 0; padding-top: 4px; }
 .flis-tittel { margin: 0; font: 600 1rem/1.3 var(--serif); }
 .flis .fakta { margin-top: 5px; font-size: 0.75rem; }
-.flis-tom { margin: 4px 0 0; font: italic 400 0.9375rem/1.45 var(--serif); color: var(--dempet); }
+.flis-tom { margin: 4px 0 0; font: 400 0.9375rem/1.45 var(--serif); color: var(--dempet); }
 .mer { margin: auto 0 0; font: 600 0.8125rem/1.3 var(--sans); }
 @media (min-width: 620px) {
   .fliser { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -473,8 +471,8 @@ a:hover { text-decoration-thickness: 2px; }
 .relaterte .rad:nth-child(-n+2) { border-top-color: var(--linje); }
 
 /* ---------- Additions for the rest of the site (same family as D) ---------- */
-.tomt { margin: 32px 0 40px; font: italic 400 1.125rem/1.5 var(--serif); color: var(--dempet); }
-.kommer { font-style: italic; color: var(--dempet); }
+.tomt { margin: 32px 0 40px; font: 400 1.125rem/1.5 var(--serif); color: var(--dempet); }
+.kommer { color: var(--dempet); }
 .fire-1, .fire-2, .fire-3 { border-bottom: 1px solid var(--linje); }
 @media (min-width: 1040px) {
   .fire-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -534,7 +532,7 @@ a:hover { text-decoration-thickness: 2px; }
 .tabellramme th, .tabellramme td { padding: 8px 12px 8px 0; border-top: 1px solid var(--linje); text-align: left; vertical-align: top; }
 .tabellramme thead th { border-top: 1px solid var(--sterk); font-weight: 600; color: var(--dempet); }
 .tabellramme tbody th { font-weight: 600; }
-.tabellramme td:nth-child(2), .tabellramme td:nth-child(3) { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tabellramme td:nth-child(2) { white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 /* Landing */
 .intro { padding: 48px 0 64px; text-align: center; }
@@ -583,3 +581,190 @@ a:hover { text-decoration-thickness: 2px; }
 
 /* Bakgrunn: the label is the heading; the byline and the drop cap lead */
 @media (min-width: 900px) { .bakgrunn .byline { margin-top: 12px; } }
+
+/* === Forside, lister, møter (gjennomgang 30.10) === */
+
+/* Short pages: the footer sits at the bottom of the window */
+body { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+body > main { flex: 1 0 auto; width: 100%; }
+body > header, body > footer, body > nav { width: 100%; }
+
+/* Footer: the double rule inside the frame, like the masthead's */
+.bunn { border-top: 0; padding: 0 var(--gutter) 48px; }
+.bunn-innhold { border-top: 3px double var(--sterk); padding-top: 26px; }
+
+/* Navigation in ink with a light underline; blue is for links in running text and sources */
+.bunn-lenker a, .andre a, .flis-fot a, .stolper-mer a, .moteliste .moteliste-mer a, .ogsa a,
+.andre-temaer a, .intro-lenke a, .ikkefunnet-lenker a, .moterader a {
+  color: var(--blekk); text-decoration-color: var(--linje-2); text-decoration-thickness: 1px;
+}
+.bunn-lenker a:hover, .andre a:hover, .flis-fot a:hover, .stolper-mer a:hover, .moteliste .moteliste-mer a:hover,
+.ogsa a:hover, .andre-temaer a:hover, .intro-lenke a:hover, .ikkefunnet-lenker a:hover, .moterader a:hover {
+  text-decoration-color: currentColor;
+}
+.meny a[aria-current="true"] { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 0.45em; }
+.meny-smal a[aria-current] { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 0.4em; }
+
+/* A sak without a card shows the kommune's own title: a plain line, not a headline */
+.lead-tittel.raatittel, .sek-tittel.raatittel, .rad-tittel.raatittel, .flis-tittel.raatittel, .valg-tittel.raatittel {
+  font: 400 1.0625rem/1.45 var(--serif); letter-spacing: 0; word-spacing: normal; color: var(--blekk-2); text-wrap: pretty;
+}
+.lead-tittel.raatittel { font-size: 1.25rem; }
+.rad-tittel.raatittel { max-width: 46em; }
+
+/* Lead: the filler fields only beside the panel; the Bakgrunn cue under the key figures */
+@media (max-width: 959px) { .lead-felt { display: none; } }
+.lead-fakta { margin-top: 14px; }
+
+/* "Perioden i tall" */
+.periode .moteliste { margin-top: 0; }
+.stolper-mer { margin: 6px 0 0; font: 600 0.8125rem/1.3 var(--sans); }
+@media (min-width: 620px) and (max-width: 959px) {
+  /* Two columns, so names stay near their numbers: meetings | temaer */
+  .periode { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 44px;
+             grid-template-areas: "h h" "tall temaer" "moter temaer"; align-items: start; }
+  .periode > h2 { grid-area: h; }
+  .periode-tall { grid-area: tall; }
+  .periode-moter { grid-area: moter; }
+  .periode-temaer { grid-area: temaer; }
+  .periode-temaer .etikett-liten { margin-top: 16px; }
+}
+
+/* The row of four: kickers are one line, facts start at the top, one map credit */
+.sek .fakta { align-content: flex-start; }
+.fire-kilde { grid-column: 1 / -1; margin: 0; padding: 0 0 14px; font: 400 0.6875rem/1.35 var(--sans); color: var(--dempet); }
+
+/* "Flere vedtak": the heading on top like "Alle temaer"; each story a column, white space below */
+.flere { display: block; }
+.flere .seksjon-hode { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 24px; margin: 0 0 18px; }
+.flere .seksjon-hode p { margin: 0; }
+@media (min-width: 700px) {
+  .forside .rad, .listeside .rad { display: flex; grid-row: auto; }
+  .forside .rad .fakta, .listeside .rad .fakta { align-self: auto; }
+}
+.forside .rad .fakta:empty, .listeside .rad .fakta:empty { display: none; }
+/* No tiles: the list's own rule closes the page, not a second one */
+@media (min-width: 960px) { .flere + .andre { margin-top: 0; border-top: 0; } }
+/* Narrow: "Perioden i tall" follows the list with its own thick rule */
+@media (max-width: 959px) { .flere { border-bottom: 0; padding-bottom: 0; } }
+
+/* Tiles: the count link at the foot; a wide last tile lists in columns */
+.flis-fot { margin: auto 0 0; padding-top: 10px; font: 600 0.8125rem/1.3 var(--sans); }
+.flis > ul + .flis-fot { border-top: 1px solid var(--linje); }
+@media (min-width: 620px) and (max-width: 1039px) {
+  .flis:last-child:nth-child(odd) > ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; }
+  .flis:last-child:nth-child(odd) > ul > li:nth-child(-n+2) { border-top: 0; padding-top: 4px; }
+}
+@media (min-width: 1040px) {
+  .flis:nth-child(4n+1):last-child > ul { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 32px; }
+  .flis:nth-child(4n+1):last-child > ul > li:nth-child(-n+3) { border-top: 0; padding-top: 4px; }
+  .flis:nth-child(4n+1):nth-last-child(2) > ul, .flis:nth-child(4n+1):nth-last-child(2) + .flis > ul,
+  .flis:nth-child(4n+1):nth-last-child(3) > ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 28px; }
+  .flis:nth-child(4n+1):nth-last-child(2) > ul > li:nth-child(-n+2), .flis:nth-child(4n+1):nth-last-child(2) + .flis > ul > li:nth-child(-n+2),
+  .flis:nth-child(4n+1):nth-last-child(3) > ul > li:nth-child(-n+2) { border-top: 0; padding-top: 4px; }
+}
+/* Temaer whose saker are all among the stories: one quiet line */
+.ogsa { margin: 26px 0 0; padding-top: 10px; border-top: 1px solid var(--linje); font: 400 0.875rem/1.7 var(--sans); color: var(--dempet); }
+.ogsa-etikett { font-weight: 600; color: var(--blekk-2); }
+.ogsa .antall { font-variant-numeric: tabular-nums; }
+/* separators drawn by CSS (decorative); the markup has a hidden comma for screen readers */
+.ogsa .nb:not(:last-child)::after, .utfall .nb:not(:last-child)::after { content: "·"; margin-left: 0.5em; color: var(--linje-2); }
+
+/* Meeting page: one column in agenda order, the sak number in the label column */
+.utfall { margin: 0.75rem 0 0; max-width: 52em; font: 500 0.875rem/1.65 var(--sans); color: var(--blekk-2); }
+.motedel { padding: 22px 0 8px; }
+.motedel > h2 { margin-bottom: 2px; }
+.rader.rader-mote { margin: 0; grid-template-columns: minmax(0, 1fr); }
+.rader-mote .rad, .rader-mote .rad:nth-child(-n+2) { border-top: 1px solid var(--linje); }
+.rader-mote .rad:first-child { border-top: 0; }
+.rad-nr { margin: 0; font: 500 0.8125rem/1.35 var(--sans); color: var(--dempet); font-variant-numeric: tabular-nums; }
+@media (max-width: 899px) { .rad-lag > .rad-nr { display: none; } }
+@media (min-width: 900px) {
+  .forside .rad.rad-lag, .listeside .rad.rad-lag { display: grid; grid-template-columns: var(--etikett) minmax(0, 1fr); column-gap: var(--spalt); }
+  .rad-lag > .rad-nr { padding-top: 1px; }
+  .rad-lag .kicker-nr { display: none; }
+  .rad-innhold { display: flex; flex-direction: column; min-width: 0; }
+}
+.valgliste { list-style: none; margin: 0; padding: 0; }
+.valgliste li { padding: 9px 0 10px; border-top: 1px solid var(--linje); }
+.valgliste li:first-child { border-top: 0; }
+.valg-tittel { margin: 0; font: 600 1rem/1.35 var(--serif); }
+@media (min-width: 900px) {
+  .valgliste li { display: grid; grid-template-columns: var(--etikett) minmax(0, 1fr); column-gap: var(--spalt); align-items: baseline; }
+}
+
+/* List pages (alle, tema): one column in meeting order; the year by month, headlines only */
+@media (min-width: 700px) {
+  .rader.rader-en { grid-template-columns: minmax(0, 1fr); }
+  .listeside .rader-en .rad:nth-child(2) { border-top-color: var(--linje); }
+}
+@media (max-width: 959px) { .listeside .rader-en .rad:first-child { border-top: 0; } }
+.seksjon-hode h3 { margin: 0; font: 700 1.375rem/1.15 var(--didone); word-spacing: 0.07em; }
+.seksjon-hode h3 a { color: var(--blekk); text-decoration-color: var(--linje-2); text-decoration-thickness: 1px; text-underline-offset: 0.16em; }
+.seksjon-hode h3 a:hover { text-decoration-color: currentColor; text-decoration-thickness: 2px; }
+.maned-tittel { margin: 0; padding: 30px 0 2px; font: 700 clamp(1.75rem, 1.4rem + 1.2vw, 2.25rem)/1.1 var(--didone); word-spacing: 0.07em; }
+/* The year's index: number | headline | tema on one line; stacked on narrow screens */
+.indeks { list-style: none; margin: 0; padding: 0; }
+.indeksrad { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; padding: 9px 0 10px; border-top: 1px solid var(--linje); }
+.indeksrad:first-child { border-top: 0; }
+.indeks-nr, .indeks-meta { margin: 0; font: 500 0.75rem/1.35 var(--sans); color: var(--dempet); font-variant-numeric: tabular-nums; }
+.indeks-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.indeks-nr + .indeks-tittel + .indeks-meta { order: 1; }
+.indeks-nr + .indeks-tittel + .indeks-meta::before { content: "·"; color: var(--linje-2); }
+.indeks-tittel { order: 2; flex-basis: 100%; margin: 3px 0 0; font: 700 1.0625rem/1.3 var(--didone); word-spacing: 0.07em; text-wrap: pretty; }
+.indeks-tittel.raatittel { font: 400 1rem/1.42 var(--serif); letter-spacing: 0; word-spacing: normal; color: var(--blekk-2); max-width: 46em; }
+.indeks .faktum-status { font-size: 0.75rem; }
+@media (min-width: 900px) {
+  .indeksrad { display: grid; grid-template-columns: 8.5rem minmax(0, 1fr) 11rem; column-gap: 20px; }
+  .indeks-nr + .indeks-tittel + .indeks-meta { order: 0; justify-content: flex-end; text-align: right; }
+  .indeks-nr + .indeks-tittel + .indeks-meta::before { content: none; }
+  .indeks-tittel { order: 0; margin: 0; }
+  .indeks-nr, .indeks-meta { padding-top: 2px; }
+}
+@media (min-width: 960px) {
+  .indeksrad:first-child { border-top: 1px solid var(--sterk); }
+  /* the meeting beside its index: organ, then the date, always on two lines */
+  .maned-del .seksjon { padding: 14px 0 12px; }
+  .maned-del .seksjon-hode h3 { font-size: 1.25rem; }
+  .listeside .seksjon-hode .nb { display: block; }
+  .maned-del .seksjon-hode p { margin-top: 3px; }
+}
+
+/* Alle møter: months in columns that run down */
+.maneder { columns: 1; column-gap: 48px; padding: 10px 0 18px; }
+@media (min-width: 620px) { .maneder { columns: 2; } }
+@media (min-width: 1040px) { .maneder { columns: 3; } }
+.maned { break-inside: avoid; padding-bottom: 26px; }
+.maned h2 { margin: 0 0 2px; padding-top: 9px; border-top: 3px solid var(--sterk); font: 700 1.375rem/1.15 var(--didone); word-spacing: 0.07em; }
+.moterader li, .moterader li:nth-child(-n+2) { border-top-color: var(--linje); }
+@media (min-width: 700px) { .moterader { display: block; } }
+.moterader li { flex-wrap: wrap; gap: 0 12px; padding: 7px 0 8px; }
+.moterader li:first-child { border-top: 0; }
+.moterader a { font-weight: 400; }
+.moterader a span { color: inherit; }
+.moterader .bystyret a { font-weight: 700; }
+.moterad-tall { margin-left: auto; text-align: right; }
+
+/* A page head with no breadcrumb above it (Om, 404) gets the same air under the masthead */
+main > .sidehode:first-child { padding-top: 38px; }
+
+/* 404 */
+.ikkefunnet-lenker ul { list-style: none; margin: 10px 0 48px; padding: 0; display: flex; flex-wrap: wrap; gap: 10px 30px; font: 600 1rem/1.4 var(--sans); }
+
+/* Print: black on white even from dark mode; no navigation */
+@media print {
+  :root, :root * { color-scheme: light; }
+  :root { --papir: #fff; --boks: #fff; --boks-kant: #ccc; --blekk: #000; --blekk-2: #222; --dempet: #444;
+          --linje: #bbb; --linje-2: #888; --sterk: #000; --lenke: #000; --merket: #eee; --stolpe: #333; --stolpe-spor: #ddd;
+          --tp-for: #333; --tp-falt: #888; --tp-spor: #ddd; --tp-kart: #ddd; --tp-flate: #fff; --tp-fg: #000; --tp-muted: #444; }
+  body { display: block; min-height: 0; font-size: 11pt; }
+  .meny, .meny-smal, .hopp, .paa-siden, .relaterte, .periodelinje, .brodsmule, .bunn-lenker, .andre, .stolper-mer,
+  .andre-temaer, .ikkefunnet-lenker { display: none !important; }
+  .masthode-smal .ore-h { display: block; }
+  h1, h2, h3, .bakgrunn-etikett, .kort-hode, .figur-tittel, .seksjon-hode, .flis-hode { break-after: avoid; }
+  .felt, .figur, .fotnoter li, .rad, .indeksrad, .flis > ul > li, .valgliste li, .sek, .lead { break-inside: avoid; }
+  .bunn { padding: 0; }
+  .bunn-innhold { border-top: 1px solid #000; padding-top: 8pt; }
+  a { text-decoration: none; }
+  .kilde a, .fn a { text-decoration: underline; }
+}

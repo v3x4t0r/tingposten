@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Om Tingposten{% endblock %}
+{% block title %}Om · Tingposten{% endblock %}
+{% block description %}Hvordan Tingposten velger, rangerer og kontrollerer sakene fra Bergen kommune.{% endblock %}
 {% block hovedklasse %}omside{% endblock %}
 {% block main %}
 <header class="sidehode">
-  <p class="kicker"><span class="kicker-tema">Om</span></p>
   <h1 class="side-tittel">Om Tingposten</h1>
   <p class="side-ingress">Tingposten viser hva Bergen kommune vedtar, i samme format for hver sak og med lenke til kommunens egne dokumenter.</p>
 </header>
@@ -22,11 +22,11 @@
   <p>Under hver sak står noen faste opplysninger, hentet rett fra dokumentene og valgt etter samme regel for alle saker: status når saken ikke bare ble vedtatt, hvilken del av byen den gjelder, stemmetallet når avstemningen var jevn (ellers hvor mange forslag som falt), beløpet i vedtaket, og om saken har en bakgrunnsartikkel.</p>
   <div class="tabellramme">
   <table>
-    <caption>Signaler og vekter</caption>
-    <thead><tr><th scope="col">Signal</th><th scope="col">Poeng</th><th scope="col">Andel</th><th scope="col">Hva det måler</th></tr></thead>
+    <caption>Signaler og vekter{% if signaler|sum(attribute="poeng") == 100 %}, til sammen 100 poeng{% endif %}</caption>
+    <thead><tr><th scope="col">Signal</th><th scope="col">Poeng</th><th scope="col">Hva det måler</th></tr></thead>
     <tbody>
       {% for v in signaler %}
-      <tr><th scope="row">{{ v.navn }}</th><td>{{ v.poeng }}</td><td>{{ v.andel }}&nbsp;%</td><td>{{ v.forklaring }}</td></tr>
+      <tr><th scope="row">{{ v.navn }}</th><td>{{ v.poeng }}</td><td>{{ v.forklaring }}</td></tr>
       {% endfor %}
     </tbody>
   </table>
