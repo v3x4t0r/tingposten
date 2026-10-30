@@ -15,15 +15,7 @@
   </div>
 </section>
 
-{% if redaktor or kontakt_epost %}
-<section class="omdel lag" aria-labelledby="bak">
-  <h2 class="etikett etikett-strek" id="bak">Hvem står bak</h2>
-  <div class="lesetekst">
-  <p>{% if redaktor %}Tingposten lages av {{ redaktor }}, som er ansvarlig redaktør.{% endif %}{% if kontakt_epost %} Kontakt: <a href="mailto:{{ kontakt_epost }}">{{ kontakt_epost }}</a>.{% endif %}</p>
-  </div>
-</section>
-
-{% endif %}<section class="omdel lag" aria-labelledby="rangering">
+<section class="omdel lag" aria-labelledby="rangering">
   <h2 class="etikett etikett-strek" id="rangering">Slik rangerer vi</h2>
   <div class="lesetekst">
   <p>Alle sakene er med. Poengsummen (0–100) bestemmer bare rekkefølgen. Forsiden viser opptil 15 saker med ferdig sammendrag, de med høyest poengsum først. Saker med minst {{ terskel }} poeng kommer først; er det færre enn 15 av dem, fylles forsiden med de neste på listen.</p>

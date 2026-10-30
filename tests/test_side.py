@@ -139,13 +139,15 @@ def test_editor_contact_and_email_report(tmp_path, data_dir, monkeypatch):
     monkeypatch.setattr(config, "KONTAKT_EPOST", "avis@eksempel.no")
     bygg.build(tmp_path / "med", data_dir, idag=date(2026, 10, 1))
     om = (tmp_path / "med" / "om" / "index.html").read_text()
-    assert "Ola Redaktør, som er ansvarlig redaktør" in om and 'href="mailto:avis@eksempel.no"' in om
+    assert "Ansvarlig redaktør er Ola Redaktør, som kan kontaktes på" in om and 'href="mailto:avis@eksempel.no"' in om
+    assert "på e-post til" in om and "Plassholder" not in om
     sak = next((tmp_path / "med" / "bergen" / "sak").rglob("index.html")).read_text()
     assert 'href="mailto:avis@eksempel.no?subject=Feil%20i%20sak' in sak and "meld feilen på GitHub" in sak
     monkeypatch.setattr(config, "ANSVARLIG_REDAKTOR", None)
     monkeypatch.setattr(config, "KONTAKT_EPOST", None)
     bygg.build(tmp_path / "uten", data_dir, idag=date(2026, 10, 1))
-    assert "Hvem står bak" not in (tmp_path / "uten" / "om" / "index.html").read_text()
+    om = (tmp_path / "uten" / "om" / "index.html").read_text()
+    assert "Ansvarlig redaktør er" not in om and "mailto:" not in om and "som en offentlig sak på GitHub" in om
     sak = next((tmp_path / "uten" / "bergen" / "sak").rglob("index.html")).read_text()
     assert "mailto:" not in sak and ">Meld feil</a>" in sak
 

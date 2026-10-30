@@ -1,6 +1,6 @@
 # Redaksjonell erklæring
 
-*Sist oppdatert: [dato]*
+*Sist oppdatert: 30. oktober 2026. Publisert tekst: `tingposten/templates/erklaering.html` (e-postadressen settes inn fra `config.KONTAKT_EPOST`).*
 
 ## Hva Tingposten er
 
@@ -45,15 +45,9 @@ Hver sak har en lenke merket «Meld feil». Du kan melde feil på e-post til [e-
 
 Tingposten følger ikke med på enkeltlesere. Vi teller besøk uten informasjonskapsler, som forklart under «Besøkstall». Tingposten er ikke knyttet til noe parti eller til Bergen kommune, og tar ikke imot betaling for omtale.
 
-Tingposten utgis av [utgiver], som også står bak Freetime (freetime.no). Ansvarlig redaktør er Henrik Midttun, som kan kontaktes på [e-post].
+Tingposten utgis av RO-Studio AS (org.nr. 938 625 999), som også står bak Freetime (freetime.no). Ansvarlig redaktør er Henrik Midttun, som kan kontaktes på [e-post].
 
 ## Kilder og gjenbruk
 
 Dokumentene tilhører Bergen kommune. Vedtak og forslag fra offentlige myndigheter er fritt tilgjengelige for gjenbruk (åndsverkloven § 14). Vedlegg laget av andre, som rapporter fra konsulenter, kart og bilder, kan være vernet. Tingposten lenker derfor til originalene i kommunens system i stedet for å legge ut kopier av dem.
 
----
-
-## Før publisering
-
-- Fyll inn [utgiver] (RO-Studio AS eller Henrik Midttun), [e-post] og [dato].
-- «Rettelser gjøres synlig» forutsetter en rettelsesmerknad på sakssiden. Den finnes ikke ennå og må bygges før erklæringen publiseres.

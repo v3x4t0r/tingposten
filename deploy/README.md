@@ -112,6 +112,30 @@ uv run --no-sync tingposten kjor
 uv run --no-sync tingposten bygg
 ```
 
+## Rettelser
+
+Er noe feil på en sak, retter du det med `tingposten rett`. Saken får da en synlig merknad rett under toppen, merket «Rettet», med datoen og det du skrev om hva som ble endret, slik den redaksjonelle erklæringen lover. Feltet som ble endret, får også et lite «Rettet», det samme gjør saken i listene, og i RSS begynner saken med merknaden.
+
+```sh
+cd ~/tingposten
+# Bytt ut teksten i et felt:
+uv run --no-sync tingposten rett https://tingposten.no/bergen/sak/571424/2026-09-23/266-26/ \
+  --merknad "Vi skrev at 45 stemte for. Riktig er 54." \
+  --felt status --tekst "Vedtatt med 54 mot 13 stemmer."
+# Bare en merknad, uten å endre tekst:
+uv run --no-sync tingposten rett 571424/2026-09-23/266-26 --merknad "…"
+# Vis den:
+uv run --no-sync tingposten bygg && uv run --no-sync tingposten publiser
+```
+
+- Saken kan oppgis som adressen, stien (`bergen/sak/571424/2026-09-23/266-26`) eller nøkkelen (`571424/2026-09-23/266-26`).
+- `--felt` er `overskrift`, `hva_endres`, `hvem_pavirkes`, `hvorfor`, `status`, `nar_og_hvor`, `artikkel:<n>` (avsnitt n i bakgrunnen) eller `artikkel_tittel`. Ingressen er første setning i `hva_endres`: rett `hva_endres`, så følger ingressen med. `--tekst ''` fjerner teksten.
+- Feltet beholder kildene sine. Gjelder den nye teksten andre sider, gi dem med `--kilde saksframlegg:5` (kan gjentas).
+- Merknaden vises slik du skriver den: hva som var feil og hva som er riktig, i én eller to setninger.
+- Kommandoen sjekker at feltet finnes på saken, lagrer rettelsen med dagens dato og skriver den ut. Den bygger og publiserer ikke. Den nattlige kjøringen tar den med; `bygg` og `publiser` for hånd viser den med en gang.
+
+Rettelsene ligger i `data/bergen/rettelser/<utvalg>/<dato>/<sak>.json`, ikke i kortene, og brukes når siden bygges. Derfor overlever de at pipelinen skriver kortet på nytt. `data/` er ikke i git, så kjør `rett` på maskinen som bygger siden (Pi-en). Har pipelinen skrevet om teksten en rettelse gjaldt, vises den nye teksten under merknaden, og byggeloggen får en advarsel («endret siden rettelsen» eller «finnes ikke på saken»). Se da over saken, og rett på nytt hvis feilen fortsatt er der. Merknaden blir stående uansett.
+
 ## Logger
 
 Hver kjøring skriver til `data/logs/ÅÅÅÅ-MM-DD.log`. Logger eldre enn 60 dager slettes automatisk.

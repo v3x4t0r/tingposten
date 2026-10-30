@@ -37,6 +37,15 @@
       {% endif %}
     </div>
   </header>
+  {% if s.rettelser %}
+  {# Rettelser (rettelser.py): every note the editor wrote, oldest first, with its date. #}
+  <section class="rettelser lag" id="rettelser" aria-labelledby="rettelser-tittel">
+    <h2 class="rettelser-etikett" id="rettelser-tittel">Rettet</h2>
+    <ul class="rettelser-liste">
+      {% for r in s.rettelser %}<li><time datetime="{{ r.dato.isoformat() }}">{{ r.dato_tekst }}</time>: {{ r.merknad|typo }}</li>{% endfor %}
+    </ul>
+  </section>
+  {% endif %}
   <div class="sak-oppsett">
     {% if s.venter_protokoll %}
     <section class="sak-melding sak-melding-venter lag" aria-label="Sammendrag">
@@ -48,7 +57,7 @@
       {% for key, label in FELT %}
       {% set f = (s.kort_felt|selectattr("key", "eq", key)|list or [none])[0] %}
       {% if not f and key == "status" and s.status_rad %}{% set f = s.status_rad %}{% endif %}
-      <div class="felt lag"><h3>{{ label }}</h3><div>
+      <div class="felt lag"><h3>{{ label }}{% if key in s.rettet %} <a class="rettet-merke" href="#rettelser">Rettet</a>{% endif %}</h3><div>
         {% if f %}
         <p class="felt-tekst">{{ f.tekst|typo }}</p>{{ kildelinje(f.kilder) }}
         {% else %}
@@ -86,10 +95,10 @@
       {% endif %}
       <div>
         {% if s.artikkel_tittel %}<h2 class="bakgrunn-tittel" id="bakgrunn-tittel"><span class="vh">Bakgrunn: </span>{{ s.artikkel_tittel|tittel }}</h2>{% endif %}
-        <p class="byline">{% if bygger %}<span>Bygger på {{ bygger }}</span>{% endif %}<span class="nb">Ca. {{ s.lesetid }} {{ "minutt" if s.lesetid == 1 else "minutter" }} å lese</span></p>
+        <p class="byline">{% if bygger %}<span>Bygger på {{ bygger }}</span>{% endif %}<span class="nb">Ca. {{ s.lesetid }} {{ "minutt" if s.lesetid == 1 else "minutter" }} å lese</span>{% if "artikkel_tittel" in s.rettet %}<span><a class="rettet-merke" href="#rettelser">Tittelen er rettet</a></span>{% endif %}</p>
         <div class="brodtekst">
           {% for a in s.artikkel %}
-          <p id="avsnitt-{{ loop.index }}">{{ a.tekst|typo }}{% if a.kilder %}<sup class="fn"><a href="#kilde-{{ loop.index }}" aria-label="Kilder til avsnitt {{ loop.index }}">{{ loop.index }}</a></sup>{% endif %}</p>
+          <p id="avsnitt-{{ loop.index }}">{{ a.tekst|typo }}{% if a.kilder %}<sup class="fn"><a href="#kilde-{{ loop.index }}" aria-label="Kilder til avsnitt {{ loop.index }}">{{ loop.index }}</a></sup>{% endif %}{% if a.rettet %} <a class="rettet-merke" href="#rettelser">Rettet</a>{% endif %}</p>
           {% endfor %}
         </div>
         <div class="fotnoter">

@@ -57,6 +57,23 @@ def main(argv: list[str] | None = None) -> int:
     byggp.add_argument("--idag", type=date.fromisoformat, help="pretend today is YYYY-MM-DD (for previews)")
     byggp.add_argument("--til", type=Path, help="build into this directory instead of site/")
 
+    rettp = sub.add_parser(
+        "rett", help="legg til en synlig rettelse på en sak (bygger og publiserer ikke)",
+        description="Legger til en rettelse med dagens dato i data/bergen/rettelser/. Saken får en merknad om "
+                    "hva som ble endret og når. Rettelsen brukes når siden bygges, og overlever at pipelinen "
+                    "skriver kortet på nytt. Kjør `tingposten bygg` og `tingposten publiser` etterpå.")
+    rettp.add_argument("sak", help="sakens adresse eller nøkkel: https://tingposten.no/bergen/sak/571424/2026-09-23/"
+                                   "266-26/, bergen/sak/571424/2026-09-23/266-26 eller 571424/2026-09-23/266-26")
+    rettp.add_argument("--merknad", required=True,
+                       help="hva som var feil og hva som er riktig, én eller to setninger. Vises på saken som du skriver den")
+    rettp.add_argument("--felt", help="det som rettes: overskrift, hva_endres, hvem_pavirkes, hvorfor, status, "
+                                      "nar_og_hvor, artikkel:<n> (avsnitt n i bakgrunnen) eller artikkel_tittel. "
+                                      "Ingressen følger hva_endres. Uten --felt er rettelsen bare en merknad")
+    rettp.add_argument("--tekst", help="ny tekst for feltet; --tekst '' fjerner teksten")
+    rettp.add_argument("--kilde", action="append", metavar="DOK:SIDE",
+                       help="kilde for den nye teksten, f.eks. saksframlegg:5 (kan gjentas). Uten beholder feltet "
+                            "sine kilder")
+
     vurd = sub.add_parser("vurder", help="local web page for sorting a meeting's draft cards")
     vurd.add_argument("--utvalg", required=True, help="utvalgId, e.g. 571424")
     vurd.add_argument("--dato", required=True, help="meeting date YYYY-MM-DD")
@@ -89,6 +106,8 @@ def main(argv: list[str] | None = None) -> int:
         return _vurder(args)
     elif args.cmd == "score":
         return _score(args)
+    elif args.cmd == "rett":
+        return _rett(args)
     elif args.cmd == "rediger":
         from . import redaktor
 
@@ -111,6 +130,22 @@ def main(argv: list[str] | None = None) -> int:
         from . import bygg
 
         logging.info("bygg: %s", bygg.build(args.til or config.SITE_DIR, idag=args.idag))
+    return 0
+
+
+def _rett(args) -> int:
+    from . import rettelser
+
+    try:
+        key = rettelser.sak_key(args.sak)
+        kilder = [rettelser.kilde(k) for k in args.kilde or []]
+        entry = rettelser.ny(config.DATA_DIR, key, args.merknad, felt=args.felt, tekst=args.tekst, kilder=kilder)
+    except ValueError as e:
+        logging.error("rettelsen ble ikke lagret: %s", e)
+        return 1
+    print(json.dumps(entry, ensure_ascii=False, indent=1))
+    print(f"Lagret i {rettelser.sti(config.DATA_DIR, key)}. Vises når siden bygges: "
+          "tingposten bygg && tingposten publiser")
     return 0
 
 

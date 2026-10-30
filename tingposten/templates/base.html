@@ -66,6 +66,7 @@
   <div class="bunn-innhold">
     <p class="bunn-navn">Tingposten</p>
     <p>Tingposten viser hva Bergen kommune vedtar. Hver setning bygger på kommunens egne dokumenter, og hver sak lenker til dem.</p>
+    {% if utgiver or redaktor %}<p class="bunn-utgiver">{% if utgiver %}Utgitt av {{ utgiver }}{% endif %}{% if utgiver and redaktor %} · {% endif %}{% if redaktor %}Ansvarlig redaktør: {{ redaktor }}{% endif %}</p>{% endif %}
     <p class="bunn-lenker"><a href="{{ root }}om/">Om Tingposten og rangeringen</a> · <a href="{{ root }}bergen/rss.xml">RSS</a> · <a href="https://github.com/{{ repo }}">Åpen kildekode</a></p>
   </div>
 </footer>

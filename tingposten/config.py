@@ -88,8 +88,11 @@ MELD_FEIL = None  # None → GitHub issue on REPO, prefilled with the sak
 # Who stands behind the site (shown on the Om page) and where readers write.
 # None = not shown. With KONTAKT_EPOST, "Meld feil" also offers e-mail
 # (prefilled with the sak) next to the GitHub issue.
-ANSVARLIG_REDAKTOR = None
-KONTAKT_EPOST = None
+ANSVARLIG_REDAKTOR = "Henrik Midttun"
+UTGIVER = "RO-Studio AS"            # publisher; the Om page also says it makes Freetime
+UTGIVER_ORGNR = "938 625 999"
+UTGIVER_OGSA = ("Freetime", "https://freetime.no/")  # "som også står bak …" (a reference, not an ad)
+KONTAKT_EPOST = None                # set when the address works, e.g. "redaksjon@tingposten.no"
 
 # Models, called through the subscription CLIs (no API keys): Claude writes
 # and classifies, Codex fact-checks — a different provider on purpose.

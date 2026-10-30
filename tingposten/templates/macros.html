@@ -26,10 +26,10 @@
 {% macro faktum_mote(s) %}<li class="faktum faktum-mote"><span>{{ s.organ_kort }}, <time datetime="{{ s.dato.isoformat() }}">{{ s.dato|kort_dato }}</time></span></li>{% endmacro %}
 
 {# The facts row: the status, organ and date off the standard meeting, at
-   most `maks` other facts, then the Bakgrunn cue. #}
+   most `maks` other facts, then the Bakgrunn cue and, for a corrected sak, "Rettet". #}
 {% macro fakta_rad(s, maks=3, uten=(), vis_mote=False) %}
 {% set ff = s.fakta|rejectattr("type", "in", uten)|rejectattr("type", "eq", "bakgrunn")|list %}
-<ul class="fakta">{% for f in ff if f.type == "status" %}{{ faktum(f) }}{% endfor %}{% if vis_mote %}{{ faktum_mote(s) }}{% endif %}{% for f in (ff|rejectattr("type", "eq", "status")|list)[:maks] %}{{ faktum(f) }}{% endfor %}{% if s.har_artikkel and "bakgrunn" not in uten %}{{ faktum({"type": "bakgrunn"}) }}{% endif %}</ul>
+<ul class="fakta">{% for f in ff if f.type == "status" %}{{ faktum(f) }}{% endfor %}{% if vis_mote %}{{ faktum_mote(s) }}{% endif %}{% for f in (ff|rejectattr("type", "eq", "status")|list)[:maks] %}{{ faktum(f) }}{% endfor %}{% if s.har_artikkel and "bakgrunn" not in uten %}{{ faktum({"type": "bakgrunn"}) }}{% endif %}{% if s.get("rettelser") and "rettet" not in uten %}<li class="faktum faktum-rettet">Rettet</li>{% endif %}</ul>
 {% endmacro %}
 
 {# Tiles stay terse: an informative status, the organ off the standard meeting, and the Bakgrunn cue. #}

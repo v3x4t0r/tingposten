@@ -12,10 +12,11 @@ Laid out like a newspaper: front pages with a lead story, a row of four,
 a two-column list (15 stories in all) and a tile per topic (tema) with saker
 left over; one page per meeting in agenda order and one page per sak with
 the full card and, for the top saker, a background article.
-Every sentence shown is from the edited card or the edited article; the dek
-is the card's first sentence. The small facts under a story (where, the
-vote, the amount) are mechanical values read off the documents, chosen by
-one fixed rule in fakta().
+Every sentence shown is from the edited card or the edited article, or
+from a correction (rettelser/, see rettelser.py) the editor made and the
+page notes with its date; the dek is the card's first sentence. The small
+facts under a story (where, the vote, the amount) are mechanical values read
+off the documents, chosen by one fixed rule in fakta().
 """
 
 import html
@@ -32,7 +33,7 @@ from urllib.parse import quote, urlencode, urlsplit
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 from markupsafe import Markup, escape
 
-from . import config, grafikk, pdf, score
+from . import config, grafikk, pdf, rettelser as rettelser_mod, score
 from .klassifiserer import TEMA
 from .saksframlegg import saksbydeler
 from . import status as status_mod
@@ -218,7 +219,8 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
     if site_dir.exists():
         shutil.rmtree(site_dir)
     tmp.rename(site_dir)
-    stats = {"sider": pages, "saker": len(saker), "fremhevet": sum(s["fremhevet"] for s in saker), "moter": len(moter)}
+    stats = {"sider": pages, "saker": len(saker), "fremhevet": sum(s["fremhevet"] for s in saker), "moter": len(moter),
+             "rettet": sum(bool(s["rettelser"]) for s in saker)}
     log.info("built %s: %s", site_dir, stats)
     return stats
 
@@ -335,6 +337,9 @@ def _sak(item: dict, ranked: dict, data_dir: Path, parsers: "_Parsers | None" = 
     parsers = parsers or _Parsers()
     card_path = data_dir / "redigert" / f"{pdf.key(item)}.json"
     card = json.loads(card_path.read_text()) if card_path.exists() else None
+    art = _read_json(data_dir / "artikler-redigert" / f"{pdf.key(item)}.json")
+    # The editor's corrections, made on copies at build time: the pipeline's files stay as written.
+    card, art, notes = rettelser_mod.bruk(rettelser_mod.les(data_dir, pdf.key(item)), card, art, pdf.key(item))
     klar = _protokoll_klar(item, data_dir, parsers)
     usable = bool(card) and not card.get("avvist") and klar
     dato = date.fromisoformat(item["moteDato"])
@@ -372,7 +377,7 @@ def _sak(item: dict, ranked: dict, data_dir: Path, parsers: "_Parsers | None" = 
         "tema": tema,
         "tema_navn": TEMA[tema],
         "tema_side": None,
-        "artikkel": _article(item, data_dir) if usable else [],
+        "artikkel": _article(item, art) if usable else [],
         "figurer": (_figures(item, data_dir, parsers) or list(card.get("figurer", []))) if usable else [],
         "pdf": {k: u for k, _, _ in pdf.KINDS if (u := pdf.url(item, k))},
         "mote": slug,
@@ -380,9 +385,12 @@ def _sak(item: dict, ranked: dict, data_dir: Path, parsers: "_Parsers | None" = 
         "side": side,
         "lenke": side,
         "venter_protokoll": not klar,
+        # Every note is shown, also one whose change couldn't be made (rettelser.bruk).
+        "rettelser": [{**n, "dato_tekst": nb_date(n["dato"])} for n in notes],
+        "rettet": sorted({n["felt"] for n in notes if n["brukt"]}),
     }
     sak["har_artikkel"] = bool(sak["artikkel"])
-    sak["artikkel_tittel"] = _article_title(item, data_dir) if sak["artikkel"] else ""
+    sak["artikkel_tittel"] = _article_title(art) if sak["artikkel"] else ""
     sak["lesetid"] = lesetid(sak["artikkel"])
     sak["fremhevet"] = sak["score"] >= _terskel()
     sak["meld_feil"] = meld_feil(sak["nr"], sak["tittel"], _site_url() + sak["lenke"])
@@ -523,9 +531,9 @@ def tema_fra_tittel(tittel: str) -> str:
     return "annet"
 
 
-def _article(item: dict, data_dir: Path) -> list[dict]:
-    """The edited background article's paragraphs, with links to the cited pages."""
-    art = _read_json(data_dir / "artikler-redigert" / f"{pdf.key(item)}.json")
+def _article(item: dict, art: dict | None) -> list[dict]:
+    """The edited background article's paragraphs, with links to the cited pages
+    (and "rettet" on a paragraph the editor corrected)."""
     if not art or art.get("avvist"):
         return []
     out = []
@@ -538,15 +546,14 @@ def _article(item: dict, data_dir: Path) -> list[dict]:
             base = pdf.url(item, k.get("dok", "")) if k.get("dok") in ("saksframlegg", "protokoll") else None
             if base and isinstance(k.get("side"), int):
                 sources.append({"dok": k["dok"], "side": k["side"], "href": f"{base}#page={k['side']}"})
-        out.append({"tekst": text, "kilder": _dedupe(sources)})
+        out.append({"tekst": text, "kilder": _dedupe(sources), "rettet": bool(a.get("rettet"))})
     return out
 
 
-def _article_title(item: dict, data_dir: Path) -> str:
+def _article_title(art: dict | None) -> str:
     """The background article's own headline, only as the redaktør kept it:
     checked as supported, with the pages that support it (rediger_tittel).
     "" for anything else, and the article is shown without one."""
-    art = _read_json(data_dir / "artikler-redigert" / f"{pdf.key(item)}.json")
     if not art or art.get("avvist") or not art.get("avsnitt"):
         return ""
     tittel = " ".join((art.get("tittel") or "").split())
@@ -946,6 +953,9 @@ def _env() -> Environment:
     env.tests["status_boks"] = status_boks
     env.globals["site_url"] = _site_url()
     env.globals["redaktor"] = getattr(config, "ANSVARLIG_REDAKTOR", None)
+    env.globals["utgiver"] = getattr(config, "UTGIVER", None)
+    env.globals["utgiver_orgnr"] = getattr(config, "UTGIVER_ORGNR", None)
+    env.globals["utgiver_ogsa"] = getattr(config, "UTGIVER_OGSA", None)
     env.globals["kontakt_epost"] = getattr(config, "KONTAKT_EPOST", None)
     env.globals["repo"] = config.REPO
     env.globals["figur"] = figur

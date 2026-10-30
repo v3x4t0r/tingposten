@@ -288,7 +288,7 @@ def test_om_page_publishes_weights(site):
     om = (site / "om/index.html").read_text()
     for name in ("Beløp", "Rekkevidde", "Juridisk vekt"):
         assert name in om
-    assert "Plassholder" in om
+    assert "Plassholder" not in om and "Redaksjonell erklæring" in om and "Når vi ikke vet" in om
 
 
 def test_figures(monkeypatch, tmp_path, data_dir):
