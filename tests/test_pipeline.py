@@ -216,7 +216,7 @@ def test_omskriv_kandidater_for_articles(tmp_path):
             "avvist": True, "koder": koder, "grunn": "artikkelen har 262 ord (maks 250)",
             "slettet": [{"avsnitt": 2, "setning": "Feil tall.", "grunn": "ikke støttet av kilden"}]}))
         path("artikler", it).parent.mkdir(parents=True, exist_ok=True)
-        meta = {"omskrevet": omskrevet} if omskrevet else {}
+        meta = {"prompt_versjon": pipeline.skribent.PROMPT_VERSJON, **({"omskrevet": omskrevet} if omskrevet else {})}
         path("artikler", it).write_text(json.dumps({"avsnitt": [], "meta": meta}))
     fb = pipeline.omskriv_kandidater([lang, privat, igjen, kort_avvist], tmp_path, artikler=True)
     assert list(fb) == ["571424/2026-05-20/1-26"]
@@ -266,18 +266,49 @@ def test_fra_dato_counts_tilbake_dager(monkeypatch):
     assert pipeline.fra_dato(datetime.date(2026, 10, 29)) == "2026-07-29"
 
 
-def test_cards_from_older_writer_rules_are_rewritten(tmp_path):
+def test_cards_from_older_writer_rules_stay_as_published(tmp_path):
     a = item("1/26")
     for kind in ("protokoll", "saksframlegg"):
         touch(tmp_path / "pdf" / f"571424/2026-05-20/1-26_{kind}.pdf", age=100)
     kort = tmp_path / "kort/571424/2026-05-20/1-26.json"
+    redigert = tmp_path / "redigert/571424/2026-05-20/1-26.json"
     kort.parent.mkdir(parents=True)
+    redigert.parent.mkdir(parents=True)
+    redigert.write_text(json.dumps({"avvist": True, "grunn": "hva_endres har 70 ord (maks 60)"}))
+    for meta in ({"prompt_versjon": "skribent-0"}, None):  # older rules, or from before versions were recorded
+        kort.write_text(json.dumps({"overskrift": "x", **({"meta": meta} if meta else {})}))
+        assert pipeline.eldre_regler(kort)
+        assert pipeline.todo("skriv", [a], tmp_path) == []      # not rewritten for new rules
+        assert pipeline.todo("rediger", [a], tmp_path) == []    # nor re-edited under new limits
+        assert pipeline.omskriv_kandidater([a], tmp_path) == {}  # nor sent back to the writer
     kort.write_text(json.dumps({"overskrift": "x", "meta": {"prompt_versjon": pipeline.skribent.PROMPT_VERSJON}}))
+    assert not pipeline.eldre_regler(kort)
     assert pipeline.todo("skriv", [a], tmp_path) == []
+    assert pipeline.todo("rediger", [a], tmp_path) == [a]
+
+
+def test_old_card_is_written_again_when_its_documents_change(tmp_path):
+    a = item("1/26")
+    kort = tmp_path / "kort/571424/2026-05-20/1-26.json"
+    kort.parent.mkdir(parents=True)
     kort.write_text(json.dumps({"overskrift": "x", "meta": {"prompt_versjon": "skribent-0"}}))
+    t = time.time() - 100
+    os.utime(kort, (t, t))
+    for kind in ("protokoll", "saksframlegg"):  # e.g. Bergen updated the protokoll
+        touch(tmp_path / "pdf" / f"571424/2026-05-20/1-26_{kind}.pdf")
     assert pipeline.todo("skriv", [a], tmp_path) == [a]
-    kort.write_text(json.dumps({"overskrift": "x"}))  # from before versions were recorded
-    assert pipeline.todo("skriv", [a], tmp_path) == [a]
+
+
+def test_old_articles_are_not_re_edited(tmp_path):
+    a = item("1/26")
+    art = tmp_path / "artikler/571424/2026-05-20/1-26.json"
+    art.parent.mkdir(parents=True)
+    art.write_text(json.dumps({"avsnitt": [], "meta": {"prompt_versjon": "skribent-0"}}))
+    assert pipeline.todo("artikkelrediger", [a], tmp_path) == [a]  # never edited: edit it once
+    touch(tmp_path / "artikler-redigert/571424/2026-05-20/1-26.json")
+    assert pipeline.todo("artikkelrediger", [a], tmp_path) == []
+    art.write_text(json.dumps({"avsnitt": [], "meta": {"prompt_versjon": pipeline.skribent.PROMPT_VERSJON}}))
+    assert pipeline.todo("artikkelrediger", [a], tmp_path) == [a]
 
 
 def test_no_card_until_the_protokoll_covers_the_meeting(tmp_path, monkeypatch):

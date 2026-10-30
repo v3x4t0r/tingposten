@@ -8,6 +8,12 @@ output is missing or older than its inputs, so a rewritten card is checked
 again and a stopped run picks up where it left off. Building and publishing
 the site are separate commands.
 
+Cards and articles written under earlier writer rules (skribent.PROMPT_VERSJON)
+stay as published: they are not rewritten, re-edited or rewritten after a
+rejection for the new rules, so the model quota goes to new saker (owner,
+30.10.2026). A sak whose documents change is written again under the current
+rules, like any stale card.
+
 A card the redaktør rejects for limit or headline problems is rewritten
 once, automatically, with the rejection as feedback, and goes through check
 and edit again in the same run; so is an article rejected for length or for
@@ -92,13 +98,14 @@ def ufullstendige_protokoller(items: list[dict], data_dir: Path = config.DATA_DI
             and _pdf(data_dir, i, "protokoll").exists() and not protokoll_klar(i, data_dir)]
 
 
-def _old_rules(kort: Path) -> bool:
-    """A card written under earlier writer rules (skribent.PROMPT_VERSJON) is redone,
-    and so is a card from before cards recorded their version."""
-    card = read_json(kort) or {}
-    if "overskrift" not in card:
-        return False  # nothing written yet (or not a card)
-    return (card.get("meta") or {}).get("prompt_versjon") != skribent.PROMPT_VERSJON
+def eldre_regler(path: Path) -> bool:
+    """A card or article written under earlier writer rules (skribent.PROMPT_VERSJON),
+    or from before they recorded their version. These stay as published: the
+    pipeline doesn't redo them for new rules (see the module docstring)."""
+    written = read_json(path) or {}
+    if "overskrift" not in written and "avsnitt" not in written:
+        return False  # nothing written yet (or not a card/article)
+    return (written.get("meta") or {}).get("prompt_versjon") != skribent.PROMPT_VERSJON
 
 
 def todo(step: str, items: list[dict], data_dir: Path) -> list[dict]:
@@ -111,7 +118,7 @@ def todo(step: str, items: list[dict], data_dir: Path) -> list[dict]:
         artikkel = _file(data_dir, "artikler", i)
         sources = [_pdf(data_dir, i, "protokoll"), _pdf(data_dir, i, "saksframlegg")]
         if step == "skriv":
-            if sources[0].exists() and (_stale(kort, sources) or _old_rules(kort)) and protokoll_klar(i, data_dir):
+            if sources[0].exists() and _stale(kort, sources) and protokoll_klar(i, data_dir):
                 out.append(i)
         elif step in ("artikkel", "artikkelsjekk", "artikkelrediger"):
             if step == "artikkel" and redigert.exists() and _stale(artikkel, [redigert]):
@@ -119,7 +126,8 @@ def todo(step: str, items: list[dict], data_dir: Path) -> list[dict]:
             elif step == "artikkelsjekk" and artikkel.exists() and _stale(_file(data_dir, "artikkelsjekk", i),
                                                                           [artikkel, redigert]):
                 out.append(i)
-            elif step == "artikkelrediger" and artikkel.exists():
+            elif step == "artikkelrediger" and artikkel.exists() and not (
+                    _file(data_dir, "artikler-redigert", i).exists() and eldre_regler(artikkel)):
                 out.append(i)
         elif not kort.exists():
             continue
@@ -127,7 +135,7 @@ def todo(step: str, items: list[dict], data_dir: Path) -> list[dict]:
             out.append(i)
         elif step == "klassifiser" and _stale(_file(data_dir, "signaler", i), [kort]):
             out.append(i)
-        elif step == "rediger":
+        elif step == "rediger" and not (redigert.exists() and eldre_regler(kort)):
             out.append(i)
     return out
 
@@ -163,7 +171,7 @@ def omskriv_kandidater(items: list[dict], data_dir: Path, artikler: bool = False
     for i in items:
         r = read_json(_file(data_dir, edited, i))
         utkast = read_json(_file(data_dir, draft, i))
-        if not r or not utkast or not redaktor.omskrivbar(r, tillatt):
+        if not r or not utkast or not redaktor.omskrivbar(r, tillatt) or eldre_regler(_file(data_dir, draft, i)):
             continue
         if int((utkast.get("meta") or {}).get("omskrevet", 0)) >= MAKS_OMSKRIVINGER:
             continue
