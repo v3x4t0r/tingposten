@@ -66,3 +66,18 @@ def test_typo_on_markup_changes_text_only():
 
 def test_typo_handles_empty_and_none():
     assert typo(None) == "" and typo("") == "" and isinstance(typo(None), Markup)
+
+
+def test_rydd_tittel_removes_bookkeeping_but_keeps_the_words():
+    from tingposten.typo import rydd_tittel
+    assert rydd_tittel("Representantforslag fra Camilla Nøttveit (V) om fysisk aktivitet i Bergensskolen Innsendt: 18.2.2026") \
+        == "Representantforslag fra Camilla Nøttveit (V) om fysisk aktivitet i Bergensskolen"
+    assert rydd_tittel("Representantforslag fra X (SV) om sommerskole i Bergen. Innsendt: 18.2.2026") \
+        == "Representantforslag fra X (SV) om sommerskole i Bergen"
+    assert rydd_tittel("Representantforslag fra Y (PP) om innfartsparkering ved Åsane Terminal -19.11.2025") \
+        == "Representantforslag fra Y (PP) om innfartsparkering ved Åsane Terminal"
+    assert rydd_tittel("Aurdalslia skole - oppgradering av ventilasjonsanlegg. Gjennomføringsvedtak ") \
+        == "Aurdalslia skole – oppgradering av ventilasjonsanlegg. Gjennomføringsvedtak"
+    assert rydd_tittel("Godkjenning av protokoll fra bystyrets møte 17 og 18.12.2025\n") \
+        == "Godkjenning av protokoll fra bystyrets møte 17 og 18.12.2025"   # dates that say something stay
+    assert rydd_tittel("ASSS- statistikk") == "ASSS- statistikk" and rydd_tittel("") == ""

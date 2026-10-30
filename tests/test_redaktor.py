@@ -387,7 +387,8 @@ def test_run_artikler_ignores_a_check_older_than_the_article(tmp_path):
         paths[step].parent.mkdir(parents=True)
         paths[step].write_text(json.dumps(obj))
     os.utime(paths["artikkelsjekk"], (1_000, 1_000))
-    assert redaktor.run_artikler([item], tmp_path) == {"redigert": 1, "publiserbar": 0, "avvist": 1, "slettet": 0, "endret": 1}
+    assert redaktor.run_artikler([item], tmp_path) == {"redigert": 1, "publiserbar": 0, "avvist": 1, "slettet": 0, "endret": 1,
+                                                       "tittel": 0}
     out = json.loads((tmp_path / "artikler-redigert" / "571424" / "2026-09-23" / "1-26.json").read_text())
     assert out["grunn"] == "ikke faktasjekket"
     os.utime(paths["artikkelsjekk"], None)  # fresh check now

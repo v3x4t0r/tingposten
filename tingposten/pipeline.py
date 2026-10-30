@@ -13,6 +13,10 @@ once, automatically, with the rejection as feedback, and goes through check
 and edit again in the same run; so is an article rejected for length or for
 too little new. Privacy rejections wait for a human.
 
+Last, every publishable edited article gets its own headline, written from
+the edited text and checked like the rest (artikkeltittel.py); the redaktør
+then keeps or drops it. A failure there never stops the run.
+
 PDFs are fetched only when config.ALLOW_PDF_FETCH is set (robots.txt; see
 config). Until then missing PDFs are reported, not downloaded.
 """
@@ -24,12 +28,13 @@ from collections import defaultdict
 from datetime import date, timedelta
 from pathlib import Path
 
-from . import config, faktasjekker, klassifiserer, pdf, protokoll, redaktor, score, skribent, status
+from . import (artikkeltittel, config, faktasjekker, klassifiserer, pdf, protokoll, redaktor, score, skribent,
+               status)
 from .llm import ClaudeCLI, CodexCLI, read_json
 
 log = logging.getLogger(__name__)
 
-STEG = ("skriv", "sjekk", "klassifiser", "rediger", "artikkel", "artikkelsjekk", "artikkelrediger")
+STEG = ("skriv", "sjekk", "klassifiser", "rediger", "artikkel", "artikkelsjekk", "artikkelrediger", "artikkeltittel")
 MAKS_OMSKRIVINGER = 1
 
 
@@ -120,6 +125,9 @@ def todo(step: str, items: list[dict], data_dir: Path) -> list[dict]:
                 out.append(i)
             elif step == "artikkelrediger" and artikkel.exists():
                 out.append(i)
+        elif step == "artikkeltittel":
+            if artikkeltittel.trenger(i, data_dir):
+                out.append(i)
         elif not kort.exists():
             continue
         elif step == "sjekk" and _stale(_file(data_dir, "sjekk", i), [kort]):
@@ -198,7 +206,9 @@ def kjor(data_dir: Path = config.DATA_DIR, utvalg: str | None = None, dato: str 
         "klassifiser": ClaudeCLI(config.MODELL_KLASSIFISERER),
     }
     llm = {**llms, "artikkel": llms.get("artikkel", llms.get("skriv")),
-           "artikkelsjekk": llms.get("artikkelsjekk", llms.get("sjekk"))}
+           "artikkelsjekk": llms.get("artikkelsjekk", llms.get("sjekk")),
+           "artikkeltittel": llms.get("artikkeltittel", llms.get("skriv")),
+           "tittelsjekk": llms.get("tittelsjekk", llms.get("sjekk"))}
     runners = {
         "skriv": skribent.run, "sjekk": faktasjekker.run, "klassifiser": klassifiserer.run,
         "artikkel": skribent.run_artikkel, "artikkelsjekk": faktasjekker.run_artikkel,
@@ -213,11 +223,16 @@ def kjor(data_dir: Path = config.DATA_DIR, utvalg: str | None = None, dato: str 
         if not work:
             return {}
         log.info("%s: %d saker", step, len(work))
+        if step == "artikkeltittel":
+            return artikkeltittel.run(work, data_dir, llm["artikkeltittel"], llm["tittelsjekk"], parallel=parallel)
         # todo() already decided these need (re)doing, stale outputs included.
         return runners[step](work, data_dir, llm=llm[step], force=True, parallel=parallel, **kw)
 
     for step in STEG:
         if step not in steg:
+            continue
+        if step == "artikkeltittel":
+            result.update(_titler(items, data_dir, step_run))
             continue
         pool = velg_artikler(items, data_dir) if step == "artikkel" else items
         result[step] = step_run(step, todo(step, pool, data_dir))
@@ -246,3 +261,21 @@ def kjor(data_dir: Path = config.DATA_DIR, utvalg: str | None = None, dato: str 
                 log.info("omskriv artikkel: %s",
                          {k: v for k, v in result.items() if k.startswith("omskriv_artikkel")})
     return result
+
+
+def _titler(items: list[dict], data_dir: Path, step_run) -> dict:
+    """The headline step, then the redaktør again so the kept headlines reach
+    artikler-redigert/ in the same run. Never raises: a failed model call is
+    retried on the next run (see artikkeltittel), anything else is logged."""
+    out = {}
+    try:
+        work = todo("artikkeltittel", items, data_dir)
+        out["artikkeltittel"] = step_run("artikkeltittel", work)
+        log.info("artikkeltittel: %s", out["artikkeltittel"] or "nothing to do")
+        if work:
+            out["artikkeltittel/rediger"] = redaktor.run_artikler(work, data_dir)
+            log.info("artikkeltittel/rediger: %s", out["artikkeltittel/rediger"])
+    except Exception as e:  # the headline is extra; it must never cost the rest of the run
+        log.exception("artikkeltittel failed")
+        out.setdefault("artikkeltittel", {}).setdefault("feil", []).append(f"steget feilet: {e}")
+    return out

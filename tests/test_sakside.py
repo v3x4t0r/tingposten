@@ -141,7 +141,7 @@ def test_unknown_outcome_has_no_status_and_one_quiet_line(side):
     # the kommune's title as h1: the quieter class, and its typography
     h1 = re.search(r'<h1 class="([^"]+)">(.*?)</h1>', page).groups()
     assert h1[0] == "sak-tittel sak-tittel-raa"
-    assert f"Gnr.{NB}160, Bnr.{NB}184{NB}m.fl," in h1[1] and f"66340000{NB}- sluttbehandling" in h1[1]
+    assert f"Gnr.{NB}160, Bnr.{NB}184{NB}m.fl," in h1[1] and f"66340000{NB}– sluttbehandling" in h1[1]
 
 
 def test_long_card_headline_is_also_set_quieter(side):

@@ -402,6 +402,43 @@ def test_article_rendering_and_cue(site):
     assert "Bakgrunn" not in sek
 
 
+@pytest.mark.parametrize("extra, shown", [
+    ({"tittel": "Hallen har vært planlagt siden 2019", "tittel_kilder": [{"dok": "saksframlegg", "side": 2}],
+      "tittel_grunn": ""}, True),
+    # anything the redaktør didn't keep as checked is never rendered
+    ({"tittel": "Hallen har vært planlagt siden 2019", "tittel_kilder": [], "tittel_grunn": ""}, False),
+    ({"tittel": "Hallen har vært planlagt siden 2019", "tittel_kilder": [{"dok": "saksframlegg", "side": 2}],
+      "tittel_grunn": "ikke faktasjekket"}, False),
+    ({"tittel": "", "tittel_kilder": [], "tittel_grunn": "ikke støttet"}, False),
+])
+def test_article_headline_only_when_checked(tmp_path, data_dir, extra, shown):
+    path = data_dir / "artikler-redigert" / BYSTYRET / "2026-09-23" / "238-26.json"
+    path.write_text(json.dumps({**ARTICLE, **extra}))
+    site = tmp_path / "site"
+    bygg.build(site, data_dir, idag=date(2026, 10, 1))
+    page = sak_page(site, "238/26").read_text()
+    bakgrunn = re.search(r'<section class="bakgrunn lag.*?</section>', page, re.S).group(0)
+    assert ("Hallen har vært planlagt siden 2019</h2>" in bakgrunn) is shown
+    if shown:
+        assert '<section class="bakgrunn lag bakgrunn-med-tittel" id="bakgrunn" aria-labelledby="bakgrunn-tittel">' in bakgrunn
+        assert ('<p class="etikett etikett-strek bakgrunn-etikett" aria-hidden="true">Bakgrunn</p>' in bakgrunn
+                and '<h2 class="bakgrunn-tittel" id="bakgrunn-tittel"><span class="vh">Bakgrunn: </span>' in bakgrunn)
+        assert bakgrunn.index('<h2 class="bakgrunn-tittel"') < bakgrunn.index('class="byline"') < bakgrunn.index("Hallen har vært planlagt siden 2019. ")
+    else:  # the layout without a headline: the label is the heading
+        assert '<h2 class="etikett etikett-strek bakgrunn-etikett" id="bakgrunn-tittel">Bakgrunn</h2>' in bakgrunn
+        assert "bakgrunn-med-tittel" not in bakgrunn and 'class="bakgrunn-tittel"' not in bakgrunn
+
+
+def test_no_article_headline_without_a_publishable_article(tmp_path, data_dir):
+    path = data_dir / "artikler-redigert" / BYSTYRET / "2026-09-23" / "239-26.json"
+    rejected = json.loads(path.read_text())
+    path.write_text(json.dumps({**rejected, "tittel": "SKAL IKKE VISES", "tittel_kilder": [{"dok": "protokoll", "side": 1}],
+                                "tittel_grunn": ""}))
+    site = tmp_path / "site"
+    bygg.build(site, data_dir, idag=date(2026, 10, 1))
+    assert "SKAL IKKE VISES" not in sak_page(site, "239/26").read_text()
+
+
 def test_rss_has_tema_category(site):
     site, _ = site
     root = ET.parse(site / "bergen" / "rss.xml").getroot()
@@ -590,11 +627,12 @@ def test_goatcounter_is_self_hosted_and_explained(tmp_path, data_dir, monkeypatc
     forside = (tmp_path / "med" / "bergen" / "index.html").read_text()
     assert '<script data-goatcounter="../count" async src="../static/count.js"></script>' in forside
     assert "globalPrivacyControl" in forside  # readers who say no aren't counted
-    assert (tmp_path / "med" / "_redirects").read_text() == "/count https://eksempel.goatcounter.com/count 200\n"
+    assert "/count https://eksempel.goatcounter.com/count 200" in (tmp_path / "med" / "_redirects").read_text().splitlines()
     assert "gc.zgo.at" not in forside and (tmp_path / "med" / "static" / "count.js").exists()
     assert "Besøkstall" in (tmp_path / "med" / "om" / "index.html").read_text()
     monkeypatch.setattr(config, "GOATCOUNTER", None)
     bygg.build(tmp_path / "uten", data_dir, idag=date(2026, 10, 1))
     assert "goatcounter" not in (tmp_path / "uten" / "bergen" / "index.html").read_text()
     assert "Besøkstall" not in (tmp_path / "uten" / "om" / "index.html").read_text()
-    assert not (tmp_path / "uten" / "_redirects").exists()
+    redirects = tmp_path / "uten" / "_redirects"
+    assert not redirects.exists() or "/count" not in redirects.read_text()

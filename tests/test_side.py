@@ -148,3 +148,13 @@ def test_editor_contact_and_email_report(tmp_path, data_dir, monkeypatch):
     assert "Hvem står bak" not in (tmp_path / "uten" / "om" / "index.html").read_text()
     sak = next((tmp_path / "uten" / "bergen" / "sak").rglob("index.html")).read_text()
     assert "mailto:" not in sak and ">Meld feil</a>" in sak
+
+
+def test_root_goes_straight_to_bergen_on_statichost(tmp_path, data_dir, monkeypatch):
+    monkeypatch.setattr(config, "STARTSIDE", "bergen/")
+    bygg.build(tmp_path / "s", data_dir, idag=date(2026, 10, 1))
+    assert "/ /bergen/ 302!" in (tmp_path / "s" / "_redirects").read_text().splitlines()
+    assert (tmp_path / "s" / "index.html").exists()  # the landing page stays as the fallback
+    monkeypatch.setattr(config, "STARTSIDE", None)
+    bygg.build(tmp_path / "u", data_dir, idag=date(2026, 10, 1))
+    assert not (tmp_path / "u" / "_redirects").exists()

@@ -78,11 +78,15 @@ def test_kjor_runs_steps_in_order_with_given_backends(tmp_path, monkeypatch):
     monkeypatch.setattr(pipeline, "todo", lambda step, items, data_dir: items)
     monkeypatch.setattr(pipeline, "velg_artikler", lambda items, data_dir: items)
     monkeypatch.setattr(pipeline, "omskriv_kandidater", lambda items, data_dir, **kw: {})
+    monkeypatch.setattr(pipeline.artikkeltittel, "run", lambda items, data_dir, llm, sjekk_llm, parallel:
+                        calls.append(("artikkeltittel.run", (llm, sjekk_llm), None)) or {"ok": len(items)})
     pipeline.kjor(tmp_path, llms={"skriv": "W", "sjekk": "C", "klassifiser": "K"})
     assert calls == [("skribent.run", "W", True), ("faktasjekker.run", "C", True), ("klassifiserer.run", "K", True),
                      ("redaktor.run", None, None),
                      ("skribent.run_artikkel", "W", True), ("faktasjekker.run_artikkel", "C", True),
-                     ("redaktor.run_artikler", None, None)]
+                     ("redaktor.run_artikler", None, None),
+                     # last: the article headline (writer + checker), then the redaktør again to keep or drop it
+                     ("artikkeltittel.run", ("W", "C"), None), ("redaktor.run_artikler", None, None)]
 
 
 def test_kjor_steg_subset_skips_the_rest(tmp_path, monkeypatch):

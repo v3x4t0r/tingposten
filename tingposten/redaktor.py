@@ -11,8 +11,13 @@ Articles get the same treatment (rediger_artikkel): sentences that are
 unsupported, that only repeat the card (plan rule 1), or that hit the
 forbudsliste are deleted; an article over the limits, or with too little left,
 is rejected.
+
+An article's own headline (artikkeltittel.py writes and checks it) is kept
+or dropped whole (rediger_tittel): dropping it publishes the article without
+a headline, never a reworded one.
 """
 
+import hashlib
 import json
 import os
 import re
@@ -27,6 +32,7 @@ MAX_HEADLINE = 65
 MAX_ARTICLE_WORDS = 250
 MAX_PARAGRAPHS = 5
 MIN_ARTICLE_WORDS = 40
+MAX_TITTEL = 60  # the article's own headline (the writer aims at 55)
 
 # Rejection codes ("koder" in the output). Only these may be fixed by the
 # writer automatically; personvern always waits for a human, and checker
@@ -369,10 +375,104 @@ def _assert_article_deletion_only(paragraphs: list[str], kept: list[tuple[int, s
             raise AssertionError(f"avsnitt {n}: redaktøren la til eller endret tekst")
 
 
+# --- the article's headline -------------------------------------------------------
+
+ORGAN_FORST = re.compile(r"\s*(?:bystyret|byrådet)\b", re.IGNORECASE)
+MERKELAPP = re.compile(r"\s*(?:bakgrunn(?:en)?|mer om|om saken|saken forklart)\b", re.IGNORECASE)
+
+
+def tittel_grunnlag(kort_overskrift: str, avsnitt: list[dict]) -> str:
+    """Fingerprint of the text a headline is written for: the card's headline
+    (which it must not repeat) and the edited article's paragraphs."""
+    text = json.dumps([kort_overskrift or "", [a.get("tekst") or "" for a in avsnitt]], ensure_ascii=False)
+    return hashlib.sha256(text.encode()).hexdigest()[:16]
+
+
+def samme_overskrift(a: str, b: str) -> bool:
+    """The same words, ignoring case, punctuation and spacing."""
+    norm = lambda s: " ".join(re.sub(r"[^\w\s]", " ", s or "").casefold().split())
+    return bool(norm(a)) and norm(a) == norm(b)
+
+
+def tittel_brudd(tittel: str, kort_overskrift: str = "") -> list[str]:
+    """The hard rules a headline must keep to be published, as reasons."""
+    out = []
+    if len(tittel) > MAX_TITTEL:
+        out.append(f"over {MAX_TITTEL} tegn ({len(tittel)})")
+    if "\n" in tittel:
+        out.append("mer enn én linje")
+    if ORGAN_FORST.match(tittel):
+        out.append("begynner med organet")
+    if MERKELAPP.match(tittel):
+        out.append("en merkelapp, ikke hva bakgrunnen handler om")
+    if hit := banned(tittel, "overskrift"):
+        out.append(f"forbudsliste: {hit}")
+    elif re.search(r"[.!:;,]\s*$", tittel):
+        out.append("slutter med tegnsetting")
+    if samme_overskrift(tittel, kort_overskrift):
+        out.append("gjentar kortets overskrift")
+    return out
+
+
+def rediger_tittel(record: dict | None, avsnitt: list[dict], kort_overskrift: str) -> dict:
+    """The article's headline, if it may be published: written for exactly this
+    text (the edited paragraphs and card headline, see tittel_grunnlag), within
+    the hard limits, and checked by the fact-checker as supported, neutral and
+    new next to the card's headline, with support on pages the article cites.
+    Otherwise "" — the article is published without one — and the reason.
+    Never reworded: the headline is the checked string or nothing."""
+    def none(why: str) -> dict:
+        return {"tittel": "", "tittel_kilder": [], "tittel_grunn": why}
+
+    if not avsnitt:
+        return none("")  # no article, no headline
+    if record is None:
+        return none("ingen tittel ennå")
+    if record.get("grunnlag") != tittel_grunnlag(kort_overskrift, avsnitt):
+        return none("tittelen ble laget for en annen tekst")
+    tittel = record.get("tittel") or ""
+    if not tittel.strip():
+        return none("ingen tittel" + (f": {record['blocked'].strip()}" if (record.get("blocked") or "").strip() else ""))
+    reasons = tittel_brudd(tittel, kort_overskrift)
+    check = record.get("sjekk")
+    if not check or check.get("tittel") != tittel:
+        reasons.append("ikke faktasjekket")
+        check = None
+    else:
+        why = (check.get("begrunnelse") or "").strip()
+        if (check.get("blocked") or "").strip():
+            reasons.append(f"ikke faktasjekket: {check['blocked'].strip()}")
+        if check.get("personvern"):
+            reasons.append("personvern: " + "; ".join(check["personvern"]))
+        if check.get("stottet") is not True:
+            reasons.append("ikke støttet" + (f": {why}" if why else ""))
+        if check.get("noytral") is not True:
+            reasons.append("ikke nøytral" + (f": {why}" if why else ""))
+        if check.get("gjentar_kortet") is not False:
+            reasons.append("gjentar kortets overskrift")
+    cited = {(k.get("dok"), k.get("side")) for a in avsnitt for k in a.get("kilder") or []}
+    kilder = []
+    for k in (check or {}).get("kilder") or []:
+        ref = {"dok": k.get("dok"), "side": k.get("side")}
+        if (ref["dok"], ref["side"]) in cited and ref not in kilder:
+            kilder.append(ref)
+    if check and not kilder:
+        reasons.append("støtten ligger ikke på sidene artikkelen bygger på")
+    if reasons:
+        return none("; ".join(dict.fromkeys(reasons)))
+    return {"tittel": tittel, "tittel_kilder": kilder, "tittel_grunn": ""}
+
+
+def _uten_tittel(result: dict | None) -> dict | None:
+    return None if result is None else {k: v for k, v in result.items() if not k.startswith("tittel")}
+
+
 def run_artikler(items: list[dict], data_dir: Path = config.DATA_DIR) -> dict:
-    """Edit every item that has an article; write artikler-redigert/<key>.json."""
+    """Edit every item that has an article; write artikler-redigert/<key>.json,
+    with the article's headline when artikkeltittel/<key>.json holds one that
+    passes rediger_tittel."""
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    counts = {"redigert": 0, "publiserbar": 0, "avvist": 0, "slettet": 0, "endret": 0}
+    counts = {"redigert": 0, "publiserbar": 0, "avvist": 0, "slettet": 0, "endret": 0, "tittel": 0}
     metrics = []
     for item in items:
         key = pdf.key(item)
@@ -383,11 +483,23 @@ def run_artikler(items: list[dict], data_dir: Path = config.DATA_DIR) -> dict:
         # A check older than the article was made for another text.
         fresh = check_path.exists() and check_path.stat().st_mtime >= art_path.stat().st_mtime
         result = rediger_artikkel(json.loads(art_path.read_text()), _read(check_path) if fresh else None)
+        title_record = _read(data_dir / "artikkeltittel" / f"{key}.json")
+        card_headline = (_read(data_dir / "redigert" / f"{key}.json") or {}).get("overskrift") or ""
+        result.update(rediger_tittel(title_record, [] if result["avvist"] else result["avsnitt"], card_headline))
         counts["redigert"] += 1
         counts["avvist" if result["avvist"] else "publiserbar"] += 1
         counts["slettet"] += len(result["slettet"])
-        if _write_if_changed(data_dir / "artikler-redigert" / f"{key}.json", result):
+        counts["tittel"] += bool(result["tittel"])
+        out_path = data_dir / "artikler-redigert" / f"{key}.json"
+        before = _read(out_path)
+        if _write_if_changed(out_path, result):
             counts["endret"] += 1
+            if title_record is not None and ((before or {}).get("tittel"), (before or {}).get("tittel_grunn")) != (
+                    result["tittel"], result["tittel_grunn"]):
+                metrics.append({"tid": now, "type": "artikkeltittel", "key": key, "tittel": result["tittel"],
+                                "tegn": len(result["tittel"]), "grunn": result["tittel_grunn"]})
+            if _uten_tittel(before) == _uten_tittel(result):
+                continue  # only the headline changed; the article's own metrics are unchanged
             metrics.append({
                 "tid": now, "type": "artikkel", "key": key, "ord_for": result["ord_for"], "ord": result["ord"],
                 "setninger_for": result["setninger_for"], "nye_fakta": result["nye_fakta"],

@@ -37,7 +37,7 @@ from .klassifiserer import TEMA
 from .saksframlegg import saksbydeler
 from . import status as status_mod
 from .status import IKKE_AVGJORT
-from .typo import typo
+from .typo import rydd_tittel, typo
 
 log = logging.getLogger(__name__)
 
@@ -200,9 +200,16 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
     if (HERE / "static" / "favicon.ico").exists():
         shutil.copy(HERE / "static" / "favicon.ico", tmp / "favicon.ico")
     (tmp / ".nojekyll").write_text("")
+    # statichost rules (_redirects): "/" goes straight to Bergen while it is the only
+    # kommune ("!" = even though index.html exists; that page stays as the fallback
+    # elsewhere), and optionally /count is proxied to GoatCounter.
+    regler = []
+    if getattr(config, "STARTSIDE", None):
+        regler.append(f"/ /{config.STARTSIDE} 302!")
     if getattr(config, "GOATCOUNTER", None) and getattr(config, "GOATCOUNTER_VIA_SIDEN", False):
-        # statichost: a 200 rule proxies /count to GoatCounter (query string included).
-        (tmp / "_redirects").write_text(f"/count {config.GOATCOUNTER} 200\n")
+        regler.append(f"/count {config.GOATCOUNTER} 200")
+    if regler:
+        (tmp / "_redirects").write_text("\n".join(regler) + "\n")
     if getattr(config, "SKJUL_FOR_SOK", False):
         (tmp / "robots.txt").write_text("User-agent: *\nDisallow: /\n")
     if config.CNAME:
@@ -342,8 +349,8 @@ def _sak(item: dict, ranked: dict, data_dir: Path, parsers: "_Parsers | None" = 
     sak = {
         "nr": _nr(item),
         "nr_etikett": nr_etikett(item),
-        "tittel": item.get("tittel", ""),
-        "overskrift": (card.get("overskrift") if usable else "") or item.get("tittel", ""),
+        "tittel": rydd_tittel(item.get("tittel", "")),
+        "overskrift": (card.get("overskrift") if usable else "") or rydd_tittel(item.get("tittel", "")),
         "organ": config.TIER1.get(uid, item.get("utvalgsNavn", uid)),
         "organ_kort": ORGAN_KORT.get(uid, config.TIER1.get(uid, uid)),
         "utvalg": uid,
@@ -375,6 +382,7 @@ def _sak(item: dict, ranked: dict, data_dir: Path, parsers: "_Parsers | None" = 
         "venter_protokoll": not klar,
     }
     sak["har_artikkel"] = bool(sak["artikkel"])
+    sak["artikkel_tittel"] = _article_title(item, data_dir) if sak["artikkel"] else ""
     sak["lesetid"] = lesetid(sak["artikkel"])
     sak["fremhevet"] = sak["score"] >= _terskel()
     sak["meld_feil"] = meld_feil(sak["nr"], sak["tittel"], _site_url() + sak["lenke"])
@@ -532,6 +540,17 @@ def _article(item: dict, data_dir: Path) -> list[dict]:
                 sources.append({"dok": k["dok"], "side": k["side"], "href": f"{base}#page={k['side']}"})
         out.append({"tekst": text, "kilder": _dedupe(sources)})
     return out
+
+
+def _article_title(item: dict, data_dir: Path) -> str:
+    """The background article's own headline, only as the redaktør kept it:
+    checked as supported, with the pages that support it (rediger_tittel).
+    "" for anything else, and the article is shown without one."""
+    art = _read_json(data_dir / "artikler-redigert" / f"{pdf.key(item)}.json")
+    if not art or art.get("avvist") or not art.get("avsnitt"):
+        return ""
+    tittel = " ".join((art.get("tittel") or "").split())
+    return tittel if tittel and art.get("tittel_kilder") and not art.get("tittel_grunn") else ""
 
 
 def _fields(item: dict, card: dict) -> list[dict]:

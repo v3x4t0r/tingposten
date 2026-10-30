@@ -48,7 +48,8 @@ def main(argv: list[str] | None = None) -> int:
     kjorp = sub.add_parser("kjor", help="write, fact-check, classify and edit every decided sak with PDFs on disk")
     kjorp.add_argument("--utvalg", help="only this utvalgId")
     kjorp.add_argument("--dato", help="only this meeting date YYYY-MM-DD")
-    kjorp.add_argument("--steg", help="comma-separated subset of skriv,sjekk,klassifiser,rediger,artikkel,artikkelsjekk,artikkelrediger")
+    kjorp.add_argument("--steg", help="comma-separated subset of skriv,sjekk,klassifiser,rediger,artikkel,"
+                                      "artikkelsjekk,artikkelrediger,artikkeltittel")
     kjorp.add_argument("--parallel", type=int, default=3)
     kjorp.add_argument("--fra", help="oldest meeting date YYYY-MM-DD (default: config.TILBAKE_DAGER back)")
 

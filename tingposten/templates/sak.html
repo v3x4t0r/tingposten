@@ -77,9 +77,15 @@
     </div>
     {% if s.artikkel %}
     {% set bygger = artikkel_dokumenter(s.artikkel) %}
-    <section class="bakgrunn lag" id="bakgrunn" aria-labelledby="bakgrunn-tittel">
+    <section class="bakgrunn lag{% if s.artikkel_tittel %} bakgrunn-med-tittel{% endif %}" id="bakgrunn" aria-labelledby="bakgrunn-tittel">
+      {# The article's own headline only as the redaktør kept it (fact-checked); "Bakgrunn" is then its kicker. #}
+      {% if s.artikkel_tittel %}
+      <p class="etikett etikett-strek bakgrunn-etikett" aria-hidden="true">Bakgrunn</p>
+      {% else %}
       <h2 class="etikett etikett-strek bakgrunn-etikett" id="bakgrunn-tittel">Bakgrunn</h2>
+      {% endif %}
       <div>
+        {% if s.artikkel_tittel %}<h2 class="bakgrunn-tittel" id="bakgrunn-tittel"><span class="vh">Bakgrunn: </span>{{ s.artikkel_tittel|tittel }}</h2>{% endif %}
         <p class="byline">{% if bygger %}<span>Bygger på {{ bygger }}</span>{% endif %}<span class="nb">Ca. {{ s.lesetid }} {{ "minutt" if s.lesetid == 1 else "minutter" }} å lese</span></p>
         <div class="brodtekst">
           {% for a in s.artikkel %}

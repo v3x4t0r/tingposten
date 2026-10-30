@@ -80,6 +80,9 @@ GOATCOUNTER = "https://v3x4t0r.goatcounter.com/count"
 # Host header as "v3x4t0r.goatcounter.com:443" and GoatCounter answers 400 "no site
 # at this domain" (tested 2026-10-30). Turn on if statichost fixes that.
 GOATCOUNTER_VIA_SIDEN = False
+# "/" sends readers straight to this page while Bergen is the only kommune
+# (statichost _redirects; the landing page stays as the fallback elsewhere). None = landing page.
+STARTSIDE = "bergen/" if PUBLISER_TIL.startswith("statichost") else None
 FREMHEVET_TERSKEL = 40  # score at or above this is highlighted on the front page
 MELD_FEIL = None  # None → GitHub issue on REPO, prefilled with the sak
 # Who stands behind the site (shown on the Om page) and where readers write.

@@ -55,3 +55,18 @@ def typo(value) -> Markup:
         parts = re.split(r"(<[^>]*>)", str(value))
         return Markup("".join(p if p.startswith("<") else _bindestrek(mellomrom(p)) for p in parts))
     return Markup(_bindestrek(str(escape(mellomrom(str(value))))))
+
+
+# The kommune's own titles carry bookkeeping a reader doesn't need: the date a
+# representantforslag was submitted, stray whitespace, and " - " used as a dash.
+_INNSENDT = re.compile(r"[\s.,]*(?:Innsendt:?\s*|-\s*(?=\d{1,2}\.\d{1,2}\.\d{4}\s*$))\d{1,2}\.\d{1,2}\.\d{2,4}\.?\s*$")
+
+
+def rydd_tittel(tittel: str) -> str:
+    """A kommune title for display: no "Innsendt: 18.2.2026" (or a trailing
+    "-19.11.2025") at the end, single spaces, and " – " for a spaced " - ".
+    The words are otherwise the kommune's own."""
+    t = " ".join((tittel or "").split())
+    if t.lower().startswith("representantforslag"):
+        t = _INNSENDT.sub("", t)
+    return t.replace(" - ", " – ")
