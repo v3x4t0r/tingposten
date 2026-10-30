@@ -165,6 +165,9 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
 
     shutil.copytree(HERE / "static", tmp / "static")
     (tmp / ".nojekyll").write_text("")
+    if getattr(config, "GOATCOUNTER", None) and getattr(config, "GOATCOUNTER_VIA_SIDEN", False):
+        # statichost: a 200 rule proxies /count to GoatCounter (query string included).
+        (tmp / "_redirects").write_text(f"/count {config.GOATCOUNTER} 200\n")
     if getattr(config, "SKJUL_FOR_SOK", False):
         (tmp / "robots.txt").write_text("User-agent: *\nDisallow: /\n")
     if config.CNAME:
@@ -733,6 +736,7 @@ def _env() -> Environment:
     env.globals["fonter"] = (HERE / "static" / "fonts.css").exists()
     env.globals["skjult"] = getattr(config, "SKJUL_FOR_SOK", False)
     env.globals["goatcounter"] = getattr(config, "GOATCOUNTER", None)
+    env.globals["teller_via_siden"] = getattr(config, "GOATCOUNTER_VIA_SIDEN", False)
     return env
 
 

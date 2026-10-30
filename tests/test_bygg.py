@@ -571,12 +571,16 @@ def test_hidden_from_search_until_launch(tmp_path, data_dir, monkeypatch):
 
 def test_goatcounter_is_self_hosted_and_explained(tmp_path, data_dir, monkeypatch):
     monkeypatch.setattr(config, "GOATCOUNTER", "https://eksempel.goatcounter.com/count")
+    monkeypatch.setattr(config, "GOATCOUNTER_VIA_SIDEN", True)
     bygg.build(tmp_path / "med", data_dir, idag=date(2026, 10, 1))
     forside = (tmp_path / "med" / "bergen" / "index.html").read_text()
-    assert '<script data-goatcounter="https://eksempel.goatcounter.com/count" async src="../static/count.js"></script>' in forside
+    assert '<script data-goatcounter="../count" async src="../static/count.js"></script>' in forside
+    assert "globalPrivacyControl" in forside  # readers who say no aren't counted
+    assert (tmp_path / "med" / "_redirects").read_text() == "/count https://eksempel.goatcounter.com/count 200\n"
     assert "gc.zgo.at" not in forside and (tmp_path / "med" / "static" / "count.js").exists()
     assert "Besøkstall" in (tmp_path / "med" / "om" / "index.html").read_text()
     monkeypatch.setattr(config, "GOATCOUNTER", None)
     bygg.build(tmp_path / "uten", data_dir, idag=date(2026, 10, 1))
     assert "goatcounter" not in (tmp_path / "uten" / "bergen" / "index.html").read_text()
     assert "Besøkstall" not in (tmp_path / "uten" / "om" / "index.html").read_text()
+    assert not (tmp_path / "uten" / "_redirects").exists()

@@ -74,6 +74,10 @@ SKJUL_FOR_SOK = True
 # in static/ is GoatCounter's own script (ISC), unmodified and served from this
 # site; only the count goes to this endpoint. None = no counting.
 GOATCOUNTER = "https://v3x4t0r.goatcounter.com/count"
+# Count through the site itself: the page sends the count to <site>/count and
+# statichost forwards it to GOATCOUNTER (a proxy rule in _redirects), so readers'
+# browsers only talk to tingposten.no. Works only on statichost.
+GOATCOUNTER_VIA_SIDEN = PUBLISER_TIL.startswith("statichost")
 FREMHEVET_TERSKEL = 40  # score at or above this is highlighted on the front page
 MELD_FEIL = None  # None → GitHub issue on REPO, prefilled with the sak
 
