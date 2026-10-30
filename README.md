@@ -12,7 +12,16 @@ Nettstedet: <https://tingposten.no/>. Redaksjonell erklæring: [`docs/redaksjone
 4. **bygg** – den statiske nettsiden i `site/`, fra malene i `tingposten/templates/`.
 5. **publiser** – committer `site/` til grenen `nettside` og ber statichost.eu publisere den.
 
-Rettelser legges inn med `tingposten rett …` og vises på saken. Daglig kjøring på en Raspberry Pi: [`deploy/README.md`](deploy/README.md).
+Rettelser legges inn med `tingposten rett …` og vises på saken.
+
+**Papirutgave** – `tingposten utgave` lager en trykkeklar PDF av ett møte, med det samme faktasjekkede innholdet som nettsiden: forside, hovedsakene i sin helhet, de andre sakene kort i sakslistens rekkefølge, og under hver sak kildene (dokument og side), en kortadresse (`tingposten.no/s/bs-266-26`) og en QR-kode. Kortadressene er regler i `_redirects` som `bygg` skriver, så de virker etter neste `bygg` + `publiser`. Trenger Chromium via Playwright (valgfri avhengighet):
+
+```sh
+uv run --extra utgave playwright install chromium   # én gang, hvis Playwright ikke finner en Chromium
+uv run --extra utgave tingposten utgave --mote 571424-2026-09-23 --format tabloid --til utgave.pdf --png forhandsvisning/
+```
+
+Formater: `tabloid` (280 × 400 mm, 5 spalter, avispapir), `a4` (A4-hefte, 3 spalter) og `a5` (A5-hefte, 2 spalter; skriver også `<fil>-hefte.pdf` med to sider per liggende A4-ark i heftrekkefølge, for tosidig utskrift med vending på kortsiden). Daglig kjøring på en Raspberry Pi: [`deploy/README.md`](deploy/README.md).
 
 ## Kjøre lokalt
 
@@ -32,6 +41,7 @@ uv run tingposten bygg --til /tmp/tingposten && python3 -m http.server -d /tmp/t
 - `protokoll.py`, `saksframlegg.py`, `status.py`, `score.py`, `grafikk.py` – det som leses mekanisk ut av dokumentene: vedtak, stemmetall, bydeler, beløp, rangering og figurer
 - `bygg.py`, `templates/`, `static/`, `typo.py`, `rettelser.py` – nettsiden
 - `publiserer.py` – publisering
+- `utgave.py`, `templates/utgave/` – papirutgaven
 
 ## Data
 

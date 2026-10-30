@@ -74,6 +74,19 @@ def main(argv: list[str] | None = None) -> int:
                        help="kilde for den nye teksten, f.eks. saksframlegg:5 (kan gjentas). Uten beholder feltet "
                             "sine kilder")
 
+    utg = sub.add_parser(
+        "utgave", help="papirutgave av ett møte som PDF (trenger: uv run --extra utgave)",
+        description="Lager en trykkeklar PDF av ett møte: forside, hovedsakene i sin helhet, de andre sakene kort, "
+                    "kilder, kortadresse og QR-kode til hver sak. Bare faktasjekket innhold, som på nettsiden. "
+                    "Kortadressene (/s/…) virker når nettsiden er bygget og publisert på nytt.")
+    utg.add_argument("--mote", required=True, help="møtet: <utvalgId>-<dato>, f.eks. 571424-2026-09-23")
+    utg.add_argument("--format", default="tabloid", choices=("tabloid", "a4", "a5"),
+                     help="tabloid: 280 × 400 mm, 5 spalter; a4: A4-hefte, 3 spalter; a5: A5-hefte, 2 spalter "
+                          "(skriver også <fil>-hefte.pdf: A4-ark med to sider side om side, klar for hjemmeskriver)")
+    utg.add_argument("--til", type=Path, required=True, help="PDF-filen som skal skrives")
+    utg.add_argument("--png", type=Path, help="skriv også en PNG av hver side i denne mappen")
+    utg.add_argument("--dpi", type=int, default=110, help="oppløsning for --png (standard 110)")
+
     vurd = sub.add_parser("vurder", help="local web page for sorting a meeting's draft cards")
     vurd.add_argument("--utvalg", required=True, help="utvalgId, e.g. 571424")
     vurd.add_argument("--dato", required=True, help="meeting date YYYY-MM-DD")
@@ -126,6 +139,19 @@ def main(argv: list[str] | None = None) -> int:
         if unknown := set(steg) - set(pipeline.STEG):
             parser.error(f"unknown steg: {', '.join(sorted(unknown))}")
         pipeline.kjor(utvalg=args.utvalg, dato=args.dato, steg=steg, parallel=args.parallel, fra=args.fra)
+    elif args.cmd == "utgave":
+        from . import utgave
+
+        try:
+            info = utgave.lag(args.mote, args.format, args.til, forhandsvisning=args.png, dpi=args.dpi)
+        except utgave.UtgaveFeil as e:
+            logging.error("utgaven ble ikke laget: %s", e)
+            return 1
+        logging.info("utgave: %s, %d sider, %d hele saker, %d korte → %s", info["format"], info["sider"],
+                     len(info["hele"]), len(info["korte"]), info["pdf"])
+        if info.get("hefte"):
+            logging.info("hefte for utskrift: %d A4-ark, tosidig med vending på kortsiden → %s", info["ark"],
+                         info["hefte"])
     elif args.cmd == "bygg":
         from . import bygg
 

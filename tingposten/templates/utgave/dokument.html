@@ -1,0 +1,46 @@
+{# One document for a whole edition (sider) or for measuring blocks (maal).
+   Every box on a page is placed explicitly (utgave.Side): position and size in mm. #}
+<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<title>Tingposten · Prøveutgave nr. {{ nr }} · {{ mote.organ_kort }} {{ mote.dato_tekst }}</title>
+<style>
+{{ fontcss }}
+@page { size: {{ fmt.bredde }}mm {{ fmt.hoyde }}mm; margin: 0; }
+:root {
+  --side-b: {{ fmt.bredde }}mm; --side-h: {{ fmt.hoyde }}mm;
+  --marg-topp: {{ fmt.topp }}mm; --marg-bunn: {{ fmt.bunn }}mm; --marg-inner: {{ fmt.inner }}mm; --marg-ytre: {{ fmt.ytre }}mm;
+  --mellom: {{ fmt.mellom }}mm; --folio: {{ fmt.folio }}mm; --folio-luft: {{ folio_luft }}mm; --band-luft: {{ luft }}mm;
+{% for k, v in fmt.css.items() %}  {{ k }}: {{ v }};
+{% endfor %}
+}
+{{ css }}
+.rute { position: absolute; overflow: hidden; }
+.strek { position: absolute; }
+.maal { display: flow-root; margin: 0 0 20mm; }
+</style>
+</head>
+<body class="format-{{ fmt.navn }}">
+{% if maal %}
+{% for m in maal %}<div class="maal" data-maal="{{ m.id }}" style="width: {{ '%.3f'|format(m.bredde) }}mm">{{ m.html }}</div>
+{% endfor %}
+{% else %}
+{% for side in sider %}
+<section class="side {{ 'hoyre' if side.nr is odd else 'venstre' }}{% if side.nr == 1 %} forside{% endif %}" data-side="{{ side.nr }}">
+  <div class="sats">
+    {% if side.folio %}
+    <header class="folio"><span class="folio-v">{% if side.nr is even %}<span class="folio-nr">{{ side.nr }}</span>&emsp;{% endif %}<span class="folio-del">{{ side.folio }}</span></span><span class="folio-navn">Tingposten</span><span class="folio-h">{{ mote.organ_kort }} {{ mote.dato_tekst }} · Prøveutgave nr. {{ nr }}{% if side.nr is odd %}&emsp;<span class="folio-nr">{{ side.nr }}</span>{% endif %}</span></header>
+    {% endif %}
+    <div class="innhold">
+      {% for r in side.ruter %}<div class="rute rute-{{ r.klasse }}" data-boks="{{ r.id }}" data-blokk="{{ r.id }}" style="top: {{ '%.2f'|format(r.y) }}mm; left: {{ '%.2f'|format(r.x) }}mm; width: {{ '%.2f'|format(r.b) }}mm; height: {{ '%.2f'|format(r.h) }}mm">{{ r.html }}</div>
+      {% endfor %}
+      {% for l in side.streker %}<div class="strek" style="top: {{ '%.2f'|format(l.y) }}mm; left: {{ '%.2f'|format(l.x) }}mm; width: {{ '%.2f'|format(l.b) }}mm; height: {{ '%.2f'|format(l.h) }}mm; {{ 'border-top' if l.h == 0 else 'border-left' }}: {{ l.vekt }}pt {{ l.stil }} #000"></div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endfor %}
+{% endif %}
+</body>
+</html>

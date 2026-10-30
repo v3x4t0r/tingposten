@@ -1,0 +1,220 @@
+/* Tingposten på papir: the site's design D set for print. Blackletter nameplate,
+   Bodoni headlines, Franklin for labels, Source Serif for reading (static
+   instances: "TP …", see utgave.fonter()). Ink only: every glyph and rule in
+   black, greys only for areas in the figures. No colour anywhere: no party
+   colours, nothing that tells winners from losers. The geometry (page, margins,
+   columns, type sizes) comes from utgave.FORMATER as custom properties. */
+
+@page { margin: 0; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #fff; }
+body {
+  color: #000;
+  font: 400 var(--brod)/var(--brod-linje) "TP Serif", serif;
+  font-kerning: normal;
+  font-variant-ligatures: common-ligatures;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  text-rendering: geometricPrecision;
+}
+.nb { white-space: nowrap; }
+svg { display: block; }
+
+/* ---------- Pages ---------- */
+.side { position: relative; width: var(--side-b); height: var(--side-h); overflow: hidden; break-after: page; page-break-after: always; background: #fff; }
+.side:last-child { break-after: auto; page-break-after: auto; }
+.sats { position: absolute; top: var(--marg-topp); bottom: var(--marg-bunn); display: flex; flex-direction: column; }
+.side.hoyre .sats { left: var(--marg-inner); right: var(--marg-ytre); }
+.side.venstre .sats { left: var(--marg-ytre); right: var(--marg-inner); }
+
+/* Running head on inside pages: page number at the outer edge, the edition in the middle */
+.folio { flex: none; height: var(--folio); display: grid; grid-template-columns: 1fr auto 1fr; align-items: end;
+         padding-bottom: 1.6mm; border-bottom: 0.9pt solid #000; font: 500 var(--liten)/1.2 "TP Franklin"; letter-spacing: 0.04em; }
+.folio-navn { font: 400 15pt/1 "TP Navn"; letter-spacing: 0; text-align: center; }
+.folio-nr { font: 700 11pt/1 "TP Franklin"; letter-spacing: 0; }
+.folio-del { text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; }
+.side.hoyre .folio-v { text-align: left; }
+.side.hoyre .folio-h { text-align: right; }
+.side.venstre .folio-v { text-align: left; }
+.side.venstre .folio-h { text-align: right; }
+
+.innhold { flex: 1 1 auto; position: relative; min-height: 0; }
+.folio + .innhold { margin-top: var(--folio-luft); }
+.band { position: absolute; left: 0; right: 0; display: grid; column-gap: var(--mellom); }
+.band + .band::before, .band.strek::before { content: ""; position: absolute; left: 0; right: 0; top: calc(-0.5 * var(--band-luft)); border-top: 0.5pt solid #000; }
+.band > .celle { position: relative; min-width: 0; }
+.band > .celle + .celle::before { content: ""; position: absolute; top: 0; bottom: 0; left: calc(-0.5 * var(--mellom)); border-left: 0.35pt solid #000; }
+
+/* ---------- Small type ---------- */
+.stikk { margin: 0 0 1.4mm; font: 700 var(--stikk)/1.25 "TP Franklin"; letter-spacing: 0.1em; text-transform: uppercase; }
+.stikk .del { font-weight: 500; letter-spacing: 0.03em; text-transform: none; }
+.stikk .del::before { content: "·"; margin: 0 0.5em; font-weight: 700; }
+.stikk .status { display: inline-block; margin-left: 0.6em; padding: 0 0.45em 0.1em; border: 0.5pt solid #000; font-weight: 600; letter-spacing: 0.03em; text-transform: none; }
+.etikett { margin: 0; font: 700 var(--liten)/1.25 "TP Franklin"; letter-spacing: 0.1em; text-transform: uppercase; }
+
+/* ---------- Full story ---------- */
+.sak { position: relative; }
+.tittel { margin: 0; font-family: "TP Bodoni"; font-weight: 700; line-height: 1.04; letter-spacing: -0.01em; word-spacing: 0.06em; text-wrap: balance; hyphens: manual; }
+.ingress { margin: 2mm 0 0; font: 400 var(--ingress)/1.3 "TP Serif Display"; text-wrap: pretty; hyphens: auto; hyphenate-limit-chars: 8 4 3; }
+.sak-full .ingress { max-width: 190mm; }
+.kropp { display: grid; column-gap: var(--mellom); margin-top: 3mm; align-items: start; }
+.spalter { column-gap: var(--mellom); column-fill: balance; orphans: 2; widows: 2; }
+/* Ragged right with hyphenation: even word spaces in narrow columns (a browser justifies line by line). */
+.spalter p { margin: 0; text-align: left; hyphens: auto; hyphenate-limit-chars: 6 3 2; text-wrap: pretty; orphans: 2; widows: 2; }
+.felt + .felt { margin-top: 1.3mm; }
+.felt-etikett { font: 700 calc(var(--brod) * 0.78)/1 "TP Franklin"; letter-spacing: 0.08em; text-transform: uppercase; margin-right: 0.3em; }
+.kort-etikett { margin: 0 0 1.2mm !important; font: 700 var(--liten)/1.25 "TP Franklin"; letter-spacing: 0.1em; text-transform: uppercase; text-align: left !important; break-after: avoid; }
+.bakgrunn { margin-top: 3mm; padding-top: 1.8mm; border-top: 0.5pt solid #000; }
+.bakgrunn-stikk { margin: 0 0 0.8mm !important; break-inside: avoid; font: 700 var(--liten)/1.25 "TP Franklin"; letter-spacing: 0.1em; text-transform: uppercase; text-align: left !important; break-after: avoid; }
+.bakgrunn-tittel { margin: 0 0 1.4mm; font: 700 calc(var(--brod) * 1.42)/1.12 "TP Bodoni"; word-spacing: 0.05em; text-wrap: balance; break-inside: avoid; break-after: avoid; hyphens: manual; }
+.bakgrunn p + p { text-indent: 1.1em; }
+.rettet { margin-top: 2mm !important; font: italic 400 calc(var(--brod) * 0.92)/1.3 "TP Serif"; text-align: left !important; }
+
+/* Sources, short address and QR code: where every story ends */
+.kildefot { break-inside: avoid; margin-top: 2.4mm; padding-top: 1.6mm; border-top: 0.35pt solid #000; font: 400 var(--liten)/1.3 "TP Franklin"; }
+.kildefot .kilde { margin: 0; text-align: left; hyphens: manual; }
+.kildefot .kilde b { font-weight: 700; }
+/* QR: at least four modules (~1.8 mm) of white around it, the quiet zone readers need. */
+.lenke { display: flex; align-items: center; gap: 2.8mm; margin-top: 2.2mm; }
+.lenke .qr { flex: none; width: var(--qr); height: var(--qr); }
+.lenke p { margin: 0; text-align: left; hyphens: manual; }
+.lenke b { display: block; font: 700 calc(var(--liten) * 1.12)/1.25 "TP Franklin"; letter-spacing: 0.01em; }
+
+/* Key facts and figures: beside the text (sidefelt) or in a row above it */
+.sidefelt { display: flex; flex-direction: column; gap: 4mm; }
+.figurrad { display: flex; flex-wrap: wrap; align-items: flex-start; column-gap: var(--mellom); row-gap: 3mm; margin-top: 3mm; }
+.nokkel { margin: 0; padding: 0; border-top: 1.4pt solid #000; }
+.nokkel > div { padding: 1.2mm 0 1.3mm; border-bottom: 0.35pt solid #000; }
+.nokkel dt { font: 700 calc(var(--liten) * 0.95)/1.2 "TP Franklin"; letter-spacing: 0.09em; text-transform: uppercase; }
+.nokkel dd { margin: 0.4mm 0 0; font: 700 calc(var(--brod) * 1.32)/1.15 "TP Bodoni"; }
+.figurrad .nokkel { width: var(--fakta-b, 46mm); }
+.figur { margin: 0; padding-top: 1.3mm; border-top: 1.4pt solid #000; break-inside: avoid; }
+.spalter .figur { margin: 2.6mm 0 1mm; }
+.erklaering .etikett { margin-bottom: 0.8mm; }
+.band-boks .boks { columns: var(--boks-spalter, 1); column-gap: var(--mellom); }
+.band-boks .boks h3, .band-boks .boks .etikett { column-span: all; }
+.figur-tittel { margin: 0 0 1mm; font: 700 calc(var(--liten) * 0.95)/1.2 "TP Franklin"; letter-spacing: 0.09em; text-transform: uppercase; }
+.figur-forklaring { margin: 0 0 1.6mm; font: 400 calc(var(--liten) * 0.95)/1.3 "TP Franklin"; }
+.figur svg { height: auto; font-family: "TP Franklin"; }
+.figur figcaption { margin-top: 1.2mm; font: 400 calc(var(--liten) * 0.92)/1.3 "TP Franklin"; }
+.tegnforklaring { margin: 0 0 0.6mm; font-weight: 700; }
+
+/* ---------- Short story (agenda order) ---------- */
+/* A block in a column of the flow: a hairline under it, GAP_KORT (utgave.py) before the next. */
+.blokk { padding-bottom: 3mm; border-bottom: 0.35pt solid #000; }
+.kolonne > .blokk + .blokk { margin-top: calc(3.2mm + var(--ekstra, 0mm)); }
+.kolonne > .blokk:last-child { border-bottom: 0; }
+.blokk-boks, .blokk-liste, .blokk-valg { border-bottom: 0; }
+.kort .tittel { font-size: var(--h-kort); line-height: 1.1; }
+.kort .ingress { margin-top: 1.2mm; font: 400 var(--brod)/var(--brod-linje) "TP Serif"; text-align: left; }
+.fakta { list-style: none; margin: 1.4mm 0 0; padding: 0; font: 600 var(--liten)/1.3 "TP Franklin"; }
+.fakta li { display: inline; }
+.fakta li + li::before { content: " · "; font-weight: 700; }
+.fakta .status { padding: 0 0.4em 0.1em; border: 0.5pt solid #000; }
+.kort .kildefot { margin-top: 1.8mm; padding-top: 0; border-top: 0; }
+.kort .lenke { margin-top: 2mm; align-items: flex-start; }
+.kort .lenke .qr { width: var(--qr-kort); height: var(--qr-kort); }
+
+/* The flow of short stories: explicit columns */
+.flyt { position: absolute; left: 0; right: 0; }
+.flyt-hode { display: flex; align-items: baseline; justify-content: space-between; gap: 6mm; padding-top: 1.6mm; border-top: 2pt solid #000; }
+.flyt-hode h2 { margin: 0; font: 700 var(--h-3)/1.05 "TP Bodoni"; word-spacing: 0.06em; }
+.flyt-hode p { margin: 0; font: 500 calc(var(--liten) * 1.15)/1.3 "TP Franklin"; text-align: right; }
+.kolonner { position: absolute; left: 0; right: 0; display: grid; column-gap: var(--mellom); }
+.kolonne { position: relative; min-width: 0; overflow: hidden; }
+.kolonne + .kolonne::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; border-left: 0.35pt solid #000; }
+.kolonner .kolonne + .kolonne { overflow: visible; }
+
+/* Agenda lines: saker without a summary, valg og fritak */
+.dagsorden { break-inside: avoid; }
+.dagsorden h3 { margin: 0 0 1.2mm; padding-top: 1.2mm; border-top: 1.4pt solid #000; font: 700 var(--liten)/1.25 "TP Franklin"; letter-spacing: 0.1em; text-transform: uppercase; }
+.dagsorden p.forklaring { margin: 0 0 1.4mm; font: 400 var(--liten)/1.35 "TP Franklin"; }
+.dagsorden ol { list-style: none; margin: 0; padding: 0; }
+.dagsorden li { padding: 1.1mm 0 1.2mm; border-top: 0.35pt solid #000; }
+.dagsorden li:first-child { border-top: 0; padding-top: 0; }
+.dagsorden .nr { display: block; font: 600 calc(var(--liten) * 0.95)/1.25 "TP Franklin"; letter-spacing: 0.02em; }
+.dagsorden .linje { display: block; font: 600 calc(var(--brod) * 0.98)/1.25 "TP Serif"; hyphens: auto; }
+.dagsorden .raa { font-weight: 400; }
+.dagsorden .adr { display: block; margin-top: 0.3mm; font: 500 calc(var(--liten) * 0.92)/1.25 "TP Franklin"; }
+
+/* ---------- Boxes: the meeting, how it's made, corrections, colophon ---------- */
+.boks { break-inside: avoid; padding-top: 1.6mm; border-top: 2pt solid #000; }
+.boks h3 { margin: 0 0 1.6mm; font: 700 calc(var(--brod) * 1.5)/1.1 "TP Bodoni"; word-spacing: 0.05em; }
+.boks p { margin: 0 0 1.4mm; text-align: left; hyphens: auto; }
+.boks .smal { font: 400 var(--liten)/1.4 "TP Franklin"; }
+.mote-tall { display: flex; align-items: baseline; gap: 2.5mm; margin: 0 0 1.6mm; }
+.mote-tall strong { font: 700 calc(var(--brod) * 4.2)/0.9 "TP Bodoni"; letter-spacing: -0.02em; }
+.mote-tall span { font: 500 calc(var(--liten) * 1.25)/1.25 "TP Franklin"; }
+.utfall { list-style: none; margin: 0; padding: 0; font: 500 calc(var(--liten) * 1.08)/1.3 "TP Franklin"; }
+.utfall li { display: flex; justify-content: space-between; gap: 2mm; padding: 0.9mm 0 1mm; border-top: 0.35pt solid #000; }
+.utfall li > span:last-child { font-weight: 700; font-variant-numeric: tabular-nums; }
+.innhold-liste { list-style: none; margin: 0; padding: 0; font: 500 calc(var(--liten) * 1.08)/1.3 "TP Franklin"; }
+.innhold-liste li { display: grid; grid-template-columns: 1fr auto; gap: 2mm; padding: 1mm 0 1.1mm; border-top: 0.35pt solid #000; }
+.innhold-liste li > span:last-child { font-weight: 700; font-variant-numeric: tabular-nums; }
+.innhold-liste .tit { font: 600 calc(var(--brod) * 0.95)/1.22 "TP Serif"; }
+.kolofon { font: 400 var(--liten)/1.45 "TP Franklin"; }
+.kolofon .kolofon-navn { margin: 0 0 1mm; font: 400 24pt/1 "TP Navn"; }
+.kolofon p { margin: 0 0 1mm; }
+.erklaering h4 { margin: 2mm 0 0.6mm; font: 700 calc(var(--liten) * 1.05)/1.25 "TP Franklin"; letter-spacing: 0.08em; text-transform: uppercase; }
+.erklaering p { text-align: left; }
+
+/* ---------- Front page ---------- */
+.forside .sats { display: block; }
+.masthode { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; }
+.navnetrekk { margin: 0; font: 400 var(--navn)/0.86 "TP Navn"; text-align: center; letter-spacing: 0; }
+.ore { margin: 0 0 3mm; font: 500 calc(var(--liten) * 1.2)/1.35 "TP Franklin"; letter-spacing: 0.05em; }
+.ore-v { justify-self: start; }
+.ore-h { justify-self: end; text-align: right; font: italic 400 calc(var(--brod) * 1.35)/1.25 "TP Bodoni"; letter-spacing: 0; }
+.prove { display: inline-block; padding: 1.2mm 2mm 1.1mm; border: 1.2pt solid #000; font: 700 calc(var(--liten) * 1.25)/1.15 "TP Franklin"; letter-spacing: 0.12em; text-transform: uppercase; }
+.dateline { margin: 0; display: flex; justify-content: center; gap: 0; padding: 1.5mm 0 1.4mm; border-top: 0.9pt solid #000; border-bottom: 3.2pt double #000;
+            font: 600 calc(var(--liten) * 1.2)/1.2 "TP Franklin"; letter-spacing: 0.1em; text-transform: uppercase; }
+.dateline span + span::before { content: "·"; margin: 0 0.9em; }
+.front-sone { position: absolute; left: 0; right: 0; display: grid; column-gap: var(--mellom); }
+.lead .tittel { font-size: var(--h-lead); line-height: 1.0; letter-spacing: -0.015em; }
+.lead .ingress { font-size: calc(var(--ingress) * 1.18); max-width: none; }
+.lead .stikk { font-size: calc(var(--stikk) * 1.12); }
+.nokkelrad { display: flex; flex-wrap: wrap; margin: 4mm 0 0; padding: 0; border-top: 0.5pt solid #000; }
+.nokkelrad > div { padding: 2mm 7mm 0 4mm; border-left: 0.35pt solid #000; }
+.nokkelrad > div:first-child { padding-left: 0; border-left: 0; }
+.nokkelrad dt { font: 700 calc(var(--liten) * 0.95)/1.2 "TP Franklin"; letter-spacing: 0.09em; text-transform: uppercase; }
+.nokkelrad dd { margin: 1mm 0 0; font: 700 calc(var(--brod) * 1.9)/1.1 "TP Bodoni"; }
+.henvisning { margin: 2.4mm 0 0; font: 700 calc(var(--liten) * 1.15)/1.3 "TP Franklin"; letter-spacing: 0.02em; }
+.teaser .tittel { font-size: var(--h-front); line-height: 1.07; }
+/* One column is narrow for Norwegian compounds: a headline may break a long word there. */
+.teaser .tittel, .kort .tittel, .bakgrunn-tittel { hyphens: auto; hyphenate-limit-chars: 10 5 4; }
+.teaser .ingress { font: 400 calc(var(--brod) * 1.08)/1.36 "TP Serif"; text-align: left; }
+.teaser .fakta { margin-top: 1.6mm; }
+.minikart { display: flex; align-items: center; gap: 2.5mm; margin: 2.2mm 0 0; }
+.minikart svg { width: 17mm; height: auto; flex: none; }
+.minikart svg text { display: none; }
+.minikart span { font: 700 calc(var(--liten) * 1.05)/1.2 "TP Franklin"; }
+.front-kilde { margin: 1.2mm 0 0; font: 400 calc(var(--liten) * 0.9)/1.3 "TP Franklin"; }
+.front-figurer { display: flex; flex-wrap: wrap; gap: 3mm var(--mellom); margin-top: 4mm; align-items: flex-start; }
+.rail { display: flex; flex-direction: column; gap: 5mm; }
+.ombord { padding: 2mm 2.4mm 2.2mm; border: 1.2pt solid #000; }
+.ombord h3 { margin: 0 0 1mm; font: 700 var(--liten)/1.25 "TP Franklin"; letter-spacing: 0.1em; text-transform: uppercase; }
+.ombord p { margin: 0; font: 400 calc(var(--brod) * 0.95)/1.32 "TP Serif"; text-align: left; hyphens: auto; }
+
+/* Key facts in a row under the dek when a story has no figures */
+.sak-full .nokkelrad { margin-top: 2.6mm; }
+.sak-full .nokkelrad dd { font-size: calc(var(--brod) * 1.32); margin-top: 0.4mm; }
+.sak-full .nokkelrad > div { padding: 1.2mm 6mm 0 3mm; }
+.sak-full .nokkelrad > div:first-child { padding-left: 0; }
+.lead-felt { margin-top: 4mm; }
+.motetall.vannrett { display: grid; grid-template-columns: var(--motetall-v, 1fr) 1fr; column-gap: var(--mellom); align-items: start; }
+.motetall.vannrett .utfall { columns: 2; column-gap: var(--mellom); }
+.motetall.vannrett .utfall li { break-inside: avoid; }
+/* One column is too narrow for "tema · Sak 240/26" on a line: the number goes under the tema. */
+.kort .stikk .del { display: block; }
+.kort .stikk .del::before { content: none; }
+.kort .stikk .status { margin: 0.5mm 0 0; }
+.bakgrunn-alene p + p { text-indent: 1.1em; }
+.figurdel-tittel { margin: 0 0 1mm; font: 700 calc(var(--brod) * 1.3)/1.15 "TP Bodoni"; word-spacing: 0.05em; }
+.sak-figurer .figurrad { margin-top: 1.5mm; }
+.stabel > * + * { margin-top: 5mm; }
+/* A5: no room for the ears beside the nameplate; the dateline says Prøveutgave. */
+.format-a5 .masthode { grid-template-columns: 1fr; justify-items: center; }
+.format-a5 .ore { display: none; }
+.format-a5 .dateline { letter-spacing: 0.05em; }
+.format-a5 .dateline span + span::before { margin: 0 0.6em; }
+.om-tittel { margin: 0 0 4mm; font: 700 var(--h-topp)/1.05 "TP Bodoni"; }
+.om-tingposten > .boks + .boks { margin-top: 5mm; }

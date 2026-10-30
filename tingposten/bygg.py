@@ -64,6 +64,13 @@ RELATED = 6         # "Fra samme møte" on a sak page
 BYSTYRET = "571424"
 # Short organ names for kickers and breadcrumbs.
 ORGAN_KORT = {BYSTYRET: "Bystyret", "900101": "Byrådet (innstilling)", "900102": "Byrådet"}
+# Short addresses for print (utgave.py): tingposten.no/s/bs-266-26 → the sak page,
+# a 301 rule in _redirects. Bystyret and byrådet number their saker in separate
+# series, so the organ is part of the address; interpellasjoner have a series of
+# their own that reuses the saker's numbers ("Interpellasjon 28/26" is not "Sak
+# 28/26"), so they get an "i" before the number: bs-i28-26.
+KORT_ORGAN = {BYSTYRET: "bs", "900102": "br", "900101": "bi"}
+KORT_STI = "s/"
 # The meeting page's outcome line ("26 vedtatt · 3 tatt til orientering …"), in this
 # order. Keys are status codes (status.LABELS); "innstilling_falt" is a sak that was
 # adopted with another proposal than the innstilling, as in fakta().
@@ -203,12 +210,14 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
     (tmp / ".nojekyll").write_text("")
     # statichost rules (_redirects): "/" goes straight to Bergen while it is the only
     # kommune ("!" = even though index.html exists; that page stays as the fallback
-    # elsewhere), and optionally /count is proxied to GoatCounter.
+    # elsewhere), optionally /count is proxied to GoatCounter, and the printed
+    # edition's short addresses (/s/bs-266-26) lead to their sak pages.
     regler = []
     if getattr(config, "STARTSIDE", None):
         regler.append(f"/ /{config.STARTSIDE} 302!")
     if getattr(config, "GOATCOUNTER", None) and getattr(config, "GOATCOUNTER_VIA_SIDEN", False):
         regler.append(f"/count {config.GOATCOUNTER} 200")
+    regler += kortlenke_regler(saker)
     if regler:
         (tmp / "_redirects").write_text("\n".join(regler) + "\n")
     if getattr(config, "SKJUL_FOR_SOK", False):
@@ -247,7 +256,40 @@ def load(data_dir: Path) -> list[dict]:
                                                        parse_saksframlegg=parsers.saksframlegg)}
             for item in meeting:
                 saker.append(_sak(item, ranked.get(_nr(item), {}), data_dir, parsers))
+    kortlenker(saker)
     return saker
+
+
+def kort_id(s: dict) -> str:
+    """The sak's short id: organ, series and number, e.g. "bs-266-26", "bs-i28-26",
+    "br-1019.1-26". Only letters, digits, "." and "-", so it survives being typed."""
+    organ = KORT_ORGAN.get(s["utvalg"], re.sub(r"[^a-z0-9]+", "", str(s["utvalg"]).lower()) or "x")
+    serie = "i" if s["nr_etikett"].startswith("Interpellasjon") else ""
+    nr = re.sub(r"[^a-z0-9.]+", "-", str(s["nr"]).lower()).strip("-.") or "sak"
+    return f"{organ}-{serie}{nr}"
+
+
+def kortlenker(saker: list[dict]) -> None:
+    """Give every sak its short address (s["kort"], relative to the site's root,
+    like s["side"]) and the full URL (s["kortlenke"]). A number is unique within
+    one organ's series and year; should it ever come back at a later meeting, the
+    earlier sak keeps the plain address (it may already be in print) and the later
+    one gets its meeting date added: bs-266-26-20261028."""
+    brukt: dict[str, dict] = {}
+    for s in sorted(saker, key=lambda x: (x["dato"], x["utvalg"], x["seq"], x["side"])):
+        kort = kort_id(s)
+        if kort in brukt:
+            log.warning("short address %s is taken by %s; %s gets the date", kort, brukt[kort]["side"], s["side"])
+            kort = f"{kort}-{s['dato']:%Y%m%d}"
+        brukt[kort] = s
+        s["kort"] = KORT_STI + kort
+        s["kortlenke"] = _site_url() + s["kort"]
+
+
+def kortlenke_regler(saker: list[dict]) -> list[str]:
+    """statichost/_redirects rules: /s/<kort> → the sak page, permanently (301)."""
+    root = urlsplit(_site_url()).path or "/"
+    return [f"{root}{s['kort']} {root}{s['side']} 301" for s in sorted(saker, key=lambda x: x["kort"]) if s.get("kort")]
 
 
 def _nr(item: dict) -> str:

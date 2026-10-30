@@ -159,4 +159,5 @@ def test_root_goes_straight_to_bergen_on_statichost(tmp_path, data_dir, monkeypa
     assert (tmp_path / "s" / "index.html").exists()  # the landing page stays as the fallback
     monkeypatch.setattr(config, "STARTSIDE", None)
     bygg.build(tmp_path / "u", data_dir, idag=date(2026, 10, 1))
-    assert not (tmp_path / "u" / "_redirects").exists()
+    redirects = tmp_path / "u" / "_redirects"  # the short addresses (/s/…) stay
+    assert not redirects.exists() or not any(r.startswith("/ ") for r in redirects.read_text().splitlines())
