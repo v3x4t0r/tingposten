@@ -1,24 +1,27 @@
 {% extends "base.html" %}
 {% block title %}Møter · Tingposten{% endblock %}
-{% block hovedklasse %}listeside{% endblock %}
+{% block description %}Alle møter i bystyret og byrådet i Bergen, nyeste først, hvert med alle sakene fra møtet.{% endblock %}
+{% block hovedklasse %}listeside moterside{% endblock %}
 {% block main %}
 <nav class="brodsmule" aria-label="Brødsmuler"><ol>
-  <li><a href="{{ root }}bergen/">Bergen</a></li>
+  <li><a href="{{ root }}bergen/">Forsiden</a></li>
   <li>Møter</li>
 </ol></nav>
 <header class="sidehode">
-  <p class="kicker"><span class="kicker-tema">Møter</span></p>
   <h1 class="side-tittel">Alle møter</h1>
-  <p class="side-ingress">Hvert møte har en egen side med alle sakene som ble avgjort. Rekkefølgen på forsiden endrer aldri hva som er med.</p>
+  <p class="side-ingress">Alle møter i bystyret og byrådet, nyeste først.</p>
 </header>
+{# Months in columns that run down: newest first, read like a list. #}
+<div class="maneder">
 {% for maned in moter|groupby("maned_nr")|reverse %}
-<section class="seksjon" aria-labelledby="mnd-{{ maned.grouper }}">
-  <div class="seksjon-hode"><h2 id="mnd-{{ maned.grouper }}">{{ maned.list[0].maned }}</h2><p>{{ maned.list|length }} {{ "møte" if maned.list|length == 1 else "møter" }}</p></div>
+<section class="maned" aria-labelledby="mnd-{{ maned.grouper }}">
+  <h2 id="mnd-{{ maned.grouper }}">{{ maned.list[0].maned }}</h2>
   <ul class="moterader">
-    {% for m in maned.list %}<li><a href="{{ root }}bergen/mote/{{ m.slug }}/">{{ m.organ_kort }} {{ m.dato|kort_dato(short=False) }}</a><span>{{ m.saker|length }} {{ "sak" if m.saker|length == 1 else "saker" }}</span></li>{% endfor %}
+    {% for m in maned.list %}<li{% if m.bystyret %} class="bystyret"{% endif %}><a href="{{ root }}bergen/mote/{{ m.slug }}/">{{ m.organ_kort }} <span class="nb">{{ m.dato|ukedag }} {{ m.dato|kort_dato(short=False) }}</span></a><span class="moterad-tall">{{ m.saker|length }} {{ "sak" if m.saker|length == 1 else "saker" }}{% if m.venter_protokoll %} · venter på protokoll{% endif %}</span></li>{% endfor %}
   </ul>
 </section>
 {% else %}
 <p class="tomt">Ingen møter ennå.</p>
 {% endfor %}
+</div>
 {% endblock %}

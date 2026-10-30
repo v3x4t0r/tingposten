@@ -3,10 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-{% if skjult %}<meta name="robots" content="noindex, nofollow">
+{% if skjult or noindex|default(false) %}<meta name="robots" content="noindex, nofollow">
 {% endif %}<title>{% block title %}Tingposten{% endblock %}</title>
 <meta name="description" content="{% block description %}Hva Bergen kommune faktisk vedtar – hver sak i samme format, med lenke til kilden.{% endblock %}">
-{% if fonter %}<link rel="stylesheet" href="{{ root }}static/fonts.css">
+{% if sti is not none %}<link rel="canonical" href="{{ site_url }}{{ sti }}">
+<meta property="og:url" content="{{ site_url }}{{ sti }}">
+{% endif %}
+<meta property="og:title" content="{{ self.title() }}">
+<meta property="og:description" content="{{ self.description() }}">
+<meta property="og:type" content="{{ 'article' if side == 'sak' else 'website' }}">
+<meta property="og:site_name" content="Tingposten">
+<meta property="og:locale" content="nb_NO">
+<link rel="icon" href="{{ root }}favicon.ico" sizes="32x32">
+<link rel="icon" href="{{ root }}static/favicon.svg" type="image/svg+xml">
+{% if fonter %}{% if side in ("forside", "landing") %}<link rel="preload" href="{{ root }}static/fonts/unifrakturmaguntia-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+{% endif %}<link rel="stylesheet" href="{{ root }}static/fonts.css">
 {% endif %}
 <link rel="stylesheet" href="{{ root }}static/style.css">
 <link rel="alternate" type="application/rss+xml" title="Tingposten Bergen" href="{{ root }}bergen/rss.xml">
@@ -22,8 +33,9 @@
 <symbol id="i-dok" viewBox="0 0 16 16"><path d="M4 1.8h5.2l3 3v9.4H4z"/><path d="M9 1.8v3.2h3.2"/></symbol>
 </svg>
 <a class="hopp" href="#innhold">Hopp til innholdet</a>
+{# "page" on the page itself; "true" on a page inside the section (one meeting under Møter). #}
 {% set meny %}
-<a href="{{ root }}bergen/"{% if side == "forside" %} aria-current="page"{% endif %}>Forside</a><a href="{{ root }}bergen/moter/"{% if side in ("moter", "mote") %} aria-current="page"{% endif %}>Møter</a><a href="{{ root }}om/"{% if side == "om" %} aria-current="page"{% endif %}>Om</a>
+<a href="{{ root }}bergen/"{% if side == "forside" %} aria-current="page"{% endif %}>Forside</a><a href="{{ root }}bergen/moter/"{% if side == "moter" %} aria-current="page"{% elif side == "mote" %} aria-current="true"{% endif %}>Møter</a><a href="{{ root }}om/"{% if side == "om" %} aria-current="page"{% endif %}>Om</a>
 {% endset %}
 {% if side in ("forside", "landing") %}
 <header class="masthode ramme">
@@ -50,11 +62,11 @@
 <main id="innhold" class="ramme {% block hovedklasse %}vanlig{% endblock %}">
 {% block main %}{% endblock %}
 </main>
-<footer class="bunn">
-  <div class="ramme">
+<footer class="bunn ramme">
+  <div class="bunn-innhold">
     <p class="bunn-navn">Tingposten</p>
     <p>Tingposten viser hva Bergen kommune vedtar. Hver setning bygger på kommunens egne dokumenter, og hver sak lenker til dem.</p>
-    <p><a href="{{ root }}om/">Om Tingposten og rangeringen</a> · <a href="{{ root }}bergen/rss.xml">RSS</a> · <a href="https://github.com/{{ repo }}">Åpen kildekode</a></p>
+    <p class="bunn-lenker"><a href="{{ root }}om/">Om Tingposten og rangeringen</a> · <a href="{{ root }}bergen/rss.xml">RSS</a> · <a href="https://github.com/{{ repo }}">Åpen kildekode</a></p>
   </div>
 </footer>
 </body>

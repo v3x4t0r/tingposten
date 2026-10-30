@@ -1,6 +1,7 @@
 {% extends "base.html" %}
-{% from "macros.html" import rad %}
+{% from "macros.html" import motegrupper %}
 {% block title %}Alle vedtak · {{ periode }} · Tingposten{% endblock %}
+{% block description %}Alle vedtak i Bergen kommune, {{ periode|lower }}, samlet per møte.{% endblock %}
 {% block hovedklasse %}listeside{% endblock %}
 {% block main %}
 <nav class="brodsmule" aria-label="Brødsmuler"><ol>
@@ -8,18 +9,12 @@
   <li>Alle vedtak</li>
 </ol></nav>
 <header class="sidehode">
-  <p class="kicker"><span class="kicker-tema">Alle vedtak</span><span class="kicker-del">{{ periode }}</span></p>
   <h1 class="side-tittel">Alle vedtak, {{ periode|lower }}</h1>
-  <p class="side-ingress">{{ antall }} vedtak, samlet per møte. Sakene står i samme rekkefølge som i møtet.</p>
+  {% if moter %}<p class="side-ingress">{{ antall }} vedtak fra {{ moter|length }} {{ "møte" if moter|length == 1 else "møter" }}, nyeste møte først. Sakene står i samme rekkefølge som i møtet.</p>{% endif %}
 </header>
-{% for m in moter %}
-<section class="seksjon" aria-labelledby="m-{{ m.slug }}">
-  <div class="seksjon-hode"><h2 id="m-{{ m.slug }}"><a href="{{ root }}bergen/mote/{{ m.slug }}/">{{ m.organ_kort }} <span class="nb">{{ m.dato_tekst }}</span></a></h2><p>{{ m.saker|length }} {{ "sak" if m.saker|length == 1 else "saker" }}</p></div>
-  <ol class="rader">
-    {% for s in m.saker %}{{ rad(s, root, nr=True) }}{% endfor %}
-  </ol>
-</section>
+{% if moter %}
+{{ motegrupper(moter, root, aar=aar) }}
 {% else %}
 <p class="tomt">Ingen vedtak i perioden.</p>
-{% endfor %}
+{% endif %}
 {% endblock %}

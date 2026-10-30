@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "macros.html" import lead as lead_story, sek, rad, flis %}
-{% block title %}Tingposten · Bergen · {{ periode }}{% endblock %}
+{% block title %}{{ periode }} · Bergen · Tingposten{% endblock %}
+{% block description %}Hva Bergen kommune har vedtatt, {{ periode|lower }}: de viktigste sakene først, hver med lenke til kommunens egne dokumenter.{% endblock %}
 {% block forhode %}
 <nav class="periodelinje ramme" aria-label="Periode">
   <div class="faner"><a href="{{ root }}bergen/"{% if visning == "" %} aria-current="page"{% endif %}>Siste 14 dager</a><a href="{{ root }}bergen/30-dager/"{% if visning == "30-dager/" %} aria-current="page"{% endif %}>Siste 30 dager</a><a href="{{ root }}bergen/i-ar/"{% if visning == "i-ar/" %} aria-current="page"{% endif %}>I år</a></div>
@@ -19,21 +20,32 @@
 <aside class="periode" aria-labelledby="periode-tittel">
   <h2 class="etikett" id="periode-tittel">Perioden i tall</h2>
   <p class="periode-tall"><strong>{{ antall }}</strong> vedtak fra {{ moter|length }} {{ "møte" if moter|length == 1 else "møter" }}</p>
-  <ul class="moteliste" aria-label="Møter i perioden">
-    {% for m in panel_moter %}<li><a href="{{ root }}bergen/mote/{{ m.slug }}/">{{ m.organ_kort }} {{ m.dato|kort_dato(short=False) }}</a><span>{{ m.saker|length }}<span class="vh"> vedtak</span></span></li>{% endfor %}
-    {% if moter|length > panel_moter|length %}<li class="moteliste-mer"><a class="pil" href="{{ root }}bergen/{{ visning }}alle/">og {{ moter|length - panel_moter|length }} møter til</a></li>{% endif %}
-  </ul>
-  <h3 class="etikett-liten">Vedtak per tema</h3>
-  {% set maks = (temaer|map(attribute="antall")|max) or 1 %}
-  <ul class="stolper">
-    {% for t in temaer %}<li><a href="#tema-{{ t.tema }}"><span class="stolpe-navn">{{ t.navn }}</span><span class="stolpe-spor" aria-hidden="true"><span class="stolpe" style="--andel:{{ '%.1f'|format(100 * t.antall / maks) }}%"></span></span><span class="stolpe-tall">{{ t.antall }}<span class="vh"> vedtak</span></span></a></li>{% endfor %}
-  </ul>
+  <div class="periode-moter">
+    <h3 class="etikett-liten" id="periode-moter">Møter</h3>
+    <ul class="moteliste" aria-labelledby="periode-moter">
+      {% for m in panel_moter %}<li><a href="{{ root }}bergen/mote/{{ m.slug }}/">{{ m.organ_kort }} {{ m.dato|kort_dato(short=False) }}</a><span>{{ m.saker|length }}<span class="vh"> vedtak</span></span></li>{% endfor %}
+      {% set flere_moter = moter|length - panel_moter|length %}
+      {% if flere_moter %}<li class="moteliste-mer"><a class="pil" href="{{ root }}bergen/moter/">og {{ flere_moter }} {{ "møte" if flere_moter == 1 else "møter" }} til</a></li>{% endif %}
+    </ul>
+  </div>
+  <div class="periode-temaer">
+    <h3 class="etikett-liten" id="periode-temaer">Vedtak per tema</h3>
+    {% set maks = (temaer|map(attribute="antall")|max) or 1 %}
+    <ul class="stolper" aria-labelledby="periode-temaer">
+      {% for t in panel_temaer %}<li><a href="{{ root }}bergen/{{ visning }}tema/{{ t.tema }}/"><span class="stolpe-navn">{{ t.navn }}</span><span class="stolpe-spor" aria-hidden="true"><span class="stolpe" style="--andel:{{ '%.1f'|format(100 * t.antall / maks) }}%"></span></span><span class="stolpe-tall">{{ t.antall }}<span class="vh"> vedtak</span></span></a></li>{% endfor %}
+    </ul>
+    {% set flere_temaer = temaer|length - panel_temaer|length %}
+    {% if flere_temaer %}<p class="stolper-mer"><a class="pil" href="#temaer">og {{ flere_temaer }} temaer til</a></p>{% endif %}
+  </div>
 </aside>
 </div>
 {% if sekundaer %}
+{% set ns = namespace(kart=false) %}
+{% for s in sekundaer %}{% if figur(s, "kart") %}{% set ns.kart = true %}{% endif %}{% endfor %}
 <section class="fire fire-{{ sekundaer|length }}" aria-labelledby="fire-tittel">
 <h2 class="vh" id="fire-tittel">Flere viktige vedtak</h2>
 {% for s in sekundaer %}{{ sek(s, root, std) }}{% endfor %}
+{% if ns.kart %}<p class="fire-kilde">Kart: © OpenStreetMap (ODbL)</p>{% endif %}
 </section>
 {% endif %}
 {% if liste %}
@@ -45,11 +57,12 @@
 </section>
 {% endif %}
 {% if fliser %}
-<section class="temaer" aria-labelledby="temaer-tittel">
+<section class="temaer" id="temaer" aria-labelledby="temaer-tittel">
   <div class="temaer-hode"><h2 id="temaer-tittel">Alle temaer</h2><p>Andre vedtak i perioden, etter tema</p></div>
   <div class="fliser">
   {% for t in fliser %}{{ flis(t, root, visning, std) }}{% endfor %}
   </div>
+  {% if ogsa %}<p class="ogsa"><span class="ogsa-etikett">Også i perioden:</span> {% for t in ogsa %}<span class="nb"><a href="{{ root }}bergen/{{ visning }}tema/{{ t.tema }}/">{{ t.navn }}</a> <span class="antall">{{ t.antall }}<span class="vh"> vedtak</span></span></span>{% if not loop.last %}<span class="vh">,</span> {% endif %}{% endfor %}</p>{% endif %}
 </section>
 {% endif %}
 <div class="andre">
