@@ -1609,6 +1609,7 @@ def lag(mote: str, format_: str, til: Path, *, saker: list[dict] | None = None, 
     if fmt.navn == "a5":
         info["hefte"] = str(hefte_sti(til))
         info["ark"] = hefte(til, hefte_sti(til))
+        info["enkeltsidig"] = [str(f) for f in enkeltsidig(hefte_sti(til))]
     if forhandsvisning:
         info["png"] = [str(p) for p in png(til, Path(forhandsvisning), dpi)]
         if info.get("hefte"):
@@ -1812,6 +1813,30 @@ def hefte(kilde: Path, til: Path) -> int:
     with open(til, "wb") as fil:
         skriver.write(fil)
     return n // 4
+
+
+def enkeltsidig(hefte_pdf: Path) -> list[Path]:
+    """The imposed booklet split for a printer without duplex: the sheets' fronts
+    in one file and their backs in another, both in sheet order (sheet 1, the one
+    with the front page, first), plus the backs turned 180° for printers that feed
+    the stack the other way round. Print the fronts, put the stack back with sheet
+    1 fed first, print the backs. Returns the three paths."""
+    from pypdf import PdfReader, PdfWriter
+
+    leser = PdfReader(str(hefte_pdf))
+    stier = [hefte_pdf.with_name(f"{hefte_pdf.stem}-{navn}{hefte_pdf.suffix}")
+             for navn in ("1-forsider", "2-baksider", "2-baksider-snudd")]
+    for sti, start, snu in zip(stier, (0, 1, 1), (False, False, True)):
+        skriver = PdfWriter()
+        for i in range(start, len(leser.pages), 2):
+            side = skriver.add_page(leser.pages[i])
+            if snu:
+                side.rotate(180)
+        skriver.add_metadata({"/Title": f"Tingposten, prøveutgave nr. {UTGAVE_NR} (A5-hefte, {sti.stem.split('-hefte-')[-1]})",
+                              "/Creator": "Tingposten (utgave.py)"})
+        with open(sti, "wb") as fil:
+            skriver.write(fil)
+    return stier
 
 
 def skjerm_sti(til: Path) -> Path:

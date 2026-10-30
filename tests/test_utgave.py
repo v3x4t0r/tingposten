@@ -376,3 +376,24 @@ def test_screen_copy_only_retints_the_paper():
     ut = utgave.skjermkopi(html)
     assert utgave.SKJERM_PAPIR in ut and "#ffffff" not in ut and "#333333" in ut
     assert utgave.skjerm_sti(Path("a/tingposten-2026-09-23-a5.pdf")).name == "tingposten-2026-09-23-a5-skjerm.pdf"
+
+
+
+def test_booklet_split_for_a_printer_without_duplex(tmp_path):
+    from pypdf import PdfReader, PdfWriter
+    from tingposten import utgave
+    # a fake 4-sheet booklet: front, back, front, back … each page's width tells which it is
+    skriver = PdfWriter()
+    for i in range(8):
+        skriver.add_blank_page(width=800 + i, height=595)
+    hefte = tmp_path / "x-a5-hefte.pdf"
+    with open(hefte, "wb") as fil:
+        skriver.write(fil)
+    forsider, baksider, snudd = utgave.enkeltsidig(hefte)
+    assert forsider.name == "x-a5-hefte-1-forsider.pdf" and baksider.name == "x-a5-hefte-2-baksider.pdf"
+    bredder = lambda f: [float(p.mediabox.width) for p in PdfReader(str(f)).pages]
+    assert bredder(forsider) == [800, 802, 804, 806]   # sheet 1–4 fronts
+    assert bredder(baksider) == [801, 803, 805, 807]   # sheet 1–4 backs, same order
+    assert bredder(snudd) == bredder(baksider)
+    assert all(p.get("/Rotate") == 180 for p in PdfReader(str(snudd)).pages)
+    assert all(p.get("/Rotate", 0) == 0 for p in PdfReader(str(baksider)).pages)
