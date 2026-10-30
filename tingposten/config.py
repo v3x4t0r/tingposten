@@ -76,8 +76,10 @@ SKJUL_FOR_SOK = True
 GOATCOUNTER = "https://v3x4t0r.goatcounter.com/count"
 # Count through the site itself: the page sends the count to <site>/count and
 # statichost forwards it to GOATCOUNTER (a proxy rule in _redirects), so readers'
-# browsers only talk to tingposten.no. Works only on statichost.
-GOATCOUNTER_VIA_SIDEN = PUBLISER_TIL.startswith("statichost")
+# browsers only talk to tingposten.no. Off for now: statichost's proxy sends the
+# Host header as "v3x4t0r.goatcounter.com:443" and GoatCounter answers 400 "no site
+# at this domain" (tested 2026-10-30). Turn on if statichost fixes that.
+GOATCOUNTER_VIA_SIDEN = False
 FREMHEVET_TERSKEL = 40  # score at or above this is highlighted on the front page
 MELD_FEIL = None  # None → GitHub issue on REPO, prefilled with the sak
 

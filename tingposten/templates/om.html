@@ -46,7 +46,7 @@
 <section class="omdel lag" aria-labelledby="besok">
   <h2 class="etikett etikett-strek" id="besok">Besøkstall</h2>
   <div class="lesetekst">
-  <p>Vi teller besøk med <a href="https://www.goatcounter.com/">GoatCounter</a>, et åpent verktøy uten informasjonskapsler. For hver sidevisning registreres hvilken side som ble åpnet, hvilken side du kom fra og skjermbredden, ikke hvem du er. Ifølge GoatCounter lagres ikke IP-adresser. Skriptet ligger hos Tingposten selv, og tellingen går til Tingposten, som sender den videre til GoatCounter. Har du slått på «Do Not Track» eller «Global Privacy Control» i nettleseren, blir du ikke telt.</p>
+  <p>Vi teller besøk med <a href="https://www.goatcounter.com/">GoatCounter</a>, et åpent verktøy uten informasjonskapsler. For hver sidevisning registreres hvilken side som ble åpnet, hvilken side du kom fra og skjermbredden, ikke hvem du er. Ifølge GoatCounter lagres ikke IP-adresser. Skriptet ligger hos Tingposten selv{% if teller_via_siden %}, og tellingen går til Tingposten, som sender den videre til GoatCounter{% else %}; bare selve tellingen sendes til GoatCounter{% endif %}. Har du slått på «Do Not Track» eller «Global Privacy Control» i nettleseren, blir du ikke telt.</p>
   </div>
 </section>
 {% endif %}
