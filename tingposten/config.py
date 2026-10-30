@@ -63,7 +63,9 @@ STATICHOST_SITE = os.environ.get("STATICHOST_SITE", "tingposten")  # → https:/
 STATICHOST_BUILDER = "https://builder.statichost.eu"
 
 # Public site
-SITE_URL = (f"https://{STATICHOST_SITE}.statichost.page/" if PUBLISER_TIL.startswith("statichost")
+# tingposten.no points at statichost (ALIAS; www redirects there). The site is
+# also reachable at https://<STATICHOST_SITE>.statichost.page/.
+SITE_URL = ("https://tingposten.no/" if PUBLISER_TIL.startswith("statichost")
             else "https://v3x4t0r.github.io/tingposten/")
 # Until launch the site is online but kept out of search engines: noindex on
 # every page and a robots.txt that disallows everything (user's choice, 2026-10-30).
