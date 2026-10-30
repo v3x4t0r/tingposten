@@ -3,28 +3,46 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex">
+<meta name="robots" content="noindex, nofollow">
 <title>Tingposten</title>
-<style>
-:root { --bg: #fbfaf7; --fg: #1d1d1b; --muted: #5f5e5a; }
-@media (prefers-color-scheme: dark) {
-  :root { --bg: #161615; --fg: #ecebe6; --muted: #a3a29c; }
-}
-body {
-  margin: 0; padding: 0 16px; background: var(--bg); color: var(--fg);
-  font: 18px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
-}
-main { max-width: 34rem; margin: 18vh auto; }
-h1 { margin: 0 0 .25em; font-size: 2.2rem; letter-spacing: -.01em; }
-p { margin: 0 0 1em; }
-.muted { color: var(--muted); }
-</style>
+<meta name="description" content="Hva Bergen kommune faktisk vedtar – hver sak i samme format, med lenke til kilden.">
+<link rel="stylesheet" href="static/fonts.css">
+<link rel="stylesheet" href="static/style.css">
+<link rel="alternate" type="application/rss+xml" title="Tingposten Bergen" href="bergen/rss.xml">
 </head>
-<body>
-<main>
-<h1>Tingposten</h1>
-<p>Hva Bergen kommune faktisk vedtar, uten politisk prat: hver sak i samme lesbare format, de viktigste først, alt dokumentert med kilde.</p>
-<p class="muted">Kommer snart.</p>
+<body class="side-landing">
+<svg class="ikoner" width="0" height="0" aria-hidden="true" focusable="false">
+<symbol id="i-sted" viewBox="0 0 16 16"><path d="M8 14.6s4.6-4.3 4.6-8.1a4.6 4.6 0 0 0-9.2 0c0 3.8 4.6 8.1 4.6 8.1z"/><circle cx="8" cy="6.5" r="1.7"/></symbol>
+<symbol id="i-stemmer" viewBox="0 0 16 16"><path d="M2.5 3.5h8M2.5 8h11M2.5 12.5h5"/></symbol>
+<symbol id="i-kr" viewBox="0 0 16 16"><rect x="1.5" y="4" width="13" height="8" rx="1.5"/><circle cx="8" cy="8" r="1.9"/></symbol>
+<symbol id="i-bakgrunn" viewBox="0 0 16 16"><rect x="2.5" y="1.8" width="11" height="12.4" rx="1.6"/><path d="M5.2 5.3h5.6M5.2 8h5.6M5.2 10.7h3.4"/></symbol>
+<symbol id="i-dok" viewBox="0 0 16 16"><path d="M4 1.8h5.2l3 3v9.4H4z"/><path d="M9 1.8v3.2h3.2"/></symbol>
+</svg>
+<a class="hopp" href="#innhold">Hopp til innholdet</a>
+<header class="masthode ramme">
+  <div class="masthode-topp">
+    <p class="ore ore-v"><strong>Bergen</strong><span class="bred"><br></span><span class="smal"> · </span>Fredag 30. oktober 2026</p>
+    <p class="navnetrekk"><a href="bergen/">Tingposten</a></p>
+    <p class="ore ore-h">Hva kommunen<br> faktisk vedtar</p>
+  </div>
+  <div class="folio">
+    <nav class="meny" aria-label="Hovedmeny"><a href="bergen/">Forside</a><a href="bergen/moter/">Møter</a><a href="om/">Om</a>
+</nav>
+  </div>
+</header>
+<main id="innhold" class="ramme landing">
+<section class="intro" aria-labelledby="intro-tittel">
+  <h1 class="vh" id="intro-tittel">Tingposten</h1>
+  <p class="intro-ingress">Hva kommunen faktisk vedtar, uten politisk prat: hver sak i samme lesbare format, de viktigste først, alt dokumentert med kilde.</p>
+  <p class="intro-lenke"><a class="pil" href="bergen/">Se vedtakene i Bergen</a></p>
+</section>
 </main>
+<footer class="bunn">
+  <div class="ramme">
+    <p class="bunn-navn">Tingposten</p>
+    <p>Tingposten viser hva Bergen kommune vedtar. Hver setning bygger på kommunens egne dokumenter, og hver sak lenker til dem.</p>
+    <p><a href="om/">Om Tingposten og rangeringen</a> · <a href="bergen/rss.xml">RSS</a> · <a href="https://github.com/v3x4t0r/tingposten">Åpen kildekode</a></p>
+  </div>
+</footer>
 </body>
 </html>

@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Om Tingposten</title>
+<meta name="description" content="Hva Bergen kommune faktisk vedtar – hver sak i samme format, med lenke til kilden.">
+<link rel="stylesheet" href="../static/fonts.css">
+<link rel="stylesheet" href="../static/style.css">
+<link rel="alternate" type="application/rss+xml" title="Tingposten Bergen" href="../bergen/rss.xml">
+</head>
+<body class="side-om">
+<svg class="ikoner" width="0" height="0" aria-hidden="true" focusable="false">
+<symbol id="i-sted" viewBox="0 0 16 16"><path d="M8 14.6s4.6-4.3 4.6-8.1a4.6 4.6 0 0 0-9.2 0c0 3.8 4.6 8.1 4.6 8.1z"/><circle cx="8" cy="6.5" r="1.7"/></symbol>
+<symbol id="i-stemmer" viewBox="0 0 16 16"><path d="M2.5 3.5h8M2.5 8h11M2.5 12.5h5"/></symbol>
+<symbol id="i-kr" viewBox="0 0 16 16"><rect x="1.5" y="4" width="13" height="8" rx="1.5"/><circle cx="8" cy="8" r="1.9"/></symbol>
+<symbol id="i-bakgrunn" viewBox="0 0 16 16"><rect x="2.5" y="1.8" width="11" height="12.4" rx="1.6"/><path d="M5.2 5.3h5.6M5.2 8h5.6M5.2 10.7h3.4"/></symbol>
+<symbol id="i-dok" viewBox="0 0 16 16"><path d="M4 1.8h5.2l3 3v9.4H4z"/><path d="M9 1.8v3.2h3.2"/></symbol>
+</svg>
+<a class="hopp" href="#innhold">Hopp til innholdet</a>
+<header class="masthode masthode-smal ramme">
+  <div class="masthode-topp">
+    <nav class="meny-smal" aria-label="Hovedmeny"><a href="../bergen/">Forside</a><a href="../bergen/moter/">Møter</a><a href="../om/" aria-current="page">Om</a>
+</nav>
+    <p class="navnetrekk"><a href="../bergen/">Tingposten</a></p>
+    <p class="ore ore-h">Hva kommunen faktisk vedtar</p>
+  </div>
+  <div class="folio"></div>
+</header>
+<main id="innhold" class="ramme omside">
+<header class="sidehode">
+  <p class="kicker"><span class="kicker-tema">Om</span></p>
+  <h1 class="side-tittel">Om Tingposten</h1>
+  <p class="side-ingress">Tingposten viser hva Bergen kommune vedtar, i samme format for hver sak og med lenke til kommunens egne dokumenter.</p>
+</header>
+
+<section class="omdel lag" aria-labelledby="erklaering">
+  <h2 class="etikett etikett-strek" id="erklaering">Redaksjonell erklæring</h2>
+  <div class="lesetekst">
+<p class="plassholder"><strong>Plassholder:</strong> Den redaksjonelle erklæringen er ikke ferdig ennå. Her kommer det hva Tingposten gjengir, hva vi ikke vurderer, hvordan vi bruker språkmodeller, og hvordan feil rettes.</p>  </div>
+</section>
+
+<section class="omdel lag" aria-labelledby="rangering">
+  <h2 class="etikett etikett-strek" id="rangering">Slik rangerer vi</h2>
+  <div class="lesetekst">
+  <p>Alle sakene er med. Poengsummen (0–100) bestemmer bare rekkefølgen. Forsiden viser opptil 15 saker med ferdig sammendrag, de med høyest poengsum først. Saker med minst 40 poeng kommer først; er det færre enn 15 av dem, fylles forsiden med de neste på listen.</p>
+  <p>Under hver sak står noen faste opplysninger, hentet rett fra dokumentene og valgt etter samme regel for alle saker: status når saken ikke bare ble vedtatt, hvilken del av byen den gjelder, stemmetallet når avstemningen var jevn (ellers hvor mange forslag som falt), beløpet i vedtaket, og om saken har en bakgrunnsartikkel.</p>
+  <div class="tabellramme">
+  <table>
+    <caption>Signaler og vekter</caption>
+    <thead><tr><th scope="col">Signal</th><th scope="col">Poeng</th><th scope="col">Andel</th><th scope="col">Hva det måler</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">Hvor mange det angår</th><td>30</td><td>30&nbsp;%</td><td>Hvor mange saken til slutt angår, direkte eller indirekte. Vurderes av en språkmodell.</td></tr>
+      <tr><th scope="row">Konkret endring</th><td>20</td><td>20&nbsp;%</td><td>Om noe konkret endrer seg for innbyggerne nå. Vurderes av en språkmodell.</td></tr>
+      <tr><th scope="row">Debatt</th><td>10</td><td>10&nbsp;%</td><td>Hvor omstridt saken var i bystyret: forslag som falt og antall avstemninger.</td></tr>
+      <tr><th scope="row">Beløp</th><td>8</td><td>8&nbsp;%</td><td>Penger vedtaket selv binder, på en logaritmisk skala fra 1 million til 1 milliard kroner.</td></tr>
+      <tr><th scope="row">Rekkevidde</th><td>8</td><td>8&nbsp;%</td><td>Hvor stor del av byen saken gjelder: én eiendom, én bydel eller hele byen.</td></tr>
+      <tr><th scope="row">Juridisk vekt</th><td>8</td><td>8&nbsp;%</td><td>Planer, budsjett og forskrifter binder i mange år. Valg til verv gjør det ikke.</td></tr>
+      <tr><th scope="row">Uenighet</th><td>5</td><td>5&nbsp;%</td><td>Hvor jevn avstemningen var. 36–31 teller mer enn 60–5.</td></tr>
+      <tr><th scope="row">Innstillingen falt</th><td>4</td><td>4&nbsp;%</td><td>Flertallet stemte ned hele eller deler av forslaget som ble lagt fram.</td></tr>
+      <tr><th scope="row">Varighet</th><td>4</td><td>4&nbsp;%</td><td>Langvarige vedtak som planer, strategier, avtaler og salg, mot engangstiltak.</td></tr>
+      <tr><th scope="row">Endelighet</th><td>3</td><td>3&nbsp;%</td><td>Endelig vedtak, eller bare en innstilling til et annet organ.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Mangler et signal for en sak, regnes poengsummen ut fra de andre. Vektene justeres for hånd, og endringer står i kildekoden.</p>
+  </div>
+</section>
+
+<section class="omdel lag" aria-labelledby="kilder">
+  <h2 class="etikett etikett-strek" id="kilder">Kilder og feil</h2>
+  <div class="lesetekst">
+  <p>Alt kommer fra Bergen kommunes egne saksframlegg og protokoller. Hver setning på et kort lenker til siden i dokumentet den bygger på. Finner du en feil, bruk «Meld feil» på saken.</p>
+  </div>
+</section>
+</main>
+<footer class="bunn">
+  <div class="ramme">
+    <p class="bunn-navn">Tingposten</p>
+    <p>Tingposten viser hva Bergen kommune vedtar. Hver setning bygger på kommunens egne dokumenter, og hver sak lenker til dem.</p>
+    <p><a href="../om/">Om Tingposten og rangeringen</a> · <a href="../bergen/rss.xml">RSS</a> · <a href="https://github.com/v3x4t0r/tingposten">Åpen kildekode</a></p>
+  </div>
+</footer>
+</body>
+</html>
