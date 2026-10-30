@@ -248,7 +248,9 @@ def side(root: Path = config.ROOT, data_dir: Path = config.DATA_DIR, site_dir: P
     return {
         "url": config.SITE_URL,
         "skjult": config.SKJUL_FOR_SOK,
-        "publisert": _git(root, "log", "-1", "--format=%cI", config.PAGES_BRANCH),
+        # The local branch once this machine has published; GitHub's copy before that.
+        "publisert": (_git(root, "log", "-1", "--format=%cI", config.PAGES_BRANCH)
+                      or _git(root, "log", "-1", "--format=%cI", f"origin/{config.PAGES_BRANCH}")),
         "bygget": _iso(_mtime([site_dir / "index.html"])),
         "saker": sum(1 for _ in site_dir.glob("bergen/sak/*/*/*/index.html")),
         "kort": _publiserbare(data_dir / "redigert"),

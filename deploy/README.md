@@ -69,6 +69,18 @@ sudo systemctl daemon-reload && sudo systemctl enable --now tingposten-admin
 journalctl -u tingposten-admin -f     # panelets egen logg
 ```
 
+Uten sudo, som brukertjeneste (krever at «linger» er på for brukeren, `loginctl show-user $USER -p Linger`; slik kjører den på Pi-en vår):
+
+```sh
+mkdir -p ~/.config/systemd/user
+sed -e '/^User=/d' -e '/network-online/d' -e 's|WantedBy=multi-user.target|WantedBy=default.target|' \
+    -e "s|/home/<user>|$HOME|g" deploy/tingposten-admin.service > ~/.config/systemd/user/tingposten-admin.service
+systemctl --user daemon-reload && systemctl --user enable --now tingposten-admin
+journalctl --user -u tingposten-admin -f
+```
+
+Etter `git pull`: `systemctl --user restart tingposten-admin` (eller `sudo systemctl restart tingposten-admin`).
+
 Lokalt, uten passord: `uv run tingposten admin` og åpne http://127.0.0.1:8787/.
 
 ## Første gangs oppsett
