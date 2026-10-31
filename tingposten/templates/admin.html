@@ -174,6 +174,7 @@ const STEG = {
   sjekk: [["hent", "Henter agendaen fra kommunen"], ["last-ned", "Teller PDF-er som mangler"]],
 };
 const MODUSNAVN = {manuell: "Last ned og publiser", daglig: "Daglig kjøring", sjekk: "Sjekk"};
+const INNSATS = {low: "lav", medium: "middels", high: "høy", xhigh: "svært høy", max: "maks"};
 const MERKE = {klar: "Klar", venter: "Venter", mangler: "Uten protokoll", kommende: "Kommer", ferdig: "Ferdig"};
 const $ = id => document.getElementById(id);
 let data = null, timer = null, bekreftTil = 0, sender = false;
@@ -319,11 +320,12 @@ function tegn() {
     ["Agendaen sist hentet", tid(d.sist_hentet)],
   ]);
   const m = d.maskin;
+  const innsats = m.reserve_innsats ? `, ${INNSATS[m.reserve_innsats] || m.reserve_innsats} innsats` : "";
   fakta("maskin", [
     ["Ledig disk", `${tall(m.disk_ledig_gb)} GB (${m.disk_brukt} % brukt)`, m.disk_ledig_gb < 2 ? "nei" : ""],
     ["Claude (skribent)", m.claude ? "Funnet" : "Mangler", m.claude ? "ok" : "nei"],
-    ["Faktasjekk", m.codex ? (m.reserve ? `Codex (${m.reserve} som reserve)` : "Codex")
-                           : m.reserve ? `${m.reserve[0].toUpperCase() + m.reserve.slice(1)} (Claude), Codex mangler` : "Codex mangler",
+    ["Faktasjekk", m.codex ? (m.reserve ? `Codex (${m.reserve}${innsats} som reserve)` : "Codex")
+                           : m.reserve ? `${m.reserve[0].toUpperCase() + m.reserve.slice(1)} (Claude${innsats}), Codex mangler` : "Codex mangler",
      m.codex || m.reserve ? "ok" : "nei"],
     s ? ["Siste kjøring", `${MODUSNAVN[s.modus] || s.modus}, ${tid(s.startet)}`] : null,
   ]);

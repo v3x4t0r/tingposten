@@ -277,6 +277,7 @@ def maskin(root: Path = config.ROOT) -> dict:
         "claude": bool(shutil.which("claude", path=path)),
         "codex": bool(shutil.which("codex", path=path)),
         "reserve": config.FAKTASJEKKER_RESERVE,
+        "reserve_innsats": config.FAKTASJEKKER_RESERVE_EFFORT,
     }
 
 

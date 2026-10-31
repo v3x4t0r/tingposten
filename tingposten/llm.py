@@ -1,8 +1,9 @@
 """Model backends: the subscription CLIs (`claude -p`, `codex exec`), no API keys.
 
-Every call gets the whole prompt on stdin, a strict JSON schema and no
-tools: the models read only what the prompt holds, run in an empty temp
-directory, and cannot touch the repo or the network on our behalf. The
+Every call is a fresh process that gets the whole prompt on stdin, a strict
+JSON schema and no tools: the models read only what the prompt holds (one
+sak; nothing carries over between calls), run in an empty temp directory,
+and cannot touch the repo or the network on our behalf. The
 answer is validated against the schema here; a malformed answer gets one
 retry with the error, then LLMError. Steps share the plumbing at the bottom
 (atomic JSON writes, a small thread pool).
@@ -24,6 +25,9 @@ CLAUDE_TIMEOUT_S = 900
 CODEX_TIMEOUT_S = 1800
 # Runaway guard per Claude call; the subscription reports a notional cost.
 CLAUDE_MAX_BUDGET_USD = "3"
+# Replaces Claude Code's own system prompt (~9k tokens of coding-agent
+# instructions on every call); our prompts carry their own instructions.
+CLAUDE_SYSTEM_PROMPT = "Følg instruksjonene i meldingen og svar bare med JSON som følger skjemaet."
 
 
 class LLMError(RuntimeError):
@@ -47,18 +51,21 @@ class _Backend:
 
 
 class ClaudeCLI(_Backend):
-    def __init__(self, model: str):
-        self.model = model
+    def __init__(self, model: str, effort: str | None = None):
+        self.model, self.effort = model, effort  # effort None → the CLI's default
         self.name = f"claude:{model}"
 
     def _call(self, prompt: str, schema: dict) -> dict:
         argv = [
             "claude", "-p", "--model", self.model,
+            "--system-prompt", CLAUDE_SYSTEM_PROMPT,
             "--output-format", "json", "--json-schema", json.dumps(schema),
             # No tools, no user/project settings, no MCP servers, no saved session.
             "--tools", "", "--restricted", "--strict-mcp-config", "--no-session-persistence",
             "--max-budget-usd", CLAUDE_MAX_BUDGET_USD,
         ]
+        if self.effort:
+            argv += ["--effort", self.effort]
         with tempfile.TemporaryDirectory(prefix="tingposten-claude-") as tmp:
             done = _run(argv, prompt, CLAUDE_TIMEOUT_S, cwd=tmp)
         try:

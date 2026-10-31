@@ -103,6 +103,8 @@ MODELL_FAKTASJEKKER = None  # None → the model set in ~/.codex/config.toml
 # fact-checks instead, for the rest of that run; the check records which model did
 # it. Owner, 30.10.2026: Codex out of tokens, Fable as the backup reviewer. None = no reserve.
 FAKTASJEKKER_RESERVE = "fable"
+# Owner, 31.10.2026: the reserve runs at low effort so it doesn't use up the subscription.
+FAKTASJEKKER_RESERVE_EFFORT = "low"
 
 # Organs whose items are recommendations to another organ, not decisions.
 # Their cases show up on the site when the deciding organ has decided.

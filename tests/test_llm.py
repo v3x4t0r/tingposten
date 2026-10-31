@@ -75,6 +75,16 @@ def test_claude_cli_flags_and_structured_output(monkeypatch):
     assert calls[0]["input"] == "PROMPT"                           # prompt on stdin, not argv
     assert "PROMPT" not in argv
     assert calls[0]["cwd"] != str(Path.cwd())                      # empty temp dir
+    assert "--effort" not in argv                                   # CLI default unless asked
+    assert argv[argv.index("--system-prompt") + 1] == llm.CLAUDE_SYSTEM_PROMPT  # not Claude Code's own
+
+
+def test_claude_cli_passes_effort(monkeypatch):
+    calls = fake_run(monkeypatch, lambda argv, cwd: done(json.dumps(
+        {"is_error": False, "subtype": "success", "structured_output": GOOD, "result": ""})))
+    llm.ClaudeCLI("fable", "low").ask("p", SCHEMA)
+    argv = calls[0]["argv"]
+    assert argv[argv.index("--effort") + 1] == "low"
 
 
 def test_claude_cli_falls_back_to_result_and_reports_errors(monkeypatch):

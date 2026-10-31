@@ -215,7 +215,8 @@ def kjor(data_dir: Path = config.DATA_DIR, utvalg: str | None = None, dato: str 
         "skriv": ClaudeCLI(config.MODELL_SKRIBENT),
         # Codex checks; when it can't answer, Claude (config.FAKTASJEKKER_RESERVE) does.
         "sjekk": MedReserve(CodexCLI(config.MODELL_FAKTASJEKKER),
-                            ClaudeCLI(config.FAKTASJEKKER_RESERVE) if config.FAKTASJEKKER_RESERVE else None),
+                            ClaudeCLI(config.FAKTASJEKKER_RESERVE, config.FAKTASJEKKER_RESERVE_EFFORT)
+                            if config.FAKTASJEKKER_RESERVE else None),
         "klassifiser": ClaudeCLI(config.MODELL_KLASSIFISERER),
     }
     llm = {**llms, "artikkel": llms.get("artikkel", llms.get("skriv")),
