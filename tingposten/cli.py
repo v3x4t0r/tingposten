@@ -105,6 +105,24 @@ def main(argv: list[str] | None = None) -> int:
     vurd.add_argument("--port", type=int, default=8765)
     vurd.add_argument("--apne", action="store_true", help="open the page in the browser")
 
+    dtest = sub.add_parser(
+        "debatt-test", help="kjør testkommentarene gjennom en moderator og vis hvor godt den treffer",
+        description="Kjører data/debatt/testsett.jsonl gjennom moderatoren og sammenligner med fasiten "
+                    "(data/debatt/fasit.json; forslagene teller der fasiten ikke er satt ennå). Skriver én linje "
+                    "per kommentar til data/debatt/test/ og en tabell per terskel. Med --rapport kjøres ingenting; "
+                    "tabellen lages fra lagrede kjøringer.")
+    dtest.add_argument("--moderator", action="append", choices=("hailo", "cpu", "jev", "claude"),
+                       help="kan gjentas; hver kjøres for seg")
+    dtest.add_argument("--bare", type=int, help="bare de første N kommentarene (prøvekjøring)")
+    dtest.add_argument("--rapport", nargs="*", type=Path, metavar="KJØRING",
+                       help="lag tabellen fra disse kjøringene (uten filer: den nyeste per moderator)")
+    dtest.add_argument("--stol-pa-etikett", action="store_true",
+                       help="regn et svar uten sannsynligheter (hailo) som sikkert")
+
+    dfas = sub.add_parser("debatt-fasit", help="lokal side for å sette fasit på testkommentarene")
+    dfas.add_argument("--port", type=int, default=8766)
+    dfas.add_argument("--apne", action="store_true", help="åpne siden i nettleseren")
+
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
@@ -131,6 +149,10 @@ def main(argv: list[str] | None = None) -> int:
         return _vurder(args)
     elif args.cmd == "admin":
         return _admin(args)
+    elif args.cmd == "debatt-test":
+        return _debatt_test(args)
+    elif args.cmd == "debatt-fasit":
+        return _debatt_fasit(args)
     elif args.cmd == "score":
         return _score(args)
     elif args.cmd == "rett":
@@ -239,6 +261,55 @@ def _admin(args) -> int:
 
     host = socket.gethostname() if args.vert in ("0.0.0.0", "::") else args.vert
     logging.info("kontrollpanel: http://%s:%d/ — Ctrl+C to stop", host, server.server_address[1])
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    return 0
+
+
+def _debatt_test(args) -> int:
+    from .debatt import moderering, testsett
+
+    try:
+        sett = testsett.les_sett()
+    except FileNotFoundError as e:
+        logging.error("%s", e)
+        return 1
+    fasit = testsett.les_fasit()
+    if args.rapport is not None:
+        filer = args.rapport or list(testsett.nyeste_kjoringer().values())
+    else:
+        if not args.moderator:
+            logging.error("velg minst én --moderator (hailo, cpu, jev, claude), eller --rapport")
+            return 1
+        filer = []
+        for navn in args.moderator:
+            m = moderering.backend(navn)
+            logging.info("debatt-test: %d kommentarer gjennom %s", min(len(sett), args.bare or len(sett)), m.name)
+            filer.append(testsett.kjor(m, sett, bare=args.bare))
+    rapporter = {}
+    for f in filer:
+        r = testsett.rapport(testsett.les_resultat(f), sett, fasit, args.stol_pa_etikett)
+        rapporter[r["modell"] or f.stem] = r
+        logging.info("%s: %d svar, %d feil, %d av %d med fasit satt av redaktøren", f.name, r["n"] - r["feil"],
+                     r["feil"], r["kontrollert"], r["n"])
+    print(testsett.tabell(rapporter))
+    return 0
+
+
+def _debatt_fasit(args) -> int:
+    from .debatt import testsett
+
+    if not testsett.sett_sti().exists():
+        logging.error("no test set at %s", testsett.sett_sti())
+        return 1
+    server = testsett.make_server(args.port)
+    url = f"http://127.0.0.1:{server.server_address[1]}/"
+    logging.info("fasit: %s (lagres i %s) — Ctrl+C for å stoppe", url, testsett.fasit_sti())
+    if args.apne:
+        import webbrowser
+        webbrowser.open(url)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
