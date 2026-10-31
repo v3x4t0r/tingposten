@@ -13,13 +13,20 @@ PAGES_BRANCH = "nettside"
 CNAME = None
 
 
+# The keys this process took from .env. A run the control panel starts doesn't
+# inherit them: it reads .env itself, so an edit to .env counts from the next run.
+FRA_DOTENV: set[str] = set()
+
+
 def _load_dotenv(path: Path) -> None:
     if not path.exists():
         return
     for line in path.read_text().splitlines():
         key, sep, value = line.partition("=")
-        if sep and not key.lstrip().startswith("#"):
-            os.environ.setdefault(key.strip(), value.strip())
+        key = key.strip()
+        if sep and not key.startswith("#") and key not in os.environ:
+            os.environ[key] = value.strip()
+            FRA_DOTENV.add(key)
 
 
 _load_dotenv(ROOT / ".env")

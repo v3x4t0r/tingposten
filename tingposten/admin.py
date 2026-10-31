@@ -351,8 +351,10 @@ class Kjorer:
                 return 429, f"Agendaen ble nettopp hentet. Du kan sjekke igjen kl. {neste.astimezone():%H:%M}."
             log_dir = self.root / "data" / "logs"
             log_dir.mkdir(parents=True, exist_ok=True)
+            # Without what the panel read from .env at its start, so the run reads .env as it is now.
+            env = {k: v for k, v in os.environ.items() if k not in config.FRA_DOTENV}
             with (log_dir / "admin.log").open("ab") as out:
-                self._proc = subprocess.Popen(self.kommando(modus), cwd=self.root, stdin=subprocess.DEVNULL,
+                self._proc = subprocess.Popen(self.kommando(modus), cwd=self.root, stdin=subprocess.DEVNULL, env=env,
                                               stdout=out, stderr=subprocess.STDOUT, start_new_session=True)
             threading.Thread(target=self._proc.wait, daemon=True).start()  # no zombie when it ends
             log.info("admin: started %s run (pid %d)", modus, self._proc.pid)

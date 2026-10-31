@@ -1,6 +1,7 @@
 import base64
 import fcntl
 import json
+import os
 import subprocess
 import sys
 import threading
@@ -11,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from tingposten import admin, pipeline
+from tingposten import admin, config, pipeline
 
 IDAG = date(2026, 10, 30)
 ROOT = Path(__file__).resolve().parent.parent
@@ -218,6 +219,30 @@ def test_start_one_run_at_a_time(server):
     assert call(base + "/start", {"modus": "manuell"}, X_Tingposten="admin")[0] == 409
     assert json.loads(call(base + "/status.json")[1])["kjoring"]["pagar"]
     assert started == ["manuell"]
+
+
+def test_run_reads_env_file_itself(data_dir, tmp_path, monkeypatch):
+    """A key the panel took from .env at its start (perhaps since fixed) isn't passed on to the run."""
+    monkeypatch.setenv("TP_FRA_ENVFIL", "gammel")
+    monkeypatch.setenv("TP_FRA_SKALL", "beholdes")
+    monkeypatch.setattr(config, "FRA_DOTENV", {"TP_FRA_ENVFIL"})
+    ut = tmp_path / "env.txt"
+    skript = f"import os; open({str(ut)!r}, 'w').write(os.environ.get('TP_FRA_ENVFIL', '-') + ' ' + os.environ['TP_FRA_SKALL'])"
+    kjorer = admin.Kjorer(root=tmp_path, data_dir=data_dir, kommando=lambda modus: [sys.executable, "-c", skript])
+    assert kjorer.start("manuell")[0] == 202
+    kjorer._proc.wait(10)
+    assert ut.read_text() == "- beholdes"
+
+
+def test_env_file_keys_are_recorded(tmp_path, monkeypatch):
+    (tmp_path / ".env").write_text("# kommentar\nTP_NY=1\nTP_SATT=fra-fil\n")
+    monkeypatch.setenv("TP_SATT", "fra-skall")
+    monkeypatch.delenv("TP_NY", raising=False)
+    monkeypatch.setattr(config, "FRA_DOTENV", set())
+    config._load_dotenv(tmp_path / ".env")
+    assert os.environ["TP_NY"] == "1" and os.environ["TP_SATT"] == "fra-skall"  # the shell wins
+    assert config.FRA_DOTENV == {"TP_NY"}
+    monkeypatch.delenv("TP_NY")
 
 
 def test_check_waits_after_a_fresh_fetch(server):
