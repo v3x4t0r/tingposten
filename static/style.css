@@ -374,8 +374,7 @@ a:hover { text-decoration-thickness: 2px; }
 .sak-oppsett > .rail { display: contents; }
 @media (min-width: 1180px) {
   .sak-oppsett { grid-template-columns: minmax(0, 1fr) var(--rail); column-gap: 48px; align-items: start; }
-  .sak-oppsett > .kort, .sak-oppsett > .sak-melding { grid-column: 1; grid-row: 1; }
-  .sak-oppsett > .bakgrunn { grid-column: 1; grid-row: 2; }
+  .sak-oppsett > .kort, .sak-oppsett > .sak-melding, .sak-oppsett > .artikkel { grid-column: 1; grid-row: 1; }
   /* The rail runs the full height, so the documents can follow the reader. */
   .sak-oppsett > .rail { display: block; grid-column: 2; grid-row: 1 / span 2; align-self: stretch; }
   .rail-dok { position: sticky; top: 24px; }
@@ -433,20 +432,30 @@ a:hover { text-decoration-thickness: 2px; }
 .dok-type { margin-left: auto; padding: 0 5px; border: 1px solid var(--linje-2); border-radius: 2px; font: 600 0.625rem/1.6 var(--sans); letter-spacing: 0.06em; color: var(--dempet); }
 .smaatekst { margin: 10px 0 0; font: 400 0.8125rem/1.5 var(--sans); color: var(--dempet); }
 
-/* Bakgrunn: its own section, larger than the card */
-.bakgrunn { padding: 40px 0 8px; scroll-margin-top: 12px; }
-.bakgrunn-etikett { margin: 0 0 10px; }
-@media (min-width: 900px) { .bakgrunn-etikett { margin: 12px 0 0; } }
+/* The story's body ("Saken"): the main column when the sak has an article; Kort fortalt then sits in the rail */
+.artikkel { padding: 8px 0 8px; scroll-margin-top: 12px; }
+.artikkel-etikett { margin: 0 0 10px; }
+@media (min-width: 900px) { .artikkel-etikett { margin: 12px 0 0; } }
+.mellomtittel { max-width: 33em; margin: 1.5em 0 0.55em; padding-top: 8px; border-top: 1px solid var(--sterk); font: 700 0.75rem/1.3 var(--sans); letter-spacing: 0.1em; text-transform: uppercase; color: var(--blekk); }
+/* Kort fortalt beside the body: labels on their own line, the text a size down */
+.kort-rail { margin: 0; padding: 0 20px 6px; }
+@media (min-width: 1180px) { .kort-rail { margin-bottom: 30px; } }
+.kort-rail .lag { grid-template-columns: minmax(0, 1fr); column-gap: 0; }
+.kort-rail .kort-hode { padding: 12px 0 10px; }
+.kort-rail .felt { padding: 12px 0 14px; }
+.kort-rail .felt h3 { margin: 0 0 3px; font-size: 0.8125rem; }
+.kort-rail .felt-tekst, .kort-rail .felt-tom { font-size: 1rem; line-height: 1.5; }
+.kort-rail .kilde { margin-top: 5px; font-size: 0.75rem; }
 .byline { margin: 0; padding-bottom: 14px; border-bottom: 1px solid var(--linje); font: 400 0.8125rem/1.5 var(--sans); color: var(--dempet); }
 .byline span + span::before { content: "·"; margin: 0 0.45em; color: var(--linje-2); }
 .brodtekst { max-width: 33em; margin-top: 22px; }
 .brodtekst p { margin: 0 0 1.05em; font: 400 1.1875rem/1.62 var(--serif); color: var(--blekk); hanging-punctuation: first; }
 @media (min-width: 720px) { .brodtekst p { font-size: 1.25rem; line-height: 1.62; } }
-.brodtekst p:first-child { font-size: 1.3125rem; line-height: 1.55; }
-@media (min-width: 720px) { .brodtekst p:first-child { font-size: 1.375rem; } }
+.brodtekst p.forste { font-size: 1.3125rem; line-height: 1.55; }
+@media (min-width: 720px) { .brodtekst p.forste { font-size: 1.375rem; } }
 /* Only where initial-letter works: Firefox would show a normal-size bold letter. */
 @supports (initial-letter: 3) or (-webkit-initial-letter: 3) {
-  .brodtekst p:first-child::first-letter { initial-letter: 3; -webkit-initial-letter: 3; font-family: var(--didone); font-weight: 700; margin-right: 0.14em; color: var(--blekk); }
+  .brodtekst p.forste::first-letter { initial-letter: 3; -webkit-initial-letter: 3; font-family: var(--didone); font-weight: 700; margin-right: 0.14em; color: var(--blekk); }
 }
 .brodtekst p:target { background: var(--merket); box-shadow: 0 0 0 8px var(--merket); }
 .fn { font: 600 0.68em/0 var(--sans); vertical-align: 0.55em; margin-left: 0.12em; }
@@ -574,7 +583,7 @@ a:hover { text-decoration-thickness: 2px; }
 .meld-feil { margin: 0; padding: 14px 0 10px; border-top: 1px solid var(--boks-kant); font: 400 0.875rem/1.45 var(--sans); color: var(--blekk-2); }
 .meld-feil a { font-weight: 600; }
 @media (min-width: 900px) { .kort .meld-feil { grid-template-columns: calc(var(--etikett) - 24px) minmax(0, 1fr); } }
-.bakgrunn .meld-feil { margin-top: 18px; border-top-color: var(--linje); }
+.artikkel .meld-feil { margin-top: 18px; border-top-color: var(--linje); }
 
 /* Rettelser: the editor's dated notes, right under the top block. A rule and
    a label like the card's, in ink: calm, never an alarm colour. On wide
@@ -599,14 +608,11 @@ a:hover { text-decoration-thickness: 2px; }
 .figur figcaption .kilde { display: block; margin: 0; font-size: inherit; }
 
 /* Bakgrunn: the label is the heading; the byline and the drop cap lead */
-@media (min-width: 900px) { .bakgrunn .byline { margin-top: 12px; } }
+@media (min-width: 900px) { .artikkel .byline { margin-top: 12px; } }
 /* With its own (fact-checked) headline: "Bakgrunn" becomes the kicker — above it on
    narrow screens, in the label column beside it like the dateline beside the h1 —
    and the headline is set in the headline face, between the field labels and the h1. */
-.bakgrunn-tittel { margin: 0; max-width: 20em; font: 700 clamp(1.625rem, 1.35rem + 0.9vw, 2rem)/1.12 var(--didone);
-  letter-spacing: -0.005em; word-spacing: 0.07em; color: var(--blekk); text-wrap: balance; }
-.bakgrunn-med-tittel .byline { margin-top: 12px; }
-@media (max-width: 899px) { .bakgrunn-med-tittel .bakgrunn-etikett { margin-bottom: 12px; } }
+
 
 /* === Forside, lister, møter (gjennomgang 30.10) === */
 
@@ -787,7 +793,7 @@ main > .sidehode:first-child { padding-top: 38px; }
   .meny, .meny-smal, .hopp, .paa-siden, .relaterte, .periodelinje, .brodsmule, .bunn-lenker, .andre, .stolper-mer,
   .andre-temaer, .ikkefunnet-lenker { display: none !important; }
   .masthode-smal .ore-h { display: block; }
-  h1, h2, h3, .bakgrunn-etikett, .kort-hode, .figur-tittel, .seksjon-hode, .flis-hode { break-after: avoid; }
+  h1, h2, h3, .artikkel-etikett, .mellomtittel, .kort-hode, .figur-tittel, .seksjon-hode, .flis-hode { break-after: avoid; }
   .felt, .figur, .fotnoter li, .rad, .indeksrad, .flis > ul > li, .valgliste li, .sek, .lead { break-inside: avoid; }
   .bunn { padding: 0; }
   .bunn-innhold { border-top: 1px solid #000; padding-top: 8pt; }
