@@ -6,27 +6,36 @@
 {% block main %}
 <header class="sidehode">
   <h1 class="side-tittel">Debattreglene</h1>
-  <p class="side-ingress">Alle meninger er lov på Tingposten, også skarpe og upopulære. Reglene handler om tonen og om loven, aldri om hva du mener.</p>
+  <p class="side-ingress">Debatten på Tingposten er åpen. Vi er strenge med hat, diskriminering, vold og trusler, og ellers lite annet. Reglene handler aldri om hva du mener.</p>
 </header>
 
 <section class="omdel lag" aria-labelledby="reglene">
   <h2 class="etikett etikett-strek" id="reglene">Reglene</h2>
   <div class="lesetekst">
   <p>{{ regler.ok[1] }}</p>
-  <p>En kommentar blir stoppet når den bryter én av disse reglene:</p>
+  <h3>Dette stopper vi alltid</h3>
   <dl class="regelliste">
-    {% for key, (navn, tekst) in regler.items() if key != "ok" %}
+    {% for key in strenge %}
+    <dt>{{ regler[key][0] }}</dt>
+    <dd>{{ regler[key][1] }}</dd>
+    {% endfor %}
+  </dl>
+  <h3>Dette stopper vi for å beskytte enkeltpersoner</h3>
+  <dl class="regelliste">
+    {% for key, (navn, tekst) in regler.items() if key != "ok" and key not in strenge %}
     <dt>{{ navn }}</dt>
     <dd>{{ tekst }}</dd>
     {% endfor %}
   </dl>
+  <p>Alt annet publiseres. Frekke ord, ironi og innlegg som sporer av er lov; lesernes stemmer avgjør hva som havner øverst.</p>
   </div>
 </section>
 
 <section class="omdel lag" aria-labelledby="slik">
   <h2 class="etikett etikett-strek" id="slik">Slik vurderes kommentarene</h2>
   <div class="lesetekst">
-  <p>Hver kommentar vurderes av en KI-modell før den vises. Modellen ser bare kommentaren, kommentaren den svarer på og hvilken sak den står under, ikke hvem du er. Er modellen sikker på at kommentaren er innenfor reglene, publiseres den. Er den sikker på at en regel er brutt, blir kommentaren stoppet, og du får vite hvilken regel det gjelder. Er modellen usikker, avgjør redaktøren.</p>
+  <p>Før du skriver første gang, tar du en kort quiz: fem eksempler på kommentarer, og du svarer om de er lov. Den viser hvor grensen går. Tar vi i bruk nye regler, tar du quizen på nytt.</p>
+  <p>Hver kommentar vurderes av en KI-modell før den vises. Modellen ser bare kommentaren, kommentaren den svarer på og hvilken sak den står under, ikke hvem du er. Ved den minste tvil om hat, diskriminering, vold eller trusler avgjør redaktøren. For de andre reglene må modellen være sikker før en kommentar stoppes. Alt annet publiseres med en gang. Blir kommentaren din stoppet, får du vite hvilken regel det gjelder.</p>
   <p>En stoppet kommentar ser bare du. Du kan endre den, eller be redaktøren se på den. Lesere kan også rapportere en publisert kommentar til redaktøren. Ansvarlig redaktør{% if redaktor %}, {{ redaktor }},{% endif %} har ansvaret for kommentarene som publiseres, og kan fjerne kommentarer og sperre kontoer som bryter reglene gjentatte ganger.</p>
   <p>Kommentarene sorteres etter stemmene fra andre lesere. «Best» legger mest vekt på andelen som stemte opp, og på hvor mange som har stemt, slik at én tidlig stemme ikke avgjør. Hvem som stemte hva, vises aldri, heller ikke for redaktøren.</p>
   </div>

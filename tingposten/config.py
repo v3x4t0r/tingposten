@@ -107,12 +107,24 @@ KONTAKT_EPOST = "tingposten@freetime.no"  # Domeneshop alias on freetime.no, for
 DEBATT = None
 # Moderators asked in turn until one is sure (tingposten/debatt/moderering.py):
 # "hailo", "cpu", "laya", "jev", "claude". Chosen from `tingposten debatt-test` (31.10,
-# 150 test comments): Jev (TypeSafe, yes/no per rule) got the rule right 87 % of the
+# 150 test comments): Jev (TypeSafe, yes/no per rule) got the rule right 87–89 % of the
 # time in 0.2 s; the local models 13–69 %, Qwen3.5 on the Pi at 16 s. Every comment's
 # text goes to TypeSafe (the rules page says so). Not final until the editor has set fasit.
 DEBATT_MODERATOR = ("jev",)
-DEBATT_TERSKEL = 0.90        # "ok" this likely → published; below → the editor decides (0.85 if the editor calls t061 lawful)
-DEBATT_TERSKEL_STOPP = 0.90  # a broken rule this likely → stopped (stricter: lawful opinions go to the editor)
+# Per rule (stop, doubt): at `stop` the comment is stopped, at `doubt` the editor decides,
+# below every rule's doubt it is published. The editor's line (31.10): strict on hate,
+# discrimination and violence; relaxed on everything else.
+# Tuned 31.10 on the test set (regler-3, Jev): 0 dangerous slips, 0 lawful comments stopped,
+# 9 % to the editor. Re-check with `debatt-test --rapport` once the editor has set fasit.
+DEBATT_GRENSER = {
+    "trussel": (0.70, 0.25),
+    "hets": (0.70, 0.25),
+    "trakassering": (0.90, 0.25),
+    "privatperson": (0.90, 0.50),
+    "beskyldning": (0.90, 0.60),
+    "spam": (0.90, 0.60),
+}
+DEBATT_GRENSE_OK = 0.40  # and "ok" itself at least this likely before a comment is published
 # The model servers' addresses; the comment server's container sets its own (deploy/debatt).
 DEBATT_HAILO_URL = os.environ.get("DEBATT_HAILO_URL", "http://127.0.0.1:8000")  # hailo-ollama on the Hailo-10H
 DEBATT_HAILO_MODELL = os.environ.get("DEBATT_HAILO_MODELL", "qwen3:1.7b")

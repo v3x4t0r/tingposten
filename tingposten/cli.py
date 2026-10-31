@@ -109,15 +109,14 @@ def main(argv: list[str] | None = None) -> int:
         "debatt-test", help="kjør testkommentarene gjennom en moderator og vis hvor godt den treffer",
         description="Kjører data/debatt/testsett.jsonl gjennom moderatoren og sammenligner med fasiten "
                     "(data/debatt/fasit.json; forslagene teller der fasiten ikke er satt ennå). Skriver én linje "
-                    "per kommentar til data/debatt/test/ og en tabell per terskel. Med --rapport kjøres ingenting; "
+                    "per kommentar til data/debatt/test/ og en tabell: de innstilte grensene (konfig) og én felles "
+                    "terskel for alle regler til sammenligning. Med --rapport kjøres ingenting; "
                     "tabellen lages fra lagrede kjøringer.")
     dtest.add_argument("--moderator", action="append", choices=("hailo", "cpu", "laya", "jev", "claude"),
                        help="kan gjentas; hver kjøres for seg")
     dtest.add_argument("--bare", type=int, help="bare de første N kommentarene (prøvekjøring)")
     dtest.add_argument("--rapport", nargs="*", type=Path, metavar="KJØRING",
                        help="lag tabellen fra disse kjøringene (uten filer: den nyeste per moderator)")
-    dtest.add_argument("--stopp", type=float, metavar="TERSKEL",
-                       help="egen terskel for å stoppe; tabellens terskel gjelder da bare publisering")
     dtest.add_argument("--stol-pa-etikett", action="store_true",
                        help="regn et svar uten sannsynligheter (hailo) som sikkert")
 
@@ -307,7 +306,7 @@ def _debatt_test(args) -> int:
             filer.append(testsett.kjor(m, sett, bare=args.bare))
     rapporter = {}
     for f in filer:
-        r = testsett.rapport(testsett.les_resultat(f), sett, fasit, args.stol_pa_etikett, args.stopp)
+        r = testsett.rapport(testsett.les_resultat(f), sett, fasit, args.stol_pa_etikett)
         rapporter[r["modell"] or f.stem] = r
         logging.info("%s: %d svar, %d feil, %d av %d med fasit satt av redaktøren", f.name, r["n"] - r["feil"],
                      r["feil"], r["kontrollert"], r["n"])

@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS brukere (
   epost TEXT UNIQUE NOT NULL,
   navn TEXT,
   navn_nokkel TEXT UNIQUE,   -- the name folded for comparison (tjeneste.navnenokkel)
+  quiz TEXT,                 -- the rules version whose quiz the reader passed (regler.REGLER_VERSJON)
   opprettet TEXT NOT NULL,
   sperret INTEGER NOT NULL DEFAULT 0
 );

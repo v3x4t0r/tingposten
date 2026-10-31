@@ -22,7 +22,7 @@ from datetime import timedelta
 
 from .db import Db, iso, na, siden
 from .moderering import Kjede, Sak
-from .regler import REGLER
+from .regler import QUIZ, REGLER, REGLER_VERSJON
 
 log = logging.getLogger(__name__)
 
@@ -112,6 +112,7 @@ class Bruker:
     navn: str | None
     opprettet: str
     sperret: bool
+    quiz: str | None = None  # the rules version whose quiz the reader passed
 
 
 class Tjeneste:
@@ -186,7 +187,7 @@ class Tjeneste:
                          _hash(okt), iso(na()))
         if rad is None or rad["sperret"]:
             return None
-        return Bruker(rad["id"], rad["navn"], rad["opprettet"], bool(rad["sperret"]))
+        return Bruker(rad["id"], rad["navn"], rad["opprettet"], bool(rad["sperret"]), rad["quiz"])
 
     def logg_ut(self, okt: str, alle: bool = False) -> None:
         with self.db.tx() as c:
@@ -225,6 +226,33 @@ class Tjeneste:
             c.execute("UPDATE brukere SET navn = ?, navn_nokkel = ? WHERE id = ?", (navn, nokkel, b.id))
         return navn
 
+    # --- the quiz -----------------------------------------------------------------
+
+    @staticmethod
+    def quiz() -> dict:
+        """The quiz questions, without the answers."""
+        return {"versjon": REGLER_VERSJON, "sporsmal": [{"id": q["id"], "tekst": q["tekst"]} for q in QUIZ]}
+
+    def svar_quiz(self, b: Bruker, svar) -> dict:
+        """Check every answer ({id: True for "lov"}); all right passes this rules version.
+        The reader sees whether each answer was right and why, and can try again."""
+        if not isinstance(svar, dict) or set(svar) != {q["id"] for q in QUIZ} or \
+                any(type(v) is not bool for v in svar.values()):
+            raise Feil(400, "Svar på alle spørsmålene.")
+        resultat = [{"id": q["id"], "riktig": svar[q["id"]] == q["lov"], "lov": q["lov"],
+                     "forklaring": q["forklaring"]} for q in QUIZ]
+        bestatt = all(r["riktig"] for r in resultat)
+        if bestatt:
+            with self.db.tx() as c:
+                c.execute("UPDATE brukere SET quiz = ? WHERE id = ?", (REGLER_VERSJON, b.id))
+        return {"bestatt": bestatt, "svar": resultat}
+
+    def _sjekk_skriverett(self, b: Bruker) -> None:
+        if not b.navn:
+            raise Feil(400, "Velg et visningsnavn først.")
+        if b.quiz != REGLER_VERSJON:
+            raise Feil(403, "Ta quizen om debattreglene før du skriver.")
+
     # --- comments --------------------------------------------------------------
 
     def _sak(self, key) -> Sak:
@@ -234,8 +262,7 @@ class Tjeneste:
         return Sak(key, info.get("tittel", ""), info.get("ingress", ""))
 
     def ny_kommentar(self, b: Bruker, sak_key, tekst, forelder=None) -> dict:
-        if not b.navn:
-            raise Feil(400, "Velg et visningsnavn først.")
+        self._sjekk_skriverett(b)
         sak = self._sak(sak_key)
         tekst = rens_tekst(tekst)
         if forelder is not None:
@@ -270,6 +297,7 @@ class Tjeneste:
             raise Feil(429, f"Du har skrevet {grense} kommentarer siste døgn. Prøv igjen senere.")
 
     def endre(self, b: Bruker, kid, tekst) -> dict:
+        self._sjekk_skriverett(b)
         tekst = rens_tekst(tekst)
         egen = self._egen(b, kid)
         if egen["status"] in ("slettet", "fjernet"):

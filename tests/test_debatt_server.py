@@ -9,7 +9,7 @@ from tingposten.debatt import moderering as m  # noqa: E402
 from tingposten.debatt import server as srv  # noqa: E402
 from tingposten.debatt import tjeneste as tj  # noqa: E402
 from tingposten.debatt.db import Db  # noqa: E402
-from tingposten.debatt.regler import REGLER  # noqa: E402
+from tingposten.debatt.regler import QUIZ, REGLER  # noqa: E402
 
 SAK = "571424/2026-09-23/266-26"
 SIDE = "https://tingposten.no"
@@ -19,14 +19,14 @@ class Ok(m.Moderator):
     name = "ok"
 
     def _vurder(self, tekst, sak, forelder):
-        regel = "personangrep" if "idiot" in tekst else "ok"
+        regel = "trakassering" if "idiot" in tekst else "ok"
         return m.Vurdering(regel, {k: (0.99 if k == regel else 0.0) for k in REGLER}, "ok", 0)
 
 
 @pytest.fixture
 def klient(tmp_path):
     sendt = []
-    t = tj.Tjeneste(Db(tmp_path / "d.db"), m.Kjede([Ok()], 0.85), {SAK: {"tittel": "Bybanen", "ingress": ""}},
+    t = tj.Tjeneste(Db(tmp_path / "d.db"), m.Kjede([Ok()], m.Grenser.jevn(0.85)), {SAK: {"tittel": "Bybanen", "ingress": ""}},
                     lambda e, lenke: sendt.append(lenke), SIDE + "/", umiddelbar_moderering=True)
     with TestClient(srv.lag_app(t, [SIDE], start_ko=False)) as c:
         c.sendt = sendt
@@ -40,6 +40,8 @@ def logg_inn(c, epost="ola@b.no", navn="Ola") -> dict:
     h = {"Authorization": f"Bearer {svar['okt']}"}
     if navn:
         assert c.post("/api/meg", json={"navn": navn}, headers=h).json() == {"navn": navn}
+        svar = {q["id"]: q["lov"] for q in QUIZ}
+        assert c.post("/api/quiz", json={"svar": svar}, headers=h).json()["bestatt"] is True
     return h
 
 
@@ -55,7 +57,7 @@ def test_full_flow_login_comment_vote(klient, monkeypatch):
     assert klient.get(f"/api/sak/{SAK}/kommentarer", headers=kari).json()["kommentarer"][0]["min_stemme"] == 1
     stopp = klient.post("/api/kommentar", json={"sak": SAK, "tekst": "Ola er en idiot", "forelder": kid},
                         headers=kari).json()
-    assert stopp["status"] == "avvist" and stopp["regel"]["navn"] == "Personangrep"
+    assert stopp["status"] == "avvist" and stopp["regel"]["navn"] == "Trakassering"
     assert klient.post(f"/api/kommentar/{stopp['id']}/manuell", headers=kari).json()["status"] == "til_redaktor"
     assert klient.get(f"/api/kommentar/{stopp['id']}").status_code == 404  # others can't see it
     eksport = klient.get("/api/meg/eksport", headers=kari).json()
@@ -143,14 +145,27 @@ def test_sak_index_is_reread_when_the_build_changes_it(tmp_path):
 
 
 def test_polling_a_waiting_comment_is_not_rate_limited(tmp_path, monkeypatch):
-    monkeypatch.setattr(srv, "IP_GRENSE", 3)
+    monkeypatch.setattr(srv, "IP_GRENSE", 4)
     sendt = []
-    t = tj.Tjeneste(Db(tmp_path / "d.db"), m.Kjede([Ok()], 0.85), {SAK: {"tittel": "Bybanen", "ingress": ""}},
+    t = tj.Tjeneste(Db(tmp_path / "d.db"), m.Kjede([Ok()], m.Grenser.jevn(0.85)), {SAK: {"tittel": "Bybanen", "ingress": ""}},
                     lambda e, lenke: sendt.append(lenke), SIDE + "/", umiddelbar_moderering=True)
     with TestClient(srv.lag_app(t, [SIDE], start_ko=False)) as c:
         c.sendt = sendt
-        ola = logg_inn(c)  # 3 writes: link, confirm, name
+        ola = logg_inn(c)  # 4 writes: link, confirm, name, quiz
         assert c.post("/api/kommentar", json={"sak": SAK, "tekst": "Hei"}, headers=ola).status_code == 429
         for _ in range(10):
             assert c.get(f"/api/sak/{SAK}/kommentarer", headers=ola).status_code == 200
             assert c.get("/api/meg", headers=ola).status_code == 200
+
+
+def test_quiz_over_http(klient):
+    sporsmal = klient.get("/api/quiz").json()["sporsmal"]
+    assert len(sporsmal) == 5 and "lov" not in sporsmal[0]
+    h = logg_inn(klient, navn=None)
+    assert klient.post("/api/meg", json={"navn": "Kari"}, headers=h).status_code == 200
+    assert klient.get("/api/meg", headers=h).json()["quiz"] is False
+    assert klient.post("/api/kommentar", json={"sak": SAK, "tekst": "Hei"}, headers=h).status_code == 403
+    alle_lov = {q["id"]: True for q in sporsmal}
+    r = klient.post("/api/quiz", json={"svar": alle_lov}, headers=h).json()
+    assert r["bestatt"] is False and len(r["svar"]) == 5
+    assert klient.post("/api/quiz", json={"svar": alle_lov}).status_code == 401

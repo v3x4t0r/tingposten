@@ -138,6 +138,7 @@
       ]);
       return navnskjema;
     }
+    if (!this.meg.quiz) return this.quiz();
     return el("div", { klasse: "debatt-skriv" }, [
       this.skjema(null, null, function () { self.last(); }),
       el("p", { klasse: "debatt-meg smaatekst" }, [
@@ -154,6 +155,56 @@
         }),
       ]),
     ]);
+  };
+
+  /* The quiz: five example comments, "lov" or "ikke lov", all must be right. The server
+     checks the answers and returns why each one is or isn't allowed. */
+  Debatt.prototype.quiz = function () {
+    var self = this;
+    var boks = el("div", { klasse: "debatt-inn debatt-quiz" }, [
+      el("p", {}, [el("strong", { tekst: "Før du skriver første gang: " }),
+        document.createTextNode("fem eksempler på kommentarer. Er de lov på Tingposten? Alle må være riktige; du ser "
+          + "forklaringen etterpå og kan prøve igjen. "),
+        el("a", { href: this.regler, tekst: "Les debattreglene" }), document.createTextNode(".")]),
+    ]);
+    api(this.api, "GET", "/api/quiz").then(function (q) {
+      var skjema = el("form", { onsubmit: function (e) {
+        e.preventDefault();
+        var svar = {};
+        q.sporsmal.forEach(function (s) {
+          var valgt = skjema.querySelector("input[name='" + s.id + "']:checked");
+          if (valgt) svar[s.id] = valgt.value === "lov";
+        });
+        if (Object.keys(svar).length < q.sporsmal.length) { self.si("Svar på alle fem.", true); return; }
+        api(self.api, "POST", "/api/quiz", { svar: svar }).then(function (r) {
+          r.svar.forEach(function (x) {
+            var f = skjema.querySelector("[data-forklaring='" + x.id + "']");
+            f.textContent = (x.riktig ? "Riktig. " : "Feil. ") + x.forklaring;
+            f.className = "debatt-forklaring " + (x.riktig ? "riktig" : "feil");
+          });
+          if (r.bestatt) {
+            self.meg.quiz = true;
+            self.si("Alt riktig. Du kan skrive nå.");
+            skjema.querySelector("button").replaceWith(el("button", { type: "button", tekst: "Skriv en kommentar",
+              onclick: function () { self.si(""); self.last(); } }));
+          } else {
+            self.si("Ikke alt var riktig. Les forklaringene og prøv igjen.", true);
+          }
+        }).catch(function (f) { self.si(f.message, true); });
+      } });
+      q.sporsmal.forEach(function (s, i) {
+        var navn = s.id;
+        skjema.append(el("fieldset", { klasse: "debatt-sporsmal" }, [
+          el("legend", { tekst: (i + 1) + ". «" + s.tekst + "»" }),
+          el("label", {}, [el("input", { type: "radio", name: navn, value: "lov" }), document.createTextNode(" Lov")]),
+          el("label", {}, [el("input", { type: "radio", name: navn, value: "ikke" }), document.createTextNode(" Ikke lov")]),
+          el("p", { "data-forklaring": navn, klasse: "debatt-forklaring", "aria-live": "polite" }),
+        ]));
+      });
+      skjema.append(el("div", { klasse: "debatt-rad" }, [el("button", { type: "submit", tekst: "Sjekk svarene" })]));
+      boks.append(skjema);
+    }).catch(function (f) { self.si(f.message, true); });
+    return boks;
   };
 
   /* A comment box: new comment (forelder null), reply, or edit (eksisterende). */

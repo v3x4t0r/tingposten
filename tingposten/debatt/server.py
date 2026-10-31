@@ -9,7 +9,9 @@ Request bodies are capped; every error a reader can fix comes back as
   POST   /api/innlogging              {epost, tilbake}   send a login link
   POST   /api/innlogging/bekreft      {token}            → {okt, navn, tilbake}
   POST   /api/utlogging               {alle}
-  GET    /api/meg                     the account (name, created)
+  GET    /api/meg                     the account (name, created, quiz passed for these rules)
+  GET    /api/quiz                    the quiz questions (no answers)
+  POST   /api/quiz                    {svar: {id: bool}} → right or wrong and why; all right = may write
   POST   /api/meg                     {navn}             choose a display name
   DELETE /api/meg                     delete the account and everything in it
   GET    /api/meg/eksport             everything stored about the reader (JSON)
@@ -40,6 +42,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
+from .regler import REGLER_VERSJON
 from .tjeneste import Feil, Tjeneste
 
 log = logging.getLogger(__name__)
@@ -159,12 +162,17 @@ def lag_app(tjeneste: Tjeneste, opprinnelser: list[str], start_ko: bool = True) 
     async def meg(request):
         b = innlogget(request)
         if request.method == "GET":
-            return svar({"navn": b.navn, "opprettet": b.opprettet})
+            return svar({"navn": b.navn, "opprettet": b.opprettet, "quiz": b.quiz == REGLER_VERSJON})
         if request.method == "DELETE":
             tjeneste.db.slett_bruker(b.id)
             return svar({"slettet": True})
         navn = await _i_traad(tjeneste.sett_navn, b, (await kropp(request)).get("navn"))
         return svar({"navn": navn})
+
+    async def quiz(request):
+        if request.method == "GET":
+            return JSONResponse(tjeneste.quiz(), headers={"Cache-Control": "public, max-age=300"})
+        return svar(tjeneste.svar_quiz(innlogget(request), (await kropp(request)).get("svar")))
 
     async def eksport(request):
         return svar(tjeneste.db.eksport(innlogget(request).id))
@@ -211,6 +219,7 @@ def lag_app(tjeneste: Tjeneste, opprinnelser: list[str], start_ko: bool = True) 
         Route("/api/utlogging", endepunkt(logg_ut, True), methods=["POST"]),
         Route("/api/meg", endepunkt(meg, True), methods=["GET", "POST", "DELETE"]),
         Route("/api/meg/eksport", endepunkt(eksport)),
+        Route("/api/quiz", endepunkt(quiz, True), methods=["GET", "POST"]),
         Route("/api/sak/{sak:path}/kommentarer", endepunkt(trad)),
         Route("/api/kommentar", endepunkt(ny, True), methods=["POST"]),
         Route("/api/kommentar/{id}", endepunkt(kommentar, True), methods=["GET", "PUT", "DELETE"]),

@@ -862,3 +862,9 @@ main > .sidehode:first-child { padding-top: 38px; }
 .debatt-tom, .debatt-nede { margin: 14px 0; font: 400 0.9375rem/1.45 var(--sans); color: var(--dempet); }
 .regelliste dt { margin-top: 14px; font: 700 1rem/1.3 var(--sans); }
 .regelliste dd { margin: 4px 0 0; }
+.debatt-sporsmal { margin: 14px 0 0; padding: 0; border: 0; }
+.debatt-sporsmal legend { padding: 0; margin-bottom: 6px; font: 400 1rem/1.5 var(--serif); }
+.debatt-sporsmal label { display: inline-flex; align-items: center; gap: 6px; margin: 0 18px 0 0; }
+.debatt-forklaring { margin: 6px 0 0; font: 400 0.875rem/1.45 var(--sans); color: var(--dempet); }
+.debatt-forklaring.riktig { color: var(--blekk); }
+.debatt-forklaring.feil { color: var(--blekk); font-weight: 600; }

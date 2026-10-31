@@ -40,7 +40,7 @@ def test_run_records_every_comment_and_errors(tmp_path):
 
 def test_report_counts_dangerous_misses_and_wrong_stops_per_threshold(tmp_path):
     rader = [
-        {"id": "t001", **v("personangrep", 0.8).som_dict()},   # ok stopped at low thresholds
+        {"id": "t001", **v("trakassering", 0.8).som_dict()},   # ok stopped at low thresholds
         {"id": "t002", **v("ok", 0.88).som_dict()},            # a threat published at ≤ 0.85
         {"id": "t003", **v("spam", 0.99).som_dict()},
     ]
@@ -53,9 +53,9 @@ def test_report_counts_dangerous_misses_and_wrong_stops_per_threshold(tmp_path):
 
 def test_owner_label_overrides_the_drafters_suggestion(tmp_path):
     sett_inn(tmp_path, ITEMS)
-    t.lagre_fasit(tmp_path, "t001", "personangrep", "  skamme seg om en person  ")
+    t.lagre_fasit(tmp_path, "t001", "trakassering", "  skamme seg om en person  ")
     fasit = t.les_fasit(tmp_path)
-    assert t.fasit_for(ITEMS[0], fasit) == ("personangrep", True)
+    assert t.fasit_for(ITEMS[0], fasit) == ("trakassering", True)
     assert t.fasit_for(ITEMS[1], fasit) == ("trussel", False)
     assert fasit["t001"]["merknad"] == "skamme seg om en person"
     with pytest.raises(ValueError):
@@ -105,7 +105,8 @@ def test_newest_run_per_moderator(tmp_path):
     assert nyeste["hailo_qwen3_1.7b"].name == "hailo_qwen3_1.7b-20261031-130000.jsonl" and "jev_jev" in nyeste
 
 
-def test_report_with_a_separate_stop_threshold():
-    rader = [{"id": "t001", **v("personangrep", 0.87).som_dict()}, {"id": "t003", **v("spam", 0.95).som_dict()}]
-    r = t.rapport(rader, ITEMS, {}, stopp=0.9)["terskler"]["0.8"]
-    assert (r["avvis"], r["redaktor"], r["feil_stoppet"]) == (1, 1, 0)
+def test_report_with_per_rule_limits():
+    rader = [{"id": "t001", **v("trakassering", 0.87).som_dict()}, {"id": "t002", **v("trussel", 0.75).som_dict()}]
+    streng = m.Grenser({k: ((0.7, 0.3) if k in ("trussel", "hets") else (0.9, 0.6)) for k in REGLER if k != "ok"})
+    r = t.rapport(rader, ITEMS, {}, grenser={"streng": streng})["terskler"]["streng"]
+    assert (r["avvis"], r["redaktor"], r["feil_stoppet"]) == (1, 1, 0)  # the threat stopped, harassment doubtful

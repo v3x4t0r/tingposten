@@ -8,8 +8,9 @@ moderator, scored against the owner's labels (go/no-go before comments go live).
                                report says how many were checked
   data/debatt/test/<moderator>-<time>.jsonl   one line per comment and run
 
-The report scores each run at several thresholds from the stored probabilities,
-so one run (and one bill) is enough to choose DEBATT_TERSKEL.
+The report scores each run from the stored probabilities: with the configured
+per-rule limits (config.DEBATT_GRENSER, the "konfig" row) and, for comparison, with
+one threshold for every rule. One run (and one bill) is enough to tune the limits.
 """
 
 import json
@@ -23,7 +24,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from .. import config
-from .moderering import Moderator, ModereringFeil, Sak, Vurdering, avgjor
+from .moderering import Grenser, Moderator, ModereringFeil, Sak, Vurdering, avgjor
 from .regler import ALVORLIGE, REGLER
 
 log = logging.getLogger(__name__)
@@ -84,10 +85,10 @@ def les_resultat(path: Path) -> list[dict]:
 
 
 def rapport(resultat: list[dict], sett: list[dict], fasit: dict[str, dict], stol_pa_etikett: bool = False,
-            stopp: float | None = None) -> dict:
-    """Scores for one run: how often the rule matched, and per threshold what would
-    have been published, stopped and sent to the editor, and what went wrong. With
-    `stopp`, the thresholds are for publishing and stopping takes `stopp`."""
+            grenser: dict[str, Grenser] | None = None) -> dict:
+    """Scores for one run: how often the rule matched, and per set of limits what would
+    have been published, stopped and sent to the editor, and what went wrong. Default:
+    the configured limits ("konfig") and one threshold for every rule (TERSKLER)."""
     etter_id = {i["id"]: i for i in sett}
     rader = [r for r in resultat if r["id"] in etter_id]
     svar = [r for r in rader if "feil" not in r]
@@ -102,8 +103,12 @@ def rapport(resultat: list[dict], sett: list[dict], fasit: dict[str, dict], stol
         "kalibrert": bool(svar) and all(r["sannsynligheter"] is not None for r in svar),
         "terskler": {},
     }
-    terskler = TERSKLER if ut["kalibrert"] else (None,)
-    for t in terskler:
+    if not ut["kalibrert"]:
+        grenser = {"etikett": Grenser({})}
+    elif grenser is None:
+        grenser = {"konfig": Grenser(config.DEBATT_GRENSER, config.DEBATT_GRENSE_OK),
+                   **{str(t): Grenser.jevn(t) for t in TERSKLER}}
+    for navn, g in grenser.items():
         telling = {"publiser": 0, "avvis": 0, "redaktor": 0, "farlige_slipp": 0, "feil_stoppet": 0,
                    "feil_publisert": 0, "feil_regel": 0}
         slipp: list[str] = []
@@ -114,7 +119,7 @@ def rapport(resultat: list[dict], sett: list[dict], fasit: dict[str, dict], stol
                 telling["redaktor"] += 1
                 continue
             v = Vurdering(r["regel"], r["sannsynligheter"], r["modell"], r["ms"])
-            utfall = avgjor(v, t if t is not None else 1.0, stol_pa_etikett, stopp)
+            utfall, regel = avgjor(v, g, stol_pa_etikett)
             telling[utfall] += 1
             if utfall == "publiser" and riktig != "ok":
                 telling["feil_publisert"] += 1
@@ -124,10 +129,10 @@ def rapport(resultat: list[dict], sett: list[dict], fasit: dict[str, dict], stol
             elif utfall == "avvis" and riktig == "ok":
                 telling["feil_stoppet"] += 1
                 stoppet.append(r["id"])
-            elif utfall == "avvis" and r["regel"] != riktig:
+            elif utfall == "avvis" and regel != riktig:
                 telling["feil_regel"] += 1
         telling["andel_redaktor"] = _andel(telling["redaktor"], len(rader))
-        ut["terskler"][str(t) if t is not None else "etikett"] = {**telling, "slipp": slipp, "stoppet": stoppet}
+        ut["terskler"][navn] = {**telling, "slipp": slipp, "stoppet": stoppet}
     return ut
 
 

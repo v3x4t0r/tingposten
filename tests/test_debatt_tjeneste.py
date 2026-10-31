@@ -3,7 +3,7 @@ import pytest
 from tingposten.debatt import moderering as m
 from tingposten.debatt import tjeneste as tj
 from tingposten.debatt.db import Db
-from tingposten.debatt.regler import REGLER
+from tingposten.debatt.regler import QUIZ, REGLER, REGLER_VERSJON
 
 SAK = "571424/2026-09-23/266-26"
 SAKER = {SAK: {"tittel": "Bybanen til Åsane", "ingress": "Bystyret vedtok traseen."}}
@@ -25,7 +25,7 @@ class Alltid(m.Moderator):
 
 def lag(tmp_path, *ledd, terskel=0.85):
     sendt = []
-    svc = tj.Tjeneste(Db(tmp_path / "d.db"), m.Kjede(list(ledd), terskel), SAKER,
+    svc = tj.Tjeneste(Db(tmp_path / "d.db"), m.Kjede(list(ledd), m.Grenser.jevn(terskel)), SAKER,
                       lambda epost, lenke: sendt.append((epost, lenke)), "https://tingposten.no/",
                       umiddelbar_moderering=True)
     svc.sendt = sendt
@@ -34,16 +34,21 @@ def lag(tmp_path, *ledd, terskel=0.85):
 
 @pytest.fixture
 def t(tmp_path):
-    return lag(tmp_path, Alltid({"idiot": "personangrep"}))
+    return lag(tmp_path, Alltid({"idiot": "trakassering"}))
+
+
+RIKTIG = {q["id"]: q["lov"] for q in QUIZ}
 
 
 def logg_inn(t, epost="Ola@Example.no", navn="Ola"):
+    """A reader who has logged in, chosen `navn` and passed the quiz (navn=None: neither)."""
     t.be_om_lenke(epost, "https://tingposten.no/bergen/sak/x/")
     token = t.sendt[-1][1].split("#t=")[1]
     svar = t.bekreft(token)
     b = t.bruker(svar["okt"])
     if navn:
         t.sett_navn(b, navn)
+        t.svar_quiz(b, RIKTIG)
         b = t.bruker(svar["okt"])
     return b, svar
 
@@ -103,7 +108,7 @@ def test_comment_is_published_or_stopped_with_the_rule_shown_only_to_the_author(
     ok = t.ny_kommentar(ola, SAK, "Et dårlig vedtak, men forståelig.")
     stopp = t.ny_kommentar(kari, SAK, "Ola er en idiot")
     assert ok["status"] == "publisert"
-    assert stopp["status"] == "avvist" and stopp["regel"]["key"] == "personangrep"
+    assert stopp["status"] == "avvist" and stopp["regel"]["key"] == "trakassering"
     for hvem, ser in ((None, [ok["id"]]), (ola, [ok["id"]]), (kari, [ok["id"], stopp["id"]])):
         assert sorted(k["id"] for k in t.trad(SAK, hvem)["kommentarer"]) == ser
     with pytest.raises(tj.Feil):
@@ -218,7 +223,7 @@ def test_all_backends_failing_never_publishes(tmp_path):
     svc.sett_navn = lambda b, navn: None  # the name check would also go to the failing moderators
     b, _ = logg_inn(svc, navn=None)
     with svc.db.tx() as c:
-        c.execute("UPDATE brukere SET navn = 'Ola' WHERE id = ?", (b.id,))
+        c.execute("UPDATE brukere SET navn = 'Ola', quiz = ? WHERE id = ?", (REGLER_VERSJON, b.id))
     k = svc.ny_kommentar(svc.bruker(svc.bekreft(_ny_token(svc, "ola@example.no"))["okt"]), SAK, "Hei")
     assert k["status"] == "til_redaktor"
     logg = svc.db.en("SELECT data FROM vurderinger WHERE kommentar = ?", k["id"])["data"]
@@ -273,7 +278,7 @@ def test_text_cleaning(tekst, feil):
 
 def test_editor_never_publishes_a_text_changed_since_they_saw_it(tmp_path, monkeypatch):
     monkeypatch.setattr(tj, "KOMMENTAR_PAUSE_S", 0)
-    svc = lag(tmp_path, Alltid({"idiot": "personangrep", "hmm": "ok"}, p=0.5))
+    svc = lag(tmp_path, Alltid({"idiot": "trakassering", "hmm": "ok"}, p=0.5))
     ola, _ = logg_inn(svc)
     k = svc.ny_kommentar(ola, SAK, "Hmm, tja.")
     assert k["status"] == "til_redaktor"
@@ -297,7 +302,7 @@ def test_a_broken_backend_never_publishes(tmp_path):
     svc.sett_navn = lambda b, navn: None
     b, _ = logg_inn(svc, navn=None)
     with svc.db.tx() as c:
-        c.execute("UPDATE brukere SET navn = 'Ola'")
+        c.execute("UPDATE brukere SET navn = 'Ola', quiz = ?", (REGLER_VERSJON,))
     k = svc.ny_kommentar(svc.bruker(svc.bekreft(_ny_token(svc, "ola@example.no"))["okt"]), SAK, "Hei hei")
     assert k["status"] == "til_redaktor"
 
@@ -439,5 +444,48 @@ def test_editor_queue_keeps_the_models_verdict_and_report_reasons(t, monkeypatch
     k = t.ny_kommentar(ola, SAK, "Noe å rapportere")
     t.rapporter(kari, k["id"], "Usant om meg")
     ko = {r["id"]: r for r in t.redaktor_ko()}
-    assert ko[stopp["id"]]["ba_om_vurdering"] and '"personangrep"' in ko[stopp["id"]]["vurdering"]
+    assert ko[stopp["id"]]["ba_om_vurdering"] and '"trakassering"' in ko[stopp["id"]]["vurdering"]
     assert ko[k["id"]]["grunner"] == ["Usant om meg"]
+
+
+# --- the quiz -------------------------------------------------------------------------------
+
+def test_no_comments_before_the_quiz_is_passed(t):
+    b, okt = logg_inn(t, navn=None)
+    t.sett_navn(b, "Ola")
+    b = t.bruker(okt["okt"])
+    with pytest.raises(tj.Feil) as e:
+        t.ny_kommentar(b, SAK, "Hei hei")
+    assert e.value.kode == 403
+
+
+def test_quiz_answers_are_checked_on_the_server_with_explanations(t):
+    b, okt = logg_inn(t, navn=None)
+    assert all(set(q) == {"id", "tekst"} for q in t.quiz()["sporsmal"])  # no answers sent to the page
+    feil = {**RIKTIG, "q2": not RIKTIG["q2"]}
+    r = t.svar_quiz(b, feil)
+    assert r["bestatt"] is False and [x["id"] for x in r["svar"] if not x["riktig"]] == ["q2"]
+    assert all(x["forklaring"] for x in r["svar"])
+    assert t.bruker(okt["okt"]).quiz is None
+    for daarlig in (None, {}, {**RIKTIG, "q9": True}, {**RIKTIG, "q1": "ja"}):
+        with pytest.raises(tj.Feil):
+            t.svar_quiz(b, daarlig)
+    assert t.svar_quiz(b, RIKTIG)["bestatt"] is True
+    assert t.bruker(okt["okt"]).quiz == REGLER_VERSJON
+
+
+def test_new_rules_mean_a_new_quiz(t, monkeypatch):
+    ola, _ = logg_inn(t)
+    t.ny_kommentar(ola, SAK, "Før reglene endret seg")
+    monkeypatch.setattr(tj, "REGLER_VERSJON", "regler-99")
+    monkeypatch.setattr(tj, "KOMMENTAR_PAUSE_S", 0)
+    with pytest.raises(tj.Feil) as e:
+        t.ny_kommentar(ola, SAK, "Etter")
+    assert e.value.kode == 403
+
+
+def test_quiz_examples_follow_the_rules():
+    """The quiz teaches the editor's line: confronting a politician is lawful, contempt for a group is not."""
+    etter_id = {q["id"]: q for q in QUIZ}
+    assert len(QUIZ) == 5 and etter_id["q2"]["lov"] is True and etter_id["q3"]["lov"] is False
+    assert sum(q["lov"] for q in QUIZ) == 2

@@ -201,10 +201,10 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
               relaterte=related(s_, meeting))
     write("om/index.html", "om.html", side="om", signaler=_weights(), terskel=_terskel())
     if env.globals["debatt"]:
-        from .debatt.regler import REGLER
+        from .debatt.regler import REGLER, STRENGE
 
         write("bergen/logg-inn/index.html", "logg_inn.html", side="logg-inn", noindex=True)
-        write("om/debattregler/index.html", "debattregler.html", side="om", regler=REGLER,
+        write("om/debattregler/index.html", "debattregler.html", side="om", regler=REGLER, strenge=STRENGE,
               eksterne_moderatorer=_eksterne_moderatorer())
         skriv_sak_indeks(saker, debatt_dir or config.DEBATT_DIR)
     # statichost serves /404.html for a missing path at any depth, so its links
