@@ -119,6 +119,14 @@ def main(argv: list[str] | None = None) -> int:
     dtest.add_argument("--stol-pa-etikett", action="store_true",
                        help="regn et svar uten sannsynligheter (hailo) som sikkert")
 
+    dsrv = sub.add_parser(
+        "debatt", help="kommentarserveren (trenger: uv run --extra debatt)",
+        description="Starter kommentarserveren: innlogging med e-postlenke, kommentarer, stemmer og moderering. "
+                    "Lytter bare lokalt; Tailscale Funnel gjør den nåbar for leserne. Innstillinger i "
+                    "miljøet (DEBATT_SMTP_*, DEBATT_AVSENDER, TINGPOSTEN_ANTHROPIC_API_KEY, TYPESAFE_API_KEY).")
+    dsrv.add_argument("--vert", default="127.0.0.1")
+    dsrv.add_argument("--port", type=int, default=8790)
+
     dfas = sub.add_parser("debatt-fasit", help="lokal side for å sette fasit på testkommentarene")
     dfas.add_argument("--port", type=int, default=8766)
     dfas.add_argument("--apne", action="store_true", help="åpne siden i nettleseren")
@@ -149,6 +157,13 @@ def main(argv: list[str] | None = None) -> int:
         return _vurder(args)
     elif args.cmd == "admin":
         return _admin(args)
+    elif args.cmd == "debatt":
+        import uvicorn
+
+        from .debatt import server
+
+        uvicorn.run(server.app_fra_config(), host=args.vert, port=args.port, proxy_headers=False,
+                    server_header=False, log_level="info")
     elif args.cmd == "debatt-test":
         return _debatt_test(args)
     elif args.cmd == "debatt-fasit":

@@ -112,11 +112,12 @@ def test_too_long_comment_never_reaches_a_model():
 
 def test_hailo_names_a_rule_without_probabilities():
     okt = Okt(Svar({"message": {"content": "<think></think>\nD"}}))
-    v = m.Hailo("http://pi:8000/", "qwen3:1.7b", session=okt).vurder("Du er en idiot", SAK, "Jeg er enig")
+    v = m.Hailo("http://pi:8000/", "qwen3:1.7b", session=okt).vurder('Du er en "idiot"\nJa', SAK, "Jeg er enig")
     assert (v.regel, v.sannsynligheter, v.modell) == ("personangrep", None, "hailo:qwen3:1.7b")
     kall = okt.kall[0]
     assert kall["url"] == "http://pi:8000/api/chat" and kall["json"]["stream"] is False
-    assert kall["json"]["messages"][0]["content"].endswith("/no_think")
+    sendt = kall["json"]["messages"][0]["content"]
+    assert sendt.endswith("/no_think") and "\n" not in sendt and '"' not in sendt
 
     with pytest.raises(m.ModereringFeil):
         m.Hailo("http://pi:8000", "qwen3:1.7b", session=Okt(Svar({"message": {"content": "Vet ikke"}}))).vurder(

@@ -2,7 +2,8 @@
 
 Reads data/bergen/: agendapunkter/ (metadata), redigert/ (cards after the
 fact-checker and the delete-only editor) and pdf/ (for the score). Writes
-plain HTML to site/: no JavaScript, no external assets, relative links only,
+plain HTML to site/: no JavaScript but the visitor count and, with config.DEBATT,
+the comment section (static/debatt.js); no external assets, relative links only,
 so the same files work under v3x4t0r.github.io/tingposten/ and at the root
 of tingposten.no (404.html is the exception: it links from the site's root
 path, since it's served at any depth). Source links go to Bergen kommune's
@@ -24,6 +25,7 @@ off the documents, chosen by one fixed rule in fakta().
 import html
 import json
 import logging
+import os
 import re
 import shutil
 from collections import defaultdict
@@ -143,7 +145,8 @@ SIGNALS = {
 }
 
 
-def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, idag: date | None = None) -> dict:
+def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, idag: date | None = None,
+          debatt_dir: Path | None = None) -> dict:
     idag = idag or date.today()
     saker = load(data_dir)
     _guard(site_dir)
@@ -197,6 +200,13 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
         write(s_["side"] + "index.html", "sak.html", side="sak", s=s_, mote=meeting,
               relaterte=related(s_, meeting))
     write("om/index.html", "om.html", side="om", signaler=_weights(), terskel=_terskel())
+    if env.globals["debatt"]:
+        from .debatt.regler import REGLER
+
+        write("bergen/logg-inn/index.html", "logg_inn.html", side="logg-inn", noindex=True)
+        write("om/debattregler/index.html", "debattregler.html", side="om", regler=REGLER,
+              eksterne_moderatorer=_eksterne_moderatorer())
+        skriv_sak_indeks(saker, debatt_dir or config.DEBATT_DIR)
     # statichost serves /404.html for a missing path at any depth, so its links
     # can't be relative: they start at the site's own root path ("/").
     write("404.html", "404.html", side="404", root=urlsplit(_site_url()).path, sti=None, noindex=True)
@@ -234,6 +244,27 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
              "rettet": sum(bool(s["rettelser"]) for s in saker)}
     log.info("built %s: %s", site_dir, stats)
     return stats
+
+
+# Moderators that send the comment text outside the house, as the rules page names them.
+_EKSTERNE = {"jev": "TypeSafe (Jev)", "claude": "Anthropic (Claude)"}
+
+
+def _eksterne_moderatorer() -> list[str]:
+    return [_EKSTERNE[m] for m in getattr(config, "DEBATT_MODERATOR", ()) if m in _EKSTERNE]
+
+
+def skriv_sak_indeks(saker: list[dict], debatt_dir: Path) -> Path:
+    """data/debatt/saker.json: every sak with a page, for the comment server (which saker
+    take comments, and the title and ingress the moderator sees)."""
+    indeks = {s_["key"]: {"tittel": s_["overskrift"], "ingress": s_["dek"] or "", "lenke": _site_url() + s_["lenke"]}
+              for s_ in saker}
+    path = debatt_dir / "saker.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(indeks, ensure_ascii=False, indent=1))
+    os.replace(tmp, path)
+    return path
 
 
 def load(data_dir: Path) -> list[dict]:
@@ -433,6 +464,7 @@ def _sak(item: dict, ranked: dict, data_dir: Path, parsers: "_Parsers | None" = 
         "pdf": {k: u for k, _, _ in pdf.KINDS if (u := pdf.url(item, k))},
         "mote": slug,
         "anker": anchor,
+        "key": pdf.key(item),
         "side": side,
         "lenke": side,
         "venter_protokoll": not klar,
@@ -1033,6 +1065,7 @@ def _env() -> Environment:
     env.globals["skjult"] = getattr(config, "SKJUL_FOR_SOK", False)
     env.globals["goatcounter"] = getattr(config, "GOATCOUNTER", None)
     env.globals["teller_via_siden"] = getattr(config, "GOATCOUNTER_VIA_SIDEN", False)
+    env.globals["debatt"] = (getattr(config, "DEBATT", None) or "").rstrip("/") or None
     return env
 
 

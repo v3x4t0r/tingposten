@@ -178,14 +178,17 @@ class Hailo(Moderator):
         self.session = session or requests.Session()
 
     def _vurder(self, tekst, sak, forelder):
-        innhold = prompt(tekst, sak, forelder, bokstaver=True)
+        # hailo-ollama 5.3 copies the message into JSON without escaping it: a line
+        # break or a quote mark gives HTTP 500 (seen 31.10). One line, typographic quotes.
+        innhold = (prompt(tekst, sak, forelder, bokstaver=True).replace("\n", " ").replace('"', "”")
+                   .replace("\\", "/"))
         if self.modell.startswith("qwen3"):
             innhold += " /no_think"
         try:
             r = self.session.post(f"{self.url}/api/chat", timeout=TIMEOUT_S, json={
                 "model": self.modell, "stream": False,
                 "messages": [{"role": "user", "content": innhold}],
-                "options": {"temperature": 0, "num_predict": 8},
+                "options": {"temperature": 0, "num_predict": 3},
             })
             r.raise_for_status()
             svar = r.json()["message"]["content"]

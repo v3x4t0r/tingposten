@@ -128,6 +128,15 @@
     </div>
   </div>
 </article>
+{% if debatt %}
+<section class="debatt lag" id="debatt" aria-labelledby="debatt-tittel" data-debatt-sak="{{ s.key }}" data-api="{{ debatt }}" data-side="{{ site_url }}{{ s.lenke }}" data-regler="{{ root }}om/debattregler/">
+  <h2 class="etikett etikett-strek" id="debatt-tittel">Debatt</h2>
+  <div class="debatt-innhold">
+    <noscript><p>Kommentarene trenger JavaScript. <a href="{{ root }}om/debattregler/">Les debattreglene</a>.</p></noscript>
+  </div>
+</section>
+<script src="{{ root }}static/debatt.js" defer></script>
+{% endif %}
 {% if relaterte %}
 <section class="relaterte lag" aria-labelledby="relaterte-tittel">
   <div class="relaterte-hode"><h2 id="relaterte-tittel">Fra samme møte</h2><p class="andre"><a class="pil" href="{{ root }}bergen/mote/{{ mote.slug }}/">Alle {{ mote.saker|length }} saker fra møtet</a></p></div>

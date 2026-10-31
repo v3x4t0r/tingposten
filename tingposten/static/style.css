@@ -1,6 +1,7 @@
 /* Tingposten: a sober newspaper (design D). Blackletter nameplate, Bodoni
-   headlines, Franklin for wayfinding, Source Serif for reading. Static CSS,
-   no scripts, self-hosted fonts (fonts.css) with system fallbacks. All
+   headlines, Franklin for wayfinding, Source Serif for reading. Static CSS;
+   the only scripts are the visitor count and, when comments are on, the
+   comment section (debatt.js). Self-hosted fonts (fonts.css) with system fallbacks. All
    colours are tokens; the figures (grafikk.py) read the --tp-* tokens and
    stay in ink: no party colours, no colour for winners or losers. */
 
@@ -791,7 +792,7 @@ main > .sidehode:first-child { padding-top: 38px; }
           --tp-for: #333; --tp-falt: #888; --tp-spor: #ddd; --tp-kart: #ddd; --tp-flate: #fff; --tp-fg: #000; --tp-muted: #444; }
   body { display: block; min-height: 0; font-size: 11pt; }
   .meny, .meny-smal, .hopp, .paa-siden, .relaterte, .periodelinje, .brodsmule, .bunn-lenker, .andre, .stolper-mer,
-  .andre-temaer, .ikkefunnet-lenker { display: none !important; }
+  .andre-temaer, .ikkefunnet-lenker, .debatt { display: none !important; }
   .masthode-smal .ore-h { display: block; }
   h1, h2, h3, .artikkel-etikett, .mellomtittel, .kort-hode, .figur-tittel, .seksjon-hode, .flis-hode { break-after: avoid; }
   .felt, .figur, .fotnoter li, .rad, .indeksrad, .flis > ul > li, .valgliste li, .sek, .lead { break-inside: avoid; }
@@ -808,3 +809,56 @@ main > .sidehode:first-child { padding-top: 38px; }
 .omside .lesetekst h3:first-of-type { margin-top: 0; }
 .omside .lesetekst ul { padding-left: 1.2em; }
 .omside .lesetekst li { margin: 6px 0; }
+
+/* Debatt: the comment section under a sak (debatt.js fills .debatt-innhold). */
+.debatt { margin-top: 44px; padding-top: 4px; scroll-margin-top: 16px; }
+.debatt > h2 { margin: 0 0 12px; }
+@media (min-width: 900px) { .debatt > h2 { margin: 4px 0 0; } }
+.debatt-innhold { max-width: 40em; font: 400 1rem/1.55 var(--serif); }
+.debatt input[type="email"], .debatt input[type="text"], .debatt textarea {
+  width: 100%; padding: 8px 10px; font: 400 1rem/1.45 var(--serif); color: var(--blekk);
+  background: var(--papir); border: 1px solid var(--linje-2); border-radius: 2px; }
+.debatt textarea { resize: vertical; min-height: 5.5em; }
+.debatt input:focus-visible, .debatt textarea:focus-visible { outline: 3px solid var(--fokus); outline-offset: 0; }
+.debatt label { display: block; margin: 0 0 6px; font: 400 0.9375rem/1.45 var(--sans); }
+.debatt button { font: 600 0.875rem/1.2 var(--sans); color: var(--papir); background: var(--blekk);
+  border: 1px solid var(--blekk); border-radius: 2px; padding: 8px 14px; cursor: pointer; }
+.debatt button:disabled { opacity: 0.55; cursor: default; }
+.debatt .lenkeknapp { padding: 0; color: var(--lenke); background: none; border: 0; font: 400 0.8125rem/1.5 var(--sans);
+  text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.18em; }
+.debatt-rad { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-top: 8px; }
+.debatt-inn .debatt-rad input { flex: 1 1 14em; width: auto; }
+.debatt-inn, .debatt-skriv { padding: 16px; background: var(--boks); border: 1px solid var(--boks-kant); }
+.debatt-skriv .debatt-meg { margin-top: 12px; }
+.debatt-melding { margin: 10px 0 0; font: 400 0.875rem/1.45 var(--sans); color: var(--dempet); min-height: 1.2em; }
+.debatt-melding.feil { color: var(--blekk); font-weight: 600; }
+.debatt-topp { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between;
+  margin: 18px 0 4px; padding-bottom: 8px; border-bottom: 1px solid var(--linje); }
+.debatt-antall { margin: 0; font: 700 0.75rem/1.3 var(--sans); letter-spacing: 0.1em; text-transform: uppercase; }
+.debatt-sorter { display: flex; gap: 4px; }
+.debatt-sorter button { padding: 3px 10px; color: var(--blekk); background: none; border: 1px solid var(--linje-2);
+  border-radius: 99px; font-weight: 400; font-size: 0.8125rem; }
+.debatt-sorter button[aria-pressed="true"] { color: var(--papir); background: var(--blekk); border-color: var(--blekk); }
+.debatt-liste, .debatt-svar { list-style: none; margin: 0; padding: 0; }
+.debatt-k { padding: 14px 0 4px; border-bottom: 1px solid var(--linje); }
+.debatt-svar { margin-top: 6px; padding-left: 14px; border-left: 2px solid var(--linje); }
+.debatt-svar .debatt-k:last-child { border-bottom: 0; }
+.debatt-svar.flat { padding-left: 0; border-left: 0; }
+@media (min-width: 620px) { .debatt-svar { padding-left: 20px; } }
+.debatt-hvem { margin: 0; font: 400 0.8125rem/1.4 var(--sans); color: var(--dempet); }
+.debatt-hvem strong { color: var(--blekk); font-weight: 600; }
+.debatt-tekst { margin: 4px 0 6px; white-space: pre-wrap; }
+.debatt-borte { margin: 0 0 6px; font: italic 400 0.875rem/1.4 var(--sans); color: var(--dempet); }
+.debatt-status { margin: 4px 0 8px; padding: 8px 10px; font: 400 0.875rem/1.45 var(--sans); background: var(--merket); }
+.debatt-status p { margin: 0; }
+.debatt-status p + p { margin-top: 4px; }
+.debatt-handlinger { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; margin-bottom: 6px; }
+.debatt-stemmer { display: inline-flex; align-items: center; gap: 2px; }
+.debatt .stem { padding: 2px 7px; color: var(--dempet); background: none; border: 1px solid transparent; font-size: 0.75rem; }
+.debatt .stem:hover:not(:disabled) { border-color: var(--linje-2); }
+.debatt .stem[aria-pressed="true"] { color: var(--blekk); border-color: var(--blekk); }
+.debatt-poeng { min-width: 2ch; text-align: center; font: 600 0.8125rem/1 var(--sans); font-variant-numeric: tabular-nums; }
+.debatt-skjema { margin: 8px 0; }
+.debatt-tom, .debatt-nede { margin: 14px 0; font: 400 0.9375rem/1.45 var(--sans); color: var(--dempet); }
+.regelliste dt { margin-top: 14px; font: 700 1rem/1.3 var(--sans); }
+.regelliste dd { margin: 4px 0 0; }

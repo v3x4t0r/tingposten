@@ -1,6 +1,7 @@
 {# The editorial declaration, approved by the editor 30.10.2026 (draft: docs/redaksjonell-erklaering.md).
-   Change the date line when the text changes. #}
-<p class="erklaering-dato">Sist oppdatert 30. oktober 2026</p>
+   Change the date line when the text changes. The parts under `debatt` (comments, branch
+   debatt) are drafts until the editor approves them; set their date then. #}
+<p class="erklaering-dato">Sist oppdatert {% if debatt %}31. oktober 2026{% else %}30. oktober 2026{% endif %}</p>
 
 <h3>Hva Tingposten er</h3>
 <p>Tingposten er en gratis og ikke-kommersiell nettside som viser hva Bergen kommune vedtar. Hver sak får et kort i samme format: en overskrift, en ingress og fem faste punkter: hva endres, hvem påvirkes, hvorfor, status og når og hvor. Hvert kort har lenke til kommunens egne dokumenter. Koden er åpen og ligger på <a href="https://github.com/{{ repo }}">GitHub</a>.</p>
@@ -32,8 +33,13 @@
 <h3>Feil og rettelser</h3>
 <p>Hver sak har en lenke merket «Meld feil». Du kan melde feil {% if kontakt_epost %}på e-post til <a href="mailto:{{ kontakt_epost }}">{{ kontakt_epost }}</a> eller {% endif %}som en offentlig sak på GitHub. Rettelser gjøres synlig: saken får en merknad om hva som ble endret og når.</p>
 
+{% if debatt %}
+<h3>Kommentarer</h3>
+<p>Lesere med konto kan kommentere sakene. Hver kommentar vurderes av en KI-modell mot <a href="debattregler/">debattreglene</a> før den vises, og er modellen usikker, avgjør redaktøren. Alle meninger er lov; reglene gjelder tonen og loven, aldri standpunktet. Den som får en kommentar stoppet, får vite hvilken regel det gjelder, og kan be redaktøren se på den. Ansvarlig redaktør har ansvaret for kommentarene som publiseres.</p>
+{% endif %}
+
 <h3>Uavhengighet</h3>
-<p>Tingposten følger ikke med på enkeltlesere.{% if goatcounter %} Vi teller besøk uten informasjonskapsler, som forklart under <a href="#besok">«Besøkstall»</a>.{% endif %} Tingposten er ikke knyttet til noe parti eller til Bergen kommune, og tar ikke imot betaling for omtale.</p>
+<p>{% if debatt %}Du kan lese alt uten konto, og Tingposten følger ikke med på hvem som leser hva. En konto trengs bare for å kommentere; hva vi da lagrer, står i <a href="debattregler/">debattreglene</a>.{% else %}Tingposten følger ikke med på enkeltlesere.{% endif %}{% if goatcounter %} Vi teller besøk uten informasjonskapsler, som forklart under <a href="#besok">«Besøkstall»</a>.{% endif %} Tingposten er ikke knyttet til noe parti eller til Bergen kommune, og tar ikke imot betaling for omtale.</p>
 {% if utgiver or redaktor %}
 <p>{% if utgiver %}Tingposten utgis av {{ utgiver }}{% if utgiver_orgnr %} (org.nr. {{ utgiver_orgnr }}){% endif %}{% if utgiver_ogsa %}, som også står bak <a href="{{ utgiver_ogsa[1] }}">{{ utgiver_ogsa[0] }}</a>{% endif %}.{% endif %}{% if redaktor %} Ansvarlig redaktør er {{ redaktor }}{% if kontakt_epost %}, som kan kontaktes på <a href="mailto:{{ kontakt_epost }}">{{ kontakt_epost }}</a>{% endif %}.{% endif %}</p>
 {% endif %}

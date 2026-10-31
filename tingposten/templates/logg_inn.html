@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{# The login link from the e-mail lands here (#t=<token>). debatt.js hands the token to
+   the comment server, keeps the session in this browser and goes back to the sak. #}
+{% block title %}Logg inn · Tingposten{% endblock %}
+{% block description %}Innlogging for å kommentere på Tingposten.{% endblock %}
+{% block hovedklasse %}omside{% endblock %}
+{% block main %}
+<header class="sidehode">
+  <h1 class="side-tittel">Logg inn</h1>
+</header>
+<div class="lesetekst" data-debatt-innlogging data-api="{{ debatt }}" data-forside="{{ site_url }}bergen/">
+  <p class="logg-inn-status" role="status" aria-live="polite">Logger inn …</p>
+  <noscript><p>Innloggingen trenger JavaScript.</p></noscript>
+</div>
+<script src="{{ root }}static/debatt.js" defer></script>
+{% endblock %}

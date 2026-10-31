@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{# The debate rules: the same list the moderator chooses from (tingposten/debatt/regler.py). #}
+{% block title %}Debattreglene · Tingposten{% endblock %}
+{% block description %}Reglene for kommentarer på Tingposten, hvordan de vurderes, og hva vi lagrer om deg.{% endblock %}
+{% block hovedklasse %}omside{% endblock %}
+{% block main %}
+<header class="sidehode">
+  <h1 class="side-tittel">Debattreglene</h1>
+  <p class="side-ingress">Alle meninger er lov på Tingposten, også skarpe og upopulære. Reglene handler om tonen og om loven, aldri om hva du mener.</p>
+</header>
+
+<section class="omdel lag" aria-labelledby="reglene">
+  <h2 class="etikett etikett-strek" id="reglene">Reglene</h2>
+  <div class="lesetekst">
+  <p>{{ regler.ok[1] }}</p>
+  <p>En kommentar blir stoppet når den bryter én av disse reglene:</p>
+  <dl class="regelliste">
+    {% for key, (navn, tekst) in regler.items() if key != "ok" %}
+    <dt>{{ navn }}</dt>
+    <dd>{{ tekst }}</dd>
+    {% endfor %}
+  </dl>
+  </div>
+</section>
+
+<section class="omdel lag" aria-labelledby="slik">
+  <h2 class="etikett etikett-strek" id="slik">Slik vurderes kommentarene</h2>
+  <div class="lesetekst">
+  <p>Hver kommentar vurderes av en KI-modell før den vises. Modellen ser bare kommentaren, kommentaren den svarer på og hvilken sak den står under, ikke hvem du er. Er modellen sikker på at kommentaren er innenfor reglene, publiseres den. Er den sikker på at en regel er brutt, blir kommentaren stoppet, og du får vite hvilken regel det gjelder. Er modellen usikker, avgjør redaktøren.</p>
+  <p>En stoppet kommentar ser bare du. Du kan endre den, eller be redaktøren se på den. Lesere kan også rapportere en publisert kommentar til redaktøren. Ansvarlig redaktør{% if redaktor %}, {{ redaktor }},{% endif %} har ansvaret for kommentarene som publiseres, og kan fjerne kommentarer og sperre kontoer som bryter reglene gjentatte ganger.</p>
+  <p>Kommentarene sorteres etter stemmene fra andre lesere. «Best» legger mest vekt på andelen som stemte opp, og på hvor mange som har stemt, slik at én tidlig stemme ikke avgjør. Hvem som stemte hva, vises aldri, heller ikke for redaktøren.</p>
+  </div>
+</section>
+
+<section class="omdel lag" aria-labelledby="lagrer">
+  <h2 class="etikett etikett-strek" id="lagrer">Hva vi lagrer</h2>
+  <div class="lesetekst">
+  <p>Du kan lese alt uten konto. For å kommentere logger du inn med en lenke vi sender på e-post; det finnes ingen passord. Vi lagrer e-postadressen din, navnet du velger å vise, kommentarene dine, stemmene dine og eventuelle rapporter, og vurderingen av hver kommentar. Innloggingen lagres i nettleseren din (ikke som informasjonskapsel) og varer i 30 dager.</p>
+  <p>Kommentarserveren står hos Tingposten selv; trafikken dit går kryptert gjennom Tailscale, som ikke kan lese den. {% if eksterne_moderatorer %}For vurderingen sendes kommentaren, uten opplysninger om hvem du er, til {{ eksterne_moderatorer|join(' og ') }}.{% else %}Vurderingen gjøres på Tingpostens egen maskin; kommentaren sendes ikke til noen andre.{% endif %} E-posten med innloggingslenken sendes gjennom e-postleverandøren vår. Vi bruker ikke dataene til noe annet enn debatten, og deler dem ikke med noen.</p>
+  <p>Under kommentarfeltet kan du laste ned alt vi har lagret om deg, og slette kontoen. Sletter du kontoen, forsvinner e-postadressen, navnet, stemmene og teksten i alle kommentarene dine. En kommentar som andre har svart på, blir stående som «Slettet av forfatteren».{% if kontakt_epost %} Spørsmål om personvern kan sendes til <a href="mailto:{{ kontakt_epost }}">{{ kontakt_epost }}</a>.{% endif %}</p>
+  </div>
+</section>
+{% endblock %}
