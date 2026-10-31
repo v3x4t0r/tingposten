@@ -124,7 +124,7 @@ DEBATT_LAYA_MODUS = os.environ.get("DEBATT_LAYA_MODUS", "ja-nei")
 # Jev (TypeSafe, key: TYPESAFE_API_KEY in .env), or a local server that speaks the same
 # System One format (Jev-Style: `jev-style serve`, e.g. http://127.0.0.1:8765/v1/systemone).
 DEBATT_JEV_URL = os.environ.get("DEBATT_JEV_URL", "https://api.typesafe.ai/v1/systemone")
-DEBATT_JEV_MODELL = os.environ.get("DEBATT_JEV_MODELL", "jev")
+DEBATT_JEV_MODELL = os.environ.get("DEBATT_JEV_MODELL", "jev-latest")  # TypeSafe SDK default alias
 DEBATT_JEV_MODUS = os.environ.get("DEBATT_JEV_MODUS", "ja-nei")  # "ja-nei" or "valg" (as for Laya)
 # Key: TINGPOSTEN_ANTHROPIC_API_KEY in .env (not ANTHROPIC_API_KEY, which would make
 # `claude -p` bill the API instead of the subscription).
