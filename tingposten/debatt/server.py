@@ -75,7 +75,7 @@ def _ip(request: Request) -> str:
 
 
 def lag_app(tjeneste: Tjeneste, opprinnelser: list[str], start_ko: bool = True) -> Starlette:
-    teller = IpTeller()
+    teller = IpTeller(IP_GRENSE)
 
     async def kropp(request: Request) -> dict:
         if int(request.headers.get("content-length") or 0) > MAKS_KROPP:
@@ -111,7 +111,8 @@ def lag_app(tjeneste: Tjeneste, opprinnelser: list[str], start_ko: bool = True) 
     def endepunkt(fn, skriver: bool = False):
         async def handler(request: Request):
             try:
-                if skriver and teller.for_mange(_ip(request)):
+                # Reading (and polling a comment that is being judged) never counts against the limit.
+                if skriver and request.method != "GET" and teller.for_mange(_ip(request)):
                     raise Feil(429, "For mange forespørsler. Vent litt.")
                 return await fn(request)
             except Feil as e:

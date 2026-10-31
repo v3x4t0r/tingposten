@@ -124,3 +124,17 @@ def test_sak_index_is_reread_when_the_build_changes_it(tmp_path):
     path.write_text(json.dumps({SAK: {"tittel": "B"}}))
     os.utime(path, (path.stat().st_atime, path.stat().st_mtime + 5))
     assert saker.get(SAK)["tittel"] == "B"
+
+
+def test_polling_a_waiting_comment_is_not_rate_limited(tmp_path, monkeypatch):
+    monkeypatch.setattr(srv, "IP_GRENSE", 3)
+    sendt = []
+    t = tj.Tjeneste(Db(tmp_path / "d.db"), m.Kjede([Ok()], 0.85), {SAK: {"tittel": "Bybanen", "ingress": ""}},
+                    lambda e, lenke: sendt.append(lenke), SIDE + "/", umiddelbar_moderering=True)
+    with TestClient(srv.lag_app(t, [SIDE], start_ko=False)) as c:
+        c.sendt = sendt
+        ola = logg_inn(c)  # 3 writes: link, confirm, name
+        assert c.post("/api/kommentar", json={"sak": SAK, "tekst": "Hei"}, headers=ola).status_code == 429
+        for _ in range(10):
+            assert c.get(f"/api/sak/{SAK}/kommentarer", headers=ola).status_code == 200
+            assert c.get("/api/meg", headers=ola).status_code == 200
