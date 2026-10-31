@@ -1,0 +1,56 @@
+# The comment server on the Pi, reachable from the internet only through Tailscale
+# Funnel (https://debatt.<tailnet>.ts.net). See deploy/debatt/README.md.
+#
+#   tailscale  its own Tailscale node "debatt" (not the Pi's own node), userspace
+#              networking, Funnel on 443 → the comment server
+#   debatt     the comment server, in the tailscale container's network namespace:
+#              it listens on 127.0.0.1:8790 there, nothing is published on the Pi
+#   modell     llama-server for the "cpu" moderator (profile cpu, only if chosen)
+#
+# Start:  cd ~/tingposten/deploy/debatt && docker compose up -d --build
+name: tingposten-debatt
+services:
+  tailscale:
+    image: tailscale/tailscale:stable
+    hostname: debatt
+    env_file: tailscale.env          # TS_AUTHKEY=tskey-auth-… (tagged tag:debatt)
+    environment:
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/funnel.json
+      TS_USERSPACE: "true"           # no /dev/net/tun, no NET_ADMIN
+      TS_ACCEPT_DNS: "false"
+    volumes:
+      - ./tailscale-state:/var/lib/tailscale
+      - ./funnel.json:/config/funnel.json:ro
+    extra_hosts:
+      - "vert:host-gateway"          # the Pi itself, for hailo-ollama (see README)
+    restart: unless-stopped
+
+  debatt:
+    build:
+      context: ../..
+      dockerfile: deploy/debatt/Dockerfile
+    network_mode: service:tailscale
+    depends_on: [tailscale]
+    env_file: debatt.env             # SMTP, API keys (copy debatt.env.example)
+    environment:
+      DEBATT_HAILO_URL: http://vert:8000
+      DEBATT_CPU_URL: http://modell:8080
+    volumes:
+      - ../../data/debatt:/data/debatt   # debatt.db and saker.json (written by bygg)
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+
+  modell:
+    profiles: [cpu]
+    image: ghcr.io/ggml-org/llama.cpp:server
+    command: ["-m", "/modeller/Qwen3.5-4B-Q4_0.gguf", "-c", "4096", "-t", "3", "--host", "0.0.0.0",
+              "--port", "8080", "--jinja", "--no-webui"]
+    volumes:
+      - ../../modeller:/modeller:ro
+    read_only: true
+    cap_drop: [ALL]
+    restart: unless-stopped

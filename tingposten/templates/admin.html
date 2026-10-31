@@ -65,6 +65,12 @@ button:disabled { opacity: .45; cursor: default; }
 .plan, .melding, .smaa { font: 14px/1.45 var(--sans); color: var(--dempet); margin: 6px 0; }
 .melding { color: var(--blekk); min-height: 1.45em; }
 .melding.feil { color: var(--feil); }
+.debatt-ko { list-style: none; margin: 8px 0 0; padding: 0; }
+.debatt-ko li { border-top: 1px solid var(--linje, #ccc); padding: 12px 0; }
+.debatt-ko .hvem { font: 13px/1.4 var(--sans); color: var(--dempet); margin: 0; }
+.debatt-ko .tekst { white-space: pre-wrap; margin: 6px 0; }
+.debatt-ko .modell { font: 13px/1.4 var(--sans); color: var(--dempet); margin: 0 0 6px; }
+.debatt-ko .knapper { margin: 6px 0 0; }
 .advarsel { font: 600 14px/1.4 var(--sans); background: var(--vent-flate); color: var(--vent); padding: 8px 10px; border-radius: 4px; margin: 8px 0; }
 
 ol.steg { list-style: none; padding: 0; margin: 12px 0 4px; display: grid; gap: 4px; font: 15px/1.4 var(--sans); }
@@ -134,6 +140,13 @@ footer { padding: 0 var(--gutter) 30px; font: 13px/1.4 var(--sans); color: var(-
         <summary>Logg fra siste kjøring</summary>
         <pre class="logg" id="logg">Ingen kjøring ennå.</pre>
       </details>
+    </section>
+
+    <section class="blokk" aria-labelledby="debatt-tittel" id="debatt" hidden>
+      <h2 id="debatt-tittel">Debatt</h2>
+      <p class="plan" id="debatt-plan"></p>
+      <p class="melding" id="debatt-melding" aria-live="polite"></p>
+      <ul class="debatt-ko" id="debatt-ko"></ul>
     </section>
 
     <section class="blokk" aria-labelledby="moter-tittel">
@@ -372,6 +385,63 @@ $("kjor").addEventListener("click", () => {
   setTimeout(() => data && tegn(), 6100);
 });
 $("sjekk").addEventListener("click", () => start("sjekk"));
+
+/* Debatt: the comments waiting for the editor and the reported ones. Reader text is set as text, never HTML. */
+const REGELNAVN = {ok: "innenfor", trussel: "trussel", hets: "hets", personangrep: "personangrep", privatperson: "privatperson",
+                   beskyldning: "udokumentert beskyldning", spam: "spam", utenfor: "utenfor saken"};
+async function lastDebatt() {
+  try {
+    const r = await fetch("/debatt.json", {cache: "no-store"});
+    if (!r.ok) return;
+    tegnDebatt(await r.json());
+  } catch (e) { /* the panel works without comments */ }
+}
+function tegnDebatt(d) {
+  $("debatt").hidden = !d.aktiv;
+  if (!d.aktiv) return;
+  $("debatt-plan").textContent = d.ko.length ? antall(d.ko.length, "kommentar venter", "kommentarer venter") + " på deg."
+                                             : "Ingen kommentarer venter på deg.";
+  const liste = $("debatt-ko");
+  liste.replaceChildren();
+  for (const k of d.ko) {
+    const grunn = k.status === "til_redaktor" ? "Modellen var usikker, eller forfatteren ba om vurdering"
+                                              : antall(k.rapporter, "rapport", "rapporter") + " fra lesere";
+    const modell = k.vurderinger.map(v => `${v.modell}: ${REGELNAVN[v.regel] || v.regel}` +
+      (v.sikkerhet != null ? ` ${Math.round(v.sikkerhet * 100)} %` : "") + (v.begrunnelse ? ` – ${v.begrunnelse}` : ""))
+      .concat(k.feil).join(" · ");
+    const knapper = el("div", {class: "knapper"});
+    const forslag = (k.vurderinger.at(-1) || {}).regel;
+    const knapp = (tekst, handling, klasse) => {
+      const b = el("button", {type: "button", class: klasse}, tekst);
+      b.addEventListener("click", () => avgjor(k.id, handling, forslag && forslag !== "ok" ? forslag : null));
+      return b;
+    };
+    knapper.append(knapp("Publiser", "publiser", "liten"), knapp("Fjern", "fjern", "liten"),
+                   knapp("Fjern og sperr forfatteren", "sperr", "liten"));
+    liste.append(el("li", null,
+      el("p", {class: "hvem"}, `${k.navn || "(slettet konto)"} · ${tid(k.opprettet)} · ${grunn} · `,
+         el("a", {href: k.lenke}, "saken")),
+      el("p", {class: "tekst"}, k.tekst),
+      modell ? el("p", {class: "modell"}, modell) : null,
+      knapper));
+  }
+}
+async function avgjor(id, handling, regel) {
+  const m = $("debatt-melding");
+  try {
+    const r = await fetch("/debatt", {method: "POST", headers: {"Content-Type": "application/json", "X-Tingposten": "admin"},
+      body: JSON.stringify({id, handling, regel})});
+    const svar = await r.json().catch(() => ({}));
+    m.textContent = svar.melding || `Feil (HTTP ${r.status})`;
+    m.classList.toggle("feil", !r.ok);
+  } catch (e) {
+    m.textContent = "Fikk ikke kontakt med Pi-en: " + e.message;
+    m.classList.add("feil");
+  }
+  lastDebatt();
+}
+lastDebatt();
+setInterval(lastDebatt, 60000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) last(); });
 last();
 </script>

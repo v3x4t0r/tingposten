@@ -19,3 +19,11 @@ docs/utkast-*.md
 # Local switches: publishing opt-in and the kill switch never go into git
 PUBLISER
 STOP
+
+# The comment server's secrets and Tailscale node state (deploy/debatt)
+deploy/debatt/debatt.env
+deploy/debatt/tailscale.env
+deploy/debatt/tailscale-state/
+
+# Local model files for the comment moderator (GGUF)
+modeller/

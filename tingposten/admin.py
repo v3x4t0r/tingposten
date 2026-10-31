@@ -414,12 +414,66 @@ def lokal_vert(host: str) -> bool:
                            or name.endswith((".local", ".lan", ".home.arpa", ".localhost")))
 
 
+class DebattKo:
+    """The comment server's editor queue, when there is a comment database: comments the
+    moderator was unsure about (or a reader asked about) and reported ones. The panel
+    shows the author's display name, never the e-mail address."""
+
+    HANDLINGER = ("publiser", "fjern", "sperr")
+
+    def __init__(self, db_path: Path | None = None):
+        self.path = db_path or config.DEBATT_DIR / "debatt.db"
+        self._tjeneste = None
+
+    def tjeneste(self):
+        if self._tjeneste is None and self.path.exists():
+            from .debatt.db import Db
+            from .debatt.tjeneste import Tjeneste
+
+            self._tjeneste = Tjeneste(Db(self.path), None, {}, None, config.SITE_URL)
+        return self._tjeneste
+
+    def status(self) -> dict:
+        t = self.tjeneste()
+        if t is None:
+            return {"aktiv": False, "ko": []}
+        ko = []
+        for r in t.redaktor_ko():
+            data = json.loads(r.pop("vurdering") or "{}")
+            r["vurderinger"] = [{"modell": v.get("modell"), "regel": v.get("regel"),
+                                 "sikkerhet": (v.get("sannsynligheter") or {}).get(v.get("regel")),
+                                 "begrunnelse": v.get("begrunnelse") or ""} for v in data.get("vurderinger", [])]
+            r["feil"] = data.get("feil", [])
+            r["lenke"] = f"{config.SITE_URL}bergen/sak/{r['sak']}/#k{r['id']}"
+            ko.append(r)
+        return {"aktiv": True, "ko": ko}
+
+    def handle(self, body: dict) -> tuple[int, dict]:
+        from .debatt.regler import REGLER
+        from .debatt.tjeneste import Feil
+
+        t = self.tjeneste()
+        kid, handling, regel = body.get("id"), body.get("handling"), body.get("regel")
+        if t is None or type(kid) is not int or handling not in self.HANDLINGER or (regel and regel not in REGLER):
+            return 400, {"melding": "Ugyldig."}
+        try:
+            if handling == "sperr":
+                t.sperr(kid)
+                t.redaktor_avgjor(kid, "fjern", regel or None)
+            else:
+                t.redaktor_avgjor(kid, handling, regel or None)
+        except Feil as e:
+            return e.kode, {"melding": e.melding}
+        return 200, {"melding": {"publiser": "Publisert.", "fjern": "Fjernet.", "sperr": "Fjernet, og forfatteren er sperret."}[handling]}
+
+
 def make_server(vert: str = "127.0.0.1", port: int = 8787, passord: str | None = None,
                 kjorer: Kjorer | None = None, site_dir: Path = config.SITE_DIR,
-                idag: date | None = None) -> ThreadingHTTPServer:
+                idag: date | None = None, debatt: DebattKo | None = None) -> ThreadingHTTPServer:
     if not passord and not _loopback(vert):
         raise ValueError(f"set {PASSORD_ENV} in .env before the panel listens on {vert}")
     kjorer = kjorer or Kjorer()
+    debatt = debatt or DebattKo()
     page = SIDE.read_bytes()
     expected = passord.encode() if passord else b""
 
@@ -432,6 +486,8 @@ def make_server(vert: str = "127.0.0.1", port: int = 8787, passord: str | None =
                 self._send(200, "text/html; charset=utf-8", page)
             elif path == "/status.json":
                 self._json(200, status(kjorer, site_dir, idag))
+            elif path == "/debatt.json":
+                self._json(200, debatt.status())
             elif path.startswith("/static/"):
                 self._static(path.removeprefix("/static/"))
             else:
@@ -444,13 +500,20 @@ def make_server(vert: str = "127.0.0.1", port: int = 8787, passord: str | None =
             if self.headers.get("X-Tingposten") != "admin" or (
                     origin and urlsplit(origin).netloc != self.headers.get("Host")):
                 return self._json(403, {"melding": "Avvist."})
-            if urlsplit(self.path).path != "/start":
+            sti = urlsplit(self.path).path
+            if sti not in ("/start", "/debatt"):
                 return self._json(404, {"melding": "Finnes ikke."})
             try:
                 length = int(self.headers.get("Content-Length") or 0)
-                modus = json.loads(self.rfile.read(min(length, 1000)) or b"{}").get("modus")
-            except (ValueError, AttributeError):
-                modus = None
+                body = json.loads(self.rfile.read(min(length, 1000)) or b"{}")
+                if not isinstance(body, dict):
+                    raise ValueError
+            except ValueError:
+                body = {}
+            if sti == "/debatt":
+                code, svar = debatt.handle(body)
+                return self._json(code, svar)
+            modus = body.get("modus")
             if modus not in MODUSER:
                 return self._json(400, {"melding": "Ukjent kjøring."})
             code, melding = kjorer.start(modus)
