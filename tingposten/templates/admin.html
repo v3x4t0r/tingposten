@@ -147,6 +147,11 @@ footer { padding: 0 var(--gutter) 30px; font: 13px/1.4 var(--sans); color: var(-
       <p class="plan" id="debatt-plan"></p>
       <p class="melding" id="debatt-melding" aria-live="polite"></p>
       <ul class="debatt-ko" id="debatt-ko"></ul>
+      <details id="debatt-stoppet-boks" hidden>
+        <summary id="debatt-stoppet-tittel">Nylig fjernet og stoppet</summary>
+        <p class="smaa">Kommentarer du har fjernet, og som modellen har stoppet, de siste 7 dagene. Var det feil, kan du publisere dem likevel.</p>
+        <ul class="debatt-ko" id="debatt-stoppet"></ul>
+      </details>
     </section>
 
     <section class="blokk" aria-labelledby="moter-tittel">
@@ -425,6 +430,23 @@ function tegnDebatt(d) {
       modell ? el("p", {class: "modell"}, modell) : null,
       k.grunner.length ? el("p", {class: "modell"}, "Lesernes grunner: " + k.grunner.join(" · ")) : null,
       knapper));
+  }
+  const stoppet = d.stoppet || [];
+  $("debatt-stoppet-boks").hidden = !stoppet.length;
+  $("debatt-stoppet-tittel").textContent = `Nylig fjernet og stoppet (${stoppet.length})`;
+  const sl = $("debatt-stoppet");
+  sl.replaceChildren();
+  for (const k of stoppet) {
+    const hvem = k.status === "fjernet" ? "Fjernet av deg" : `Stoppet av modellen (${REGELNAVN[k.regel] || k.regel || "regel"})`;
+    const modell = k.vurderinger.map(v => `${v.modell}: ${REGELNAVN[v.regel] || v.regel}` +
+      (v.sikkerhet != null ? ` ${Math.round(v.sikkerhet * 100)} %` : "")).join(" · ");
+    const b = el("button", {type: "button", class: "liten"}, "Publiser likevel");
+    b.addEventListener("click", () => avgjor(k.id, "publiser", null, k.tekst));
+    sl.append(el("li", null,
+      el("p", {class: "hvem"}, `${k.navn || "(slettet konto)"} · ${tid(k.tid || k.opprettet)} · ${hvem} · `, el("a", {href: k.lenke}, "saken")),
+      el("p", {class: "tekst"}, k.tekst),
+      modell ? el("p", {class: "modell"}, modell) : null,
+      el("div", {class: "knapper"}, b)));
   }
 }
 async function avgjor(id, handling, regel, tekst) {

@@ -436,17 +436,22 @@ class DebattKo:
     def status(self) -> dict:
         t = self.tjeneste()
         if t is None:
-            return {"aktiv": False, "ko": []}
-        ko = []
-        for r in t.redaktor_ko():
-            data = json.loads(r.pop("vurdering") or "{}")
-            r["vurderinger"] = [{"modell": v.get("modell"), "regel": v.get("regel"),
-                                 "sikkerhet": (v.get("sannsynligheter") or {}).get(v.get("regel")),
-                                 "begrunnelse": v.get("begrunnelse") or ""} for v in data.get("vurderinger", [])]
-            r["feil"] = data.get("feil", [])
-            r["lenke"] = f"{config.SITE_URL}bergen/sak/{r['sak']}/#k{r['id']}"
-            ko.append(r)
-        return {"aktiv": True, "ko": ko}
+            return {"aktiv": False, "ko": [], "stoppet": []}
+        return {"aktiv": True, "ko": [self._rad(r) for r in t.redaktor_ko()],
+                "stoppet": [self._rad(r) for r in t.nylig_stoppet()]}
+
+    @staticmethod
+    def _rad(r: dict) -> dict:
+        """One comment for the panel: the moderators' last verdict, the link, no e-mail."""
+        r = dict(r)
+        data = json.loads(r.pop("vurdering", None) or "{}")
+        r["vurderinger"] = [{"modell": v.get("modell"), "regel": v.get("regel"),
+                             "sikkerhet": (v.get("sannsynligheter") or {}).get(v.get("regel")),
+                             "begrunnelse": v.get("begrunnelse") or ""} for v in data.get("vurderinger", [])]
+        r["feil"] = data.get("feil", [])
+        r.setdefault("grunner", [])
+        r["lenke"] = f"{config.SITE_URL}bergen/sak/{r['sak']}/#k{r['id']}"
+        return r
 
     def handle(self, body: dict) -> tuple[int, dict]:
         from .debatt.regler import REGLER

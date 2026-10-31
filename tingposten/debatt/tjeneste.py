@@ -511,10 +511,25 @@ class Tjeneste:
             ut.append(d)
         return ut
 
+    def nylig_stoppet(self, dager: int = 7) -> list[dict]:
+        """Comments removed by the editor or stopped by the model in the last `dager` days,
+        newest first, so the editor can see what was stopped and undo a mistake."""
+        rader = self.db.les(
+            "SELECT k.id, k.sak, k.tekst, k.status, k.regel, k.opprettet, u.navn, "
+            "(SELECT v.tid FROM vurderinger v WHERE v.kommentar = k.id ORDER BY v.id DESC LIMIT 1) AS tid, "
+            "(SELECT v.hvem FROM vurderinger v WHERE v.kommentar = k.id ORDER BY v.id DESC LIMIT 1) AS hvem, "
+            "(SELECT data FROM vurderinger v WHERE v.kommentar = k.id AND v.hvem NOT IN ('leseren', 'redaktør') "
+            " ORDER BY v.id DESC LIMIT 1) AS vurdering "
+            "FROM kommentarer k LEFT JOIN brukere u ON u.id = k.bruker "
+            "WHERE k.status IN ('fjernet', 'avvist') AND k.tekst != '' ORDER BY k.id DESC")
+        grense = siden(days=dager)
+        return [dict(r) for r in rader if (r["tid"] or r["opprettet"]) >= grense]
+
     def redaktor_avgjor(self, kid: int, utfall: str, regel: str | None = None, tekst: str | None = None) -> None:
         """The editor publishes ('publiser') or removes ('fjern', optionally with the rule
         broken). Publishing needs the text the editor read: if the author changed or
-        deleted it since, nothing happens (409) and the queue shows the new state."""
+        deleted it since, nothing happens (409) and the queue shows the new state. A
+        comment the editor removed or the model stopped can be published after all."""
         if utfall not in ("publiser", "fjern") or (regel is not None and regel not in REGLER):
             raise Feil(400, "Ugyldig avgjørelse.")
         with self.db.tx() as c:
@@ -522,7 +537,8 @@ class Tjeneste:
                 raise Feil(404, "Fant ikke kommentaren.")
             if utfall == "publiser":
                 endret = c.execute("UPDATE kommentarer SET status = 'publisert', regel = NULL WHERE id = ? "
-                                   "AND status IN ('til_redaktor', 'publisert') AND tekst = ?", (kid, tekst)).rowcount
+                                   "AND status IN ('til_redaktor', 'publisert', 'fjernet', 'avvist') AND tekst = ?",
+                                   (kid, tekst)).rowcount
             else:
                 endret = c.execute("UPDATE kommentarer SET status = 'fjernet', regel = ? WHERE id = ? "
                                    "AND status != 'slettet'", (regel, kid)).rowcount
