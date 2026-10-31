@@ -75,3 +75,10 @@ def test_no_comment_database_means_no_section(tmp_path):
     assert ko.status() == {"aktiv": False, "ko": []}
     assert ko.handle({"id": 1, "handling": "publiser"})[0] == 400
     assert not (tmp_path / "finnes-ikke.db").exists()
+
+
+def test_local_test_panel_never_starts_a_run():
+    from tingposten.debatt.lokal import _IngenKjoring
+    k = _IngenKjoring()
+    assert k.start("manuell")[0] == 403 and k.start("sjekk")[0] == 403
+    assert k.pagar() in (True, False)  # the rest of the panel still reads the status
