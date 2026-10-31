@@ -111,12 +111,12 @@ DEBATT_MODERATOR = ("hailo",)
 DEBATT_TERSKEL = 0.85  # a rule counts when its probability reaches this; below → the editor decides
 # The model servers' addresses; the comment server's container sets its own (deploy/debatt).
 DEBATT_HAILO_URL = os.environ.get("DEBATT_HAILO_URL", "http://127.0.0.1:8000")  # hailo-ollama on the Hailo-10H
-DEBATT_HAILO_MODELL = "qwen3:1.7b"
+DEBATT_HAILO_MODELL = os.environ.get("DEBATT_HAILO_MODELL", "qwen3:1.7b")
 # hailo-ollama gives no probabilities, only a rule. False = its verdict alone never
 # publishes or stops a comment (the next moderator or the editor decides).
 DEBATT_HAILO_STOL_PA_ETIKETT = False
 DEBATT_CPU_URL = os.environ.get("DEBATT_CPU_URL", "http://127.0.0.1:8081")  # llama-server (llama.cpp) on the CPU
-DEBATT_CPU_MODELL = "qwen3.5-4b"
+DEBATT_CPU_MODELL = os.environ.get("DEBATT_CPU_MODELL", "qwen3.5-4b")  # names the test runs
 DEBATT_JEV_URL = "https://api.typesafe.ai/v1/systemone"  # key: TYPESAFE_API_KEY in .env
 DEBATT_JEV_MODELL = "jev"
 # Key: TINGPOSTEN_ANTHROPIC_API_KEY in .env (not ANTHROPIC_API_KEY, which would make
