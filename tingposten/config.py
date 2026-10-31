@@ -106,9 +106,13 @@ KONTAKT_EPOST = "tingposten@freetime.no"  # Domeneshop alias on freetime.no, for
 # pages get a comment section that talks to it. None = no comments on the site.
 DEBATT = None
 # Moderators asked in turn until one is sure (tingposten/debatt/moderering.py):
-# "hailo", "cpu", "jev", "claude". Chosen from `tingposten debatt-test` results.
-DEBATT_MODERATOR = ("hailo",)
-DEBATT_TERSKEL = 0.85  # a rule counts when its probability reaches this; below → the editor decides
+# "hailo", "cpu", "laya", "jev", "claude". Chosen from `tingposten debatt-test` (31.10,
+# 150 test comments): Jev (TypeSafe, yes/no per rule) got the rule right 87 % of the
+# time in 0.2 s; the local models 13–69 %, Qwen3.5 on the Pi at 16 s. Every comment's
+# text goes to TypeSafe (the rules page says so). Not final until the editor has set fasit.
+DEBATT_MODERATOR = ("jev",)
+DEBATT_TERSKEL = 0.90        # "ok" this likely → published; below → the editor decides (0.85 if the editor calls t061 lawful)
+DEBATT_TERSKEL_STOPP = 0.90  # a broken rule this likely → stopped (stricter: lawful opinions go to the editor)
 # The model servers' addresses; the comment server's container sets its own (deploy/debatt).
 DEBATT_HAILO_URL = os.environ.get("DEBATT_HAILO_URL", "http://127.0.0.1:8000")  # hailo-ollama on the Hailo-10H
 DEBATT_HAILO_MODELL = os.environ.get("DEBATT_HAILO_MODELL", "qwen3:1.7b")

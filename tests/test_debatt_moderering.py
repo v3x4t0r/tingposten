@@ -234,3 +234,13 @@ def test_backend_names_from_config():
         ["hailo", "cpu", "laya", "jev", "claude"]
     with pytest.raises(ValueError):
         m.backend("gpt")
+
+
+def test_separate_thresholds_for_publishing_and_stopping():
+    ok, brudd = vurdering("ok", 0.82), vurdering("personangrep", 0.87)
+    assert m.avgjor(ok, 0.80, stopp=0.90) == "publiser"
+    assert m.avgjor(brudd, 0.80, stopp=0.90) == "redaktor"  # not sure enough to stop a lawful opinion
+    assert m.avgjor(vurdering("personangrep", 0.93), 0.80, stopp=0.90) == "avvis"
+    assert m.avgjor(brudd, 0.85) == "avvis"  # without `stopp`, one threshold for both
+    k = m.Kjede([m.FakeModerator([brudd])], 0.80, stopp=0.90)
+    assert k.avgjor("x", SAK).utfall == "redaktor" and k.lokal().stopp == 0.90

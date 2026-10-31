@@ -116,6 +116,8 @@ def main(argv: list[str] | None = None) -> int:
     dtest.add_argument("--bare", type=int, help="bare de første N kommentarene (prøvekjøring)")
     dtest.add_argument("--rapport", nargs="*", type=Path, metavar="KJØRING",
                        help="lag tabellen fra disse kjøringene (uten filer: den nyeste per moderator)")
+    dtest.add_argument("--stopp", type=float, metavar="TERSKEL",
+                       help="egen terskel for å stoppe; tabellens terskel gjelder da bare publisering")
     dtest.add_argument("--stol-pa-etikett", action="store_true",
                        help="regn et svar uten sannsynligheter (hailo) som sikkert")
 
@@ -305,7 +307,7 @@ def _debatt_test(args) -> int:
             filer.append(testsett.kjor(m, sett, bare=args.bare))
     rapporter = {}
     for f in filer:
-        r = testsett.rapport(testsett.les_resultat(f), sett, fasit, args.stol_pa_etikett)
+        r = testsett.rapport(testsett.les_resultat(f), sett, fasit, args.stol_pa_etikett, args.stopp)
         rapporter[r["modell"] or f.stem] = r
         logging.info("%s: %d svar, %d feil, %d av %d med fasit satt av redaktøren", f.name, r["n"] - r["feil"],
                      r["feil"], r["kontrollert"], r["n"])

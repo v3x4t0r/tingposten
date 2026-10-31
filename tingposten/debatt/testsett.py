@@ -83,9 +83,11 @@ def les_resultat(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
-def rapport(resultat: list[dict], sett: list[dict], fasit: dict[str, dict], stol_pa_etikett: bool = False) -> dict:
+def rapport(resultat: list[dict], sett: list[dict], fasit: dict[str, dict], stol_pa_etikett: bool = False,
+            stopp: float | None = None) -> dict:
     """Scores for one run: how often the rule matched, and per threshold what would
-    have been published, stopped and sent to the editor, and what went wrong."""
+    have been published, stopped and sent to the editor, and what went wrong. With
+    `stopp`, the thresholds are for publishing and stopping takes `stopp`."""
     etter_id = {i["id"]: i for i in sett}
     rader = [r for r in resultat if r["id"] in etter_id]
     svar = [r for r in rader if "feil" not in r]
@@ -112,7 +114,7 @@ def rapport(resultat: list[dict], sett: list[dict], fasit: dict[str, dict], stol
                 telling["redaktor"] += 1
                 continue
             v = Vurdering(r["regel"], r["sannsynligheter"], r["modell"], r["ms"])
-            utfall = avgjor(v, t if t is not None else 1.0, stol_pa_etikett)
+            utfall = avgjor(v, t if t is not None else 1.0, stol_pa_etikett, stopp)
             telling[utfall] += 1
             if utfall == "publiser" and riktig != "ok":
                 telling["feil_publisert"] += 1

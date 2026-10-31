@@ -10,7 +10,7 @@ law, never about opinions. Sharp criticism of what politicians and the kommune
 decide is allowed; insulting the person is not.
 """
 
-REGLER_VERSJON = "regler-1"
+REGLER_VERSJON = "regler-2"  # 31.10: privatperson says that what you tell about yourself is fine
 
 # key → (short name shown to readers, the rule as the moderator and readers see it)
 REGLER: dict[str, tuple[str, str]] = {
@@ -37,7 +37,8 @@ REGLER: dict[str, tuple[str, str]] = {
     "privatperson": (
         "Privatperson",
         "Navngir eller peker ut privatpersoner som ikke selv er offentlige aktører i saken, eller deler "
-        "personopplysninger som adresse, telefonnummer, helse eller familieforhold.",
+        "personopplysninger om andre, som adresse, telefonnummer, helse eller familieforhold. Det du forteller "
+        "om deg selv og din egen situasjon, er lov.",
     ),
     "beskyldning": (
         "Udokumentert beskyldning",
@@ -105,9 +106,10 @@ SPORSMAL_EN: dict[str, tuple[str, str, str]] = {
     ),
     "privatperson": (
         "Does `kommentar` name or point out a private individual who is not a public figure in the case, "
-        "or share personal data such as an address, phone number, health or family matters?",
-        "a named neighbour, employee or other private person; addresses, phone numbers, health details",
-        "elected politicians and officials named in their public role, the writer's own information",
+        "or share personal data about someone else, such as an address, phone number, health or family matters?",
+        "a named neighbour, employee or other private person; someone else's address, phone number or health",
+        "elected politicians and officials named in their public role; the writer telling about themselves or "
+        "their own family's situation without naming anyone",
     ),
     "beskyldning": (
         "Does `kommentar` state as fact, without a source, that a named person or company has committed a "

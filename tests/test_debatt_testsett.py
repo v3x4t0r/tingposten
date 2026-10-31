@@ -103,3 +103,9 @@ def test_newest_run_per_moderator(tmp_path):
         (test_dir / f"{navn}.jsonl").write_text('{"id": "t001", "feil": "x"}\n')
     nyeste = t.nyeste_kjoringer(tmp_path)
     assert nyeste["hailo_qwen3_1.7b"].name == "hailo_qwen3_1.7b-20261031-130000.jsonl" and "jev_jev" in nyeste
+
+
+def test_report_with_a_separate_stop_threshold():
+    rader = [{"id": "t001", **v("personangrep", 0.87).som_dict()}, {"id": "t003", **v("spam", 0.95).som_dict()}]
+    r = t.rapport(rader, ITEMS, {}, stopp=0.9)["terskler"]["0.8"]
+    assert (r["avvis"], r["redaktor"], r["feil_stoppet"]) == (1, 1, 0)

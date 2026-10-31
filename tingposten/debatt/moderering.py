@@ -84,13 +84,16 @@ class Avgjorelse:
     feil: list[str] = field(default_factory=list)
 
 
-def avgjor(v: Vurdering, terskel: float, stol_pa_etikett: bool = False) -> str:
-    """One backend's verdict as an outcome. A rule only counts when its probability
-    reaches `terskel`; a backend without probabilities is trusted only with
-    `stol_pa_etikett` (set from the test results), otherwise it is 'unsure'."""
+def avgjor(v: Vurdering, terskel: float, stol_pa_etikett: bool = False, stopp: float | None = None) -> str:
+    """One backend's verdict as an outcome. "ok" publishes when its probability reaches
+    `terskel`; a broken rule stops the comment when its probability reaches `stopp`
+    (default: the same). A stricter `stopp` protects lawful opinions: when in doubt, the
+    editor decides rather than the model stopping it. A backend without probabilities is
+    trusted only with `stol_pa_etikett` (set from the test results), otherwise it is 'unsure'."""
     if v.regel not in REGLER:
         return "redaktor"
-    sikker = (v.sikkerhet or 0.0) >= terskel if v.sannsynligheter is not None else stol_pa_etikett
+    grense = terskel if v.regel == "ok" or stopp is None else stopp
+    sikker = (v.sikkerhet or 0.0) >= grense if v.sannsynligheter is not None else stol_pa_etikett
     if not sikker:
         return "redaktor"
     return "publiser" if v.regel == "ok" else "avvis"
@@ -116,10 +119,10 @@ class Moderator:
 class Kjede:
     """Asks each moderator in turn until one is sure. `terskel` applies to all."""
 
-    def __init__(self, ledd: list[Moderator], terskel: float):
+    def __init__(self, ledd: list[Moderator], terskel: float, stopp: float | None = None):
         if not ledd:
             raise ValueError("a moderator chain needs at least one backend")
-        self.ledd, self.terskel = ledd, terskel
+        self.ledd, self.terskel, self.stopp = ledd, terskel, stopp
 
     @property
     def name(self) -> str:
@@ -128,7 +131,7 @@ class Kjede:
     def lokal(self) -> "Kjede | None":
         """The same chain with only the backends that run at home (for display names)."""
         ledd = [m for m in self.ledd if m.lokal]
-        return Kjede(ledd, self.terskel) if ledd else None
+        return Kjede(ledd, self.terskel, self.stopp) if ledd else None
 
     def avgjor(self, tekst: str, sak: Sak, forelder: str | None = None) -> Avgjorelse:
         svar = Avgjorelse("redaktor", None)
@@ -144,7 +147,7 @@ class Kjede:
                 svar.feil.append(f"{m.name}: {type(e).__name__}")
                 continue
             svar.vurderinger.append(v)
-            utfall = avgjor(v, self.terskel, m.stol_pa_etikett)
+            utfall = avgjor(v, self.terskel, m.stol_pa_etikett, self.stopp)
             if utfall != "redaktor":
                 svar.utfall, svar.regel = utfall, (v.regel if utfall == "avvis" else None)
                 return svar
@@ -456,6 +459,8 @@ def backend(navn: str) -> Moderator:
     raise ValueError(f"unknown moderator {navn!r} (hailo, cpu, laya, jev, claude)")
 
 
-def kjede(navn: tuple[str, ...] | list[str] | None = None, terskel: float | None = None) -> Kjede:
+def kjede(navn: tuple[str, ...] | list[str] | None = None, terskel: float | None = None,
+          stopp: float | None = None) -> Kjede:
     return Kjede([backend(n) for n in (navn or config.DEBATT_MODERATOR)],
-                 config.DEBATT_TERSKEL if terskel is None else terskel)
+                 config.DEBATT_TERSKEL if terskel is None else terskel,
+                 getattr(config, "DEBATT_TERSKEL_STOPP", None) if stopp is None else stopp)
