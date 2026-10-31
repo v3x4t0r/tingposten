@@ -124,15 +124,19 @@
     }
     if (!this.meg.navn) {
       var navn = el("input", { type: "text", name: "navn", required: true, minlength: 2, maxlength: 30, id: "debatt-navn" });
-      return el("form", { klasse: "debatt-inn", onsubmit: function (e) {
+      var navnskjema = el("form", { klasse: "debatt-inn", onsubmit: function (e) {
         e.preventDefault();
+        var knapp = navnskjema.querySelector("button");
+        knapp.disabled = true;
+        self.si("Sjekker navnet mot debattreglene …");
         api(self.api, "POST", "/api/meg", { navn: navn.value })
-          .then(function (m) { self.meg.navn = m.navn; self.last(); })
-          .catch(function (f) { self.si(f.message, true); });
+          .then(function (m) { self.meg.navn = m.navn; self.si(""); self.last(); })
+          .catch(function (f) { knapp.disabled = false; self.si(f.message, true); });
       } }, [
         el("label", { for: "debatt-navn", tekst: "Velg navnet som vises over kommentarene dine (det kan være et kallenavn):" }),
         el("div", { klasse: "debatt-rad" }, [navn, el("button", { type: "submit", tekst: "Lagre" })]),
       ]);
+      return navnskjema;
     }
     return el("div", { klasse: "debatt-skriv" }, [
       this.skjema(null, null, function () { self.last(); }),
