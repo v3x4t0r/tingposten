@@ -141,18 +141,57 @@ def test_llamacpp_reads_one_token_of_logprobs():
     assert sendt["max_tokens"] == 1 and sendt["logprobs"] is True and sendt["cache_prompt"] is True
 
 
-def test_jev_sends_only_the_texts_and_reads_the_choice():
-    okt = Okt(Svar({"answers": {"regel": {"type": "choice", "choice": "privatperson", "confidence": 0.9,
-                                          "probabilities": {"privatperson": 0.9, "ok": 0.1}}}}))
+def test_jev_asks_one_yes_no_question_per_rule_and_sends_only_the_texts():
+    noul = {k: {"type": "noul", "noul": 0.02} for k in REGLER if k != "ok"}
+    okt = Okt(Svar({"answers": {**noul, "privatperson": {"type": "noul", "noul": 0.9}}}))
     v = m.Jev("https://api.typesafe.ai/v1/systemone", "jev", "nøkkel", session=okt).vurder(
         "Naboen min Ola Hansen i Fjellveien 3 …", SAK)
     assert v.regel == "privatperson" and v.sannsynligheter["privatperson"] == 0.9 and v.kostnad_usd > 0
+    assert v.sannsynligheter["ok"] == pytest.approx(0.1)
     kall = okt.kall[0]
     assert kall["headers"]["Authorization"] == "Bearer nøkkel"
     assert set(kall["json"]["state"]) == {"sak", "kommentar"}
-    assert list(kall["json"]["questions"]["regel"]["criteria"]) == list(REGLER)
+    sporsmal = kall["json"]["questions"]
+    assert set(sporsmal) == set(REGLER) - {"ok"} and all(q["type"] == "noul" for q in sporsmal.values())
+    assert set(sporsmal["trussel"]["criteria"]) == {"true", "false"}
     with pytest.raises(m.ModereringFeil):
-        m.Jev("u", "jev", None, session=Okt()).vurder("Hei", SAK)
+        m.Jev("https://api.typesafe.ai/v1/systemone", "jev", None, session=Okt()).vurder("Hei", SAK)
+
+
+def test_jev_choice_mode_and_a_local_server_without_key():
+    okt = Okt(Svar({"answers": {"regel": {"type": "choice", "choice": "spam",
+                                          "probabilities": {"spam": 0.97, "ok": 0.03}}}}))
+    jev = m.Jev("http://127.0.0.1:8765/v1/systemone", "jev-style-2b", None, modus="valg", session=okt)
+    assert jev.lokal and jev.vurder("Kjøp nå!", SAK).regel == "spam"
+    assert okt.kall[0]["headers"] == {} and list(okt.kall[0]["json"]["questions"]) == ["regel"]
+    assert not m.Jev("https://api.typesafe.ai/v1/systemone", "jev", "k").lokal
+    with pytest.raises(ValueError):
+        m.Jev("u", "jev", "k", modus="kanskje")
+
+
+@pytest.mark.parametrize("brudd, regel, ok", [(0.9, "trussel", 0.1), (0.3, "ok", 0.7)])
+def test_yes_no_answers_become_rule_probabilities(brudd, regel, ok):
+    svar = {k: {"noul": 0.01} for k in REGLER if k != "ok"}
+    svar["trussel"] = {"noul": brudd}
+    r, sann = m.fra_svar(svar, "ja-nei")
+    assert r == regel and sann["ok"] == pytest.approx(ok) and sann["trussel"] == brudd
+    v = m.Vurdering(r, sann, "x", 0)
+    assert m.avgjor(v, 0.85) == ("avvis" if brudd >= 0.85 else "redaktor")
+
+
+def test_laya_runs_the_same_questions_in_process():
+    class Agent:
+        def __init__(self):
+            self.kall = []
+
+        def predict(self, state, questions):
+            self.kall.append((state, questions))
+            return {"answers": {k: {"type": "noul", "noul": 0.01} for k in questions}}
+    agent = Agent()
+    v = m.Laya(agent=agent).vurder("Endelig!", SAK, "Bra sak")
+    assert v.regel == "ok" and v.sikkerhet == pytest.approx(0.99) and m.Laya.lokal
+    state, questions = agent.kall[0]
+    assert state["svarer_pa"] == "Bra sak" and questions == m.sporsmal_en("ja-nei")
 
 
 class FakeAnthropic:
@@ -191,7 +230,7 @@ def test_claude_refusal_goes_to_the_editor():
 
 def test_backend_names_from_config():
     assert m.backend("hailo").stol_pa_etikett is False
-    assert [b.name.split(":")[0] for b in m.kjede(("hailo", "cpu", "jev", "claude")).ledd] == \
-        ["hailo", "cpu", "jev", "claude"]
+    assert [b.name.split(":")[0] for b in m.kjede(("hailo", "cpu", "laya", "jev", "claude")).ledd] == \
+        ["hailo", "cpu", "laya", "jev", "claude"]
     with pytest.raises(ValueError):
         m.backend("gpt")

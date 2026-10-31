@@ -252,36 +252,72 @@ def _fra_logprobs(topp: list[dict]) -> tuple[str, dict[str, float]]:
     return max(sann, key=sann.get), sann
 
 
+def sporsmal_en(modus: str) -> dict:
+    """The rules as System One questions (Jev's request format, which Laya and Jev-Style
+    also read). "ja-nei": one yes/no question per rule with what counts as yes and no, the
+    pattern of TypeSafe's guardrail cookbook. "valg": one question over all the rules."""
+    from .regler import SPORSMAL_EN
+
+    if modus == "valg":
+        return {"regel": {
+            "type": "choice",
+            "instructions": "Which rule does the reader comment in `kommentar` break? All opinions are allowed, "
+                            "also harsh and unpopular ones; choose ok if it breaks none.",
+            "criteria": {"ok": "breaks none of the rules", **{k: q for k, (q, _, _) in SPORSMAL_EN.items()}},
+        }}
+    if modus == "ja-nei":
+        return {k: {"type": "noul", "instructions": q, "criteria": {"true": ja, "false": nei}}
+                for k, (q, ja, nei) in SPORSMAL_EN.items()}
+    raise ValueError(f"unknown question mode {modus!r} (ja-nei, valg)")
+
+
+def fra_svar(svar: dict, modus: str) -> tuple[str, dict[str, float]]:
+    """(rule, probability per rule) from System One answers. In "ja-nei" every rule has
+    its own probability and ok is the chance that none applies (1 − the likeliest)."""
+    if modus == "valg":
+        sann = {k: float(svar["regel"]["probabilities"].get(k, 0.0)) for k in REGLER}
+        return max(sann, key=sann.get), sann
+    brudd = {k: float(svar[k]["noul"]) for k in REGLER if k != "ok"}
+    verst = max(brudd, key=brudd.get)
+    sann = {"ok": round(1 - brudd[verst], 4), **{k: round(v, 4) for k, v in brudd.items()}}
+    return (verst if brudd[verst] >= 0.5 else "ok"), sann
+
+
+def _er_lokal(url: str) -> bool:
+    vert = (url.split("://", 1)[-1].split("/", 1)[0].rsplit(":", 1)[0]).strip("[]")
+    return vert in ("127.0.0.1", "localhost", "::1", "modell", "vert")
+
+
 class Jev(Moderator):
-    """TypeSafe's System One API: the rules as one choice question, the comment as state."""
+    """A System One API: TypeSafe's Jev, or a server that speaks the same format on
+    our own machine (Jev-Style: `jev-style serve`). The comment and its context are the
+    state; the rules are the questions (sporsmal_en). A local server counts as lokal."""
 
-    lokal = False
-
-    def __init__(self, url: str, modell: str, nokkel: str | None, session=None):
-        self.url, self.modell, self.nokkel = url, modell, nokkel
-        self.name = f"jev:{modell}"
+    def __init__(self, url: str, modell: str, nokkel: str | None, modus: str = "ja-nei", session=None):
+        sporsmal_en(modus)  # validates the mode
+        self.url, self.modell, self.nokkel, self.modus = url, modell, nokkel, modus
+        self.lokal = _er_lokal(url)
+        self.name = f"jev:{modell}:{modus}"
         self.session = session or requests.Session()
 
     def _vurder(self, tekst, sak, forelder):
-        if not self.nokkel:
+        if not self.nokkel and not self.lokal:
             raise ModereringFeil("TYPESAFE_API_KEY is not set")
         state = {"sak": f"{sak.tittel}\n{sak.ingress}".strip(), "kommentar": tekst}
         if forelder:
             state["svarer_pa"] = forelder
+        sporsmal = sporsmal_en(self.modus)
+        headers = {"Authorization": f"Bearer {self.nokkel}"} if self.nokkel else {}
         try:
-            r = self.session.post(self.url, timeout=TIMEOUT_S, headers={"Authorization": f"Bearer {self.nokkel}"},
-                                  json={"model": self.modell, "state": state, "questions": {"regel": {
-                                      "type": "choice", "instructions": VEILEDNING,
-                                      "criteria": {k: tekst_ for k, (_, tekst_) in REGLER.items()}}}})
+            r = self.session.post(self.url, timeout=TIMEOUT_S, headers=headers,
+                                  json={"model": self.modell, "state": state, "questions": sporsmal})
             r.raise_for_status()
-            svar = r.json()["answers"]["regel"]
-            sann = {k: float(svar["probabilities"].get(k, 0.0)) for k in REGLER}
+            regel, sann = fra_svar(r.json()["answers"], self.modus)
         except (requests.RequestException, ValueError, KeyError, TypeError, AttributeError) as e:
             raise ModereringFeil(f"jev: {e}") from None
-        regel = svar.get("choice") if svar.get("choice") in REGLER else max(sann, key=sann.get)
         # Price: $0.042 per million input tokens, output free (TypeSafe, 2026); ~4 characters per token.
-        tokens = (len(json.dumps(state)) + len(VEILEDNING) + sum(len(t) for _, t in REGLER.values())) / 4
-        return Vurdering(regel, sann, self.name, 0, kostnad_usd=tokens * 0.042e-6)
+        kostnad = 0.0 if self.lokal else (len(json.dumps(state)) + len(json.dumps(sporsmal))) / 4 * 0.042e-6
+        return Vurdering(regel, sann, self.name, 0, kostnad_usd=kostnad)
 
 
 CLAUDE_SKJEMA = {
@@ -352,6 +388,40 @@ class Claude(Moderator):
                          kostnad_usd=round(kostnad, 6))
 
 
+class Laya(Moderator):
+    """Laya (Convai Innovations, Apache-2.0): an open decision model of the same kind as
+    Jev, run in-process on the Pi's CPU; nothing leaves the house. `modus` "ja-nei" asks
+    one yes/no question per rule (each rule its own probability; ok = no rule likely),
+    "valg" asks one question over all the rules. The questions are in English
+    (regler.SPORSMAL_EN); the comment stays as written. Needs `pip install laya` with torch."""
+
+    def __init__(self, modell: str = "convaiinnovations/laya-multilingual", modus: str = "ja-nei", agent=None):
+        sporsmal_en(modus)  # validates the mode
+        self.modell, self.modus, self._agent = modell, modus, agent
+        self.name = f"laya:{modell.rsplit('/', 1)[-1]}:{modus}"
+
+    def _agenten(self):
+        if self._agent is None:
+            try:
+                import laya
+            except ImportError:
+                raise ModereringFeil("laya is not installed") from None
+            self._agent = laya.load(self.modell)
+        return self._agent
+
+    def _vurder(self, tekst, sak, forelder):
+        state = {"sak": f"{sak.tittel}\n{sak.ingress}".strip(), "kommentar": tekst}
+        if forelder:
+            state["svarer_pa"] = forelder
+        try:
+            regel, sann = fra_svar(self._agenten().predict(state, sporsmal_en(self.modus))["answers"], self.modus)
+        except ModereringFeil:
+            raise
+        except (KeyError, TypeError, ValueError) as e:
+            raise ModereringFeil(f"laya gave an unexpected answer: {e}") from None
+        return Vurdering(regel, sann, self.name, 0)
+
+
 class FakeModerator(Moderator):
     """For tests: returns the given Vurderinger (or raises the given exceptions) in order."""
 
@@ -377,10 +447,13 @@ def backend(navn: str) -> Moderator:
     if navn == "cpu":
         return LlamaCpp(config.DEBATT_CPU_URL, config.DEBATT_CPU_MODELL)
     if navn == "jev":
-        return Jev(config.DEBATT_JEV_URL, config.DEBATT_JEV_MODELL, os.environ.get("TYPESAFE_API_KEY"))
+        return Jev(config.DEBATT_JEV_URL, config.DEBATT_JEV_MODELL, os.environ.get("TYPESAFE_API_KEY"),
+                   config.DEBATT_JEV_MODUS)
+    if navn == "laya":
+        return Laya(config.DEBATT_LAYA_MODELL, config.DEBATT_LAYA_MODUS)
     if navn == "claude":
         return Claude(config.DEBATT_CLAUDE_MODELL, os.environ.get("TINGPOSTEN_ANTHROPIC_API_KEY"))
-    raise ValueError(f"unknown moderator {navn!r} (hailo, cpu, jev, claude)")
+    raise ValueError(f"unknown moderator {navn!r} (hailo, cpu, laya, jev, claude)")
 
 
 def kjede(navn: tuple[str, ...] | list[str] | None = None, terskel: float | None = None) -> Kjede:

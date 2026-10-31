@@ -111,7 +111,7 @@ def main(argv: list[str] | None = None) -> int:
                     "(data/debatt/fasit.json; forslagene teller der fasiten ikke er satt ennå). Skriver én linje "
                     "per kommentar til data/debatt/test/ og en tabell per terskel. Med --rapport kjøres ingenting; "
                     "tabellen lages fra lagrede kjøringer.")
-    dtest.add_argument("--moderator", action="append", choices=("hailo", "cpu", "jev", "claude"),
+    dtest.add_argument("--moderator", action="append", choices=("hailo", "cpu", "laya", "jev", "claude"),
                        help="kan gjentas; hver kjøres for seg")
     dtest.add_argument("--bare", type=int, help="bare de første N kommentarene (prøvekjøring)")
     dtest.add_argument("--rapport", nargs="*", type=Path, metavar="KJØRING",

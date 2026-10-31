@@ -117,8 +117,15 @@ DEBATT_HAILO_MODELL = os.environ.get("DEBATT_HAILO_MODELL", "qwen3:1.7b")
 DEBATT_HAILO_STOL_PA_ETIKETT = False
 DEBATT_CPU_URL = os.environ.get("DEBATT_CPU_URL", "http://127.0.0.1:8081")  # llama-server (llama.cpp) on the CPU
 DEBATT_CPU_MODELL = os.environ.get("DEBATT_CPU_MODELL", "qwen3.5-4b")  # names the test runs
-DEBATT_JEV_URL = "https://api.typesafe.ai/v1/systemone"  # key: TYPESAFE_API_KEY in .env
-DEBATT_JEV_MODELL = "jev"
+# Laya, an open Jev-like decision model run in-process (pip install laya, with torch).
+# "ja-nei" = one yes/no question per rule, "valg" = one question over all the rules.
+DEBATT_LAYA_MODELL = os.environ.get("DEBATT_LAYA_MODELL", "convaiinnovations/laya-multilingual")
+DEBATT_LAYA_MODUS = os.environ.get("DEBATT_LAYA_MODUS", "ja-nei")
+# Jev (TypeSafe, key: TYPESAFE_API_KEY in .env), or a local server that speaks the same
+# System One format (Jev-Style: `jev-style serve`, e.g. http://127.0.0.1:8765/v1/systemone).
+DEBATT_JEV_URL = os.environ.get("DEBATT_JEV_URL", "https://api.typesafe.ai/v1/systemone")
+DEBATT_JEV_MODELL = os.environ.get("DEBATT_JEV_MODELL", "jev")
+DEBATT_JEV_MODUS = os.environ.get("DEBATT_JEV_MODUS", "ja-nei")  # "ja-nei" or "valg" (as for Laya)
 # Key: TINGPOSTEN_ANTHROPIC_API_KEY in .env (not ANTHROPIC_API_KEY, which would make
 # `claude -p` bill the API instead of the subscription).
 DEBATT_CLAUDE_MODELL = "claude-opus-5-5"

@@ -77,3 +77,52 @@ def regeltekst(bokstaver: bool = False) -> str:
         prefix = f"{bokstav}) " if bokstaver else ""
         linjer.append(f"{prefix}{key} – {REGLER[key][1]}")
     return "\n".join(linjer)
+
+
+# The same rules in English, for decision models trained on English instructions
+# (Laya; the comment itself stays Norwegian). One yes/no question per rule, with what
+# counts as yes and as no, the pattern TypeSafe's guardrail cookbook uses. Change a
+# Norwegian rule above, change its English twin here.
+SPORSMAL_EN: dict[str, tuple[str, str, str]] = {
+    "trussel": (
+        "Does `kommentar` threaten someone, or call for violence, vandalism or harassment, also as a joke or a hint?",
+        "threats, veiled threats ('someone should pay him a visit at home'), calls for violence or vandalism, "
+        "urging others to harass a person",
+        "anger, harsh criticism, wanting politicians voted out, lawful protest, complaints",
+    ),
+    "hets": (
+        "Does `kommentar` show hatred or contempt for a group because of skin colour, ethnicity, national origin, "
+        "religion, belief, sexual orientation, gender identity or disability?",
+        "contempt, slurs or demeaning stereotypes about such a group, also when sarcastic or coded",
+        "criticism of policies on immigration, religion or integration; neutral discussion; reporting",
+    ),
+    "personangrep": (
+        "Does `kommentar` insult, mock or demean a person (a politician, an employee or another commenter) "
+        "instead of discussing the issue?",
+        "name-calling (idiot, clown, moron), mocking a person, attacks on someone's character or looks",
+        "calling a decision stupid, sharp criticism of what politicians decide or how they do their job, "
+        "disagreement, sarcasm about a decision",
+    ),
+    "privatperson": (
+        "Does `kommentar` name or point out a private individual who is not a public figure in the case, "
+        "or share personal data such as an address, phone number, health or family matters?",
+        "a named neighbour, employee or other private person; addresses, phone numbers, health details",
+        "elected politicians and officials named in their public role, the writer's own information",
+    ),
+    "beskyldning": (
+        "Does `kommentar` state as fact, without a source, that a named person or company has committed a "
+        "crime or something seriously wrongful, such as corruption, fraud or abuse?",
+        "unsupported claims that a named person or company is corrupt, a fraud or a criminal",
+        "questions, claims with a source, criticism of decisions, opinions about competence",
+    ),
+    "spam": (
+        "Is `kommentar` spam: advertising, links unrelated to the debate, repeated text or meaningless text?",
+        "advertising, promotion, unrelated links, copy-pasted repeats, gibberish",
+        "an ordinary comment, also a very short one ('Enig.', 'Endelig!')",
+    ),
+    "utenfor": (
+        "Is `kommentar` clearly unrelated to the case in `sak` and to the debate about it?",
+        "a comment about something with no connection to the case",
+        "views on the case, related topics, short reactions, questions",
+    ),
+}
