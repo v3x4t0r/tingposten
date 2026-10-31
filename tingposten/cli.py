@@ -128,6 +128,16 @@ def main(argv: list[str] | None = None) -> int:
     dsrv.add_argument("--vert", default="127.0.0.1")
     dsrv.add_argument("--port", type=int, default=8790)
 
+    dlok = sub.add_parser(
+        "debatt-lokal", help="prøv kommentarfeltet på egen maskin (trenger: uv run --extra debatt)",
+        description="Bygger siden med kommentarer på, viser den på 127.0.0.1 og kjører kommentarserveren ved "
+                    "siden av med den ekte moderatoren (Jev trenger TYPESAFE_API_KEY i .env). Innloggingslenkene "
+                    "skrives i terminalen. Alt ligger i data/debatt/lokal/; ingenting publiseres.")
+    dlok.add_argument("--port", type=int, default=8091, help="siden (standard 8091)")
+    dlok.add_argument("--api-port", type=int, default=8790, help="kommentarserveren (standard 8790)")
+    dlok.add_argument("--moderator", action="append", choices=("hailo", "cpu", "laya", "jev", "claude"),
+                      help="i stedet for config.DEBATT_MODERATOR (kan gjentas)")
+
     dfas = sub.add_parser("debatt-fasit", help="lokal side for å sette fasit på testkommentarene")
     dfas.add_argument("--port", type=int, default=8766)
     dfas.add_argument("--apne", action="store_true", help="åpne siden i nettleseren")
@@ -165,6 +175,13 @@ def main(argv: list[str] | None = None) -> int:
 
         uvicorn.run(server.app_fra_config(), host=args.vert, port=args.port, proxy_headers=False,
                     server_header=False, log_level="info")
+    elif args.cmd == "debatt-lokal":
+        from .debatt import lokal
+
+        try:
+            lokal.kjor(args.port, args.api_port, tuple(args.moderator) if args.moderator else None)
+        except KeyboardInterrupt:
+            pass
     elif args.cmd == "debatt-test":
         return _debatt_test(args)
     elif args.cmd == "debatt-fasit":
