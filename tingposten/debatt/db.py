@@ -3,8 +3,10 @@
 Personal data kept here, and nowhere else: a reader's e-mail address, display
 name, comments and votes. Login links and sessions are stored only as SHA-256
 hashes. Who voted for what is never shown to anyone, the editor included; only
-the totals are. Deleting an account removes the e-mail, the name, the votes and
-the text of every comment (a comment with replies stays as "[slettet]").
+the totals are. Deleting an account removes the e-mail (also from unused login
+links), the name, the votes, the text of every comment (a comment with replies
+stays as "[slettet]") and the moderators' notes on them; secure_delete overwrites
+the freed pages.
 """
 
 import json
@@ -18,19 +20,21 @@ SKJEMA = """
 CREATE TABLE IF NOT EXISTS brukere (
   id INTEGER PRIMARY KEY,
   epost TEXT UNIQUE NOT NULL,
-  navn TEXT UNIQUE COLLATE NOCASE,
+  navn TEXT,
+  navn_nokkel TEXT UNIQUE,   -- the name folded for comparison (tjeneste.navnenokkel)
   opprettet TEXT NOT NULL,
   sperret INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS innlogging (
   hash TEXT PRIMARY KEY,
   epost TEXT NOT NULL,
+  epost_nokkel TEXT NOT NULL,  -- the address without +tag, for the rate limit
   tilbake TEXT,
   opprettet TEXT NOT NULL,
   utloper TEXT NOT NULL,
   brukt INTEGER NOT NULL DEFAULT 0
 );
-CREATE INDEX IF NOT EXISTS innlogging_epost ON innlogging(epost, opprettet);
+CREATE INDEX IF NOT EXISTS innlogging_epost ON innlogging(epost_nokkel, opprettet);
 CREATE TABLE IF NOT EXISTS okter (
   hash TEXT PRIMARY KEY,
   bruker INTEGER NOT NULL REFERENCES brukere(id) ON DELETE CASCADE,
@@ -48,6 +52,7 @@ CREATE TABLE IF NOT EXISTS kommentarer (
   regel TEXT,
   opprettet TEXT NOT NULL,
   endret TEXT,
+  endringer INTEGER NOT NULL DEFAULT 0,
   opp INTEGER NOT NULL DEFAULT 0,
   ned INTEGER NOT NULL DEFAULT 0
 );
@@ -108,6 +113,7 @@ class Db:
             c = sqlite3.connect(self.path, timeout=10, isolation_level=None, check_same_thread=False)
             c.row_factory = sqlite3.Row
             c.execute("PRAGMA foreign_keys = ON")
+            c.execute("PRAGMA secure_delete = ON")
             if self.path != ":memory:":
                 c.execute("PRAGMA journal_mode = WAL")
             self._lokal.c = c
@@ -143,6 +149,11 @@ class Db:
     def slett_bruker(self, bruker: int) -> None:
         """Everything about the reader goes; replies to their comments keep a placeholder."""
         with self.tx() as c:
+            rad = c.execute("SELECT epost FROM brukere WHERE id = ?", (bruker,)).fetchone()
+            if rad:
+                c.execute("DELETE FROM innlogging WHERE epost = ?", (rad["epost"],))
+            c.execute("UPDATE vurderinger SET data = '{}' WHERE kommentar IN "
+                      "(SELECT id FROM kommentarer WHERE bruker = ?)", (bruker,))
             for (kid,) in c.execute("SELECT kommentar FROM stemmer WHERE bruker = ?", (bruker,)).fetchall():
                 c.execute("DELETE FROM stemmer WHERE bruker = ? AND kommentar = ?", (bruker, kid))
                 self._tell_stemmer(c, kid)
@@ -160,6 +171,11 @@ class Db:
             "stemmer": [dict(r) for r in self.les("SELECT kommentar, verdi FROM stemmer WHERE bruker = ?", bruker)],
             "rapporter": [dict(r) for r in self.les("SELECT kommentar, tid, grunn FROM rapporter WHERE bruker = ?",
                                                     bruker)],
+            "innloggingslenker": [dict(r) for r in self.les(
+                "SELECT opprettet, utloper, brukt FROM innlogging WHERE epost = ?", b["epost"])] if b else [],
+            "vurderinger": [dict(r) for r in self.les(
+                "SELECT v.kommentar, v.tid, v.utfall, v.regel, v.hvem, v.data FROM vurderinger v "
+                "JOIN kommentarer k ON k.id = v.kommentar WHERE k.bruker = ? ORDER BY v.id", bruker)],
         }
 
     # --- votes -----------------------------------------------------------------

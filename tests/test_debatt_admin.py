@@ -56,10 +56,12 @@ def test_queue_shows_name_text_and_verdict_but_never_the_email(oppsett):
 
 def test_editor_decisions_need_the_panel_header(oppsett):
     base, t, k, okt = oppsett
-    assert call(base + "/debatt", {"id": k["id"], "handling": "publiser"})[0] == 403
+    sett = {"id": k["id"], "handling": "publiser", "tekst": "Kanskje litt frekt"}
+    assert call(base + "/debatt", sett)[0] == 403
     assert call(base + "/debatt", {"id": k["id"], "handling": "slett alt"}, X_Tingposten="admin")[0] == 400
-    assert call(base + "/debatt", {"id": 999, "handling": "publiser"}, X_Tingposten="admin")[0] == 404
-    assert call(base + "/debatt", {"id": k["id"], "handling": "publiser"}, X_Tingposten="admin")[0] == 200
+    assert call(base + "/debatt", {**sett, "id": 999}, X_Tingposten="admin")[0] == 404
+    assert call(base + "/debatt", {**sett, "tekst": "en annen tekst"}, X_Tingposten="admin")[0] == 409
+    assert call(base + "/debatt", sett, X_Tingposten="admin")[0] == 200
     assert t.trad(SAK, None)["antall"] == 1 and json.loads(call(base + "/debatt.json")[1])["ko"] == []
     k2 = t.ny_kommentar(t.bruker(okt), SAK, "Enda en")
     code, body = call(base + "/debatt", {"id": k2["id"], "handling": "sperr", "regel": "personangrep"},

@@ -64,16 +64,24 @@ def test_letter_from_small_model_answer(svar, bokstav):
     assert m._bokstav(svar) == bokstav
 
 
-def test_probabilities_from_logprobs_are_a_softmax_over_rule_letters():
+def test_probabilities_from_logprobs_are_absolute_and_merge_spacing_variants():
     regel, sann = m._fra_logprobs([
         {"token": "B", "logprob": math.log(0.6)}, {"token": " A", "logprob": math.log(0.3)},
-        {"token": "Jeg", "logprob": math.log(0.05)}, {"token": "A", "logprob": math.log(0.01)},  # duplicate ignored
+        {"token": "Jeg", "logprob": math.log(0.05)}, {"token": "A", "logprob": math.log(0.01)},
     ])
     assert regel == "trussel"
-    assert sann["trussel"] == pytest.approx(2 / 3, abs=1e-3) and sann["ok"] == pytest.approx(1 / 3, abs=1e-3)
+    assert sann["trussel"] == pytest.approx(0.6, abs=1e-3) and sann["ok"] == pytest.approx(0.31, abs=1e-3)
     assert set(sann) == set(REGLER) and sann["spam"] == 0
     with pytest.raises(m.ModereringFeil):
         m._fra_logprobs([{"token": "Hei", "logprob": -0.1}])
+
+
+def test_a_model_that_wanted_to_say_something_else_is_not_sure():
+    """Review 31.10: renormalising over the letters turned 0.1 % into 100 %."""
+    regel, sann = m._fra_logprobs([{"token": "Jeg", "logprob": math.log(0.99)},
+                                   {"token": "A", "logprob": math.log(0.001)}])
+    v = m.Vurdering(regel, sann, "cpu", 0)
+    assert regel == "ok" and v.sikkerhet < 0.01 and m.avgjor(v, 0.85) == "redaktor"
 
 
 @pytest.mark.parametrize("v, stol, utfall", [
@@ -128,7 +136,7 @@ def test_llamacpp_reads_one_token_of_logprobs():
     topp = [{"token": "A", "logprob": math.log(0.97)}, {"token": "H", "logprob": math.log(0.02)}]
     okt = Okt(Svar({"choices": [{"logprobs": {"content": [{"top_logprobs": topp}]}}]}))
     v = m.LlamaCpp("http://pi:8081", session=okt).vurder("Endelig!", SAK)
-    assert v.regel == "ok" and v.sikkerhet > 0.97
+    assert v.regel == "ok" and v.sikkerhet == pytest.approx(0.97, abs=1e-3)
     sendt = okt.kall[0]["json"]
     assert sendt["max_tokens"] == 1 and sendt["logprobs"] is True and sendt["cache_prompt"] is True
 

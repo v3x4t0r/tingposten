@@ -7,13 +7,16 @@ message is Norwegian and shown as it is.
 """
 
 import hashlib
+import json
 import logging
 import math
 import queue
 import re
 import secrets
 import threading
+import time
 import unicodedata
+from collections import defaultdict, deque
 from dataclasses import dataclass
 from datetime import timedelta
 
@@ -28,15 +31,38 @@ OKT_GYLDIG = timedelta(days=30)
 MAKS_TEKST = 3000
 MIN_TEKST = 2
 NAVN_MIN, NAVN_MAKS = 2, 30
-LENKER_PER_TIME = 3            # login e-mails per address and hour
-KOMMENTAR_PAUSE_S = 30         # between two comments from one account
+LENKER_PER_TIME = 3            # login e-mails per address (without +tag) and hour
+LENKER_PER_TIME_TOTALT = 200   # all login e-mails per hour: protects the mail account's reputation
+KOMMENTAR_PAUSE_S = 30         # between two comments (or edits) from one account
 KOMMENTARER_PER_DOGN = 30
 NYE_KONTO_PER_DOGN = 5         # the first 24 hours of an account
-RESERVERTE_NAVN = ("tingposten", "redaksjonen", "redaksjon", "redaktør", "redaktor", "redaktøren", "admin",
-                   "administrator", "moderator", "bergen kommune", "byrådet", "bystyret", "kommunen")
+MAKS_ENDRINGER = 5             # edits per comment; each one is judged again
+NAVNEFORSOK_PER_TIME = 5
+MAKS_DYBDE = 8                 # replies to replies …; deeper threads are refused
+# Names a reader can't take or hide inside their own (folded: see navnenokkel).
+RESERVERTE_NAVN = ("tingposten", "redaksjon", "redaktor", "redaktoren", "admin", "moderator", "bergenkommune",
+                   "kommunen", "byradet", "bystyret", "ordforer")
+# Latin look-alikes in other scripts, folded before the reserved names are compared.
+_FORVEKSLING = str.maketrans("аеорсухіјӏԁոѕԛԝαεορτυνιкмтвн", "aeopcyxijldnsqwaeoptuvikmtbh")
 
 _EPOST = re.compile(r"^[^@\s]{1,64}@[^@\s]+\.[^@\s]{2,}$")
 _NAVN_TEGN = re.compile(r"^[\w .'\-]+$")
+
+
+def navnenokkel(navn: str) -> str:
+    """A display name folded for comparison: compatibility forms, case, look-alike
+    letters from other scripts, Norwegian letters and everything but letters and
+    digits. "Тingposten" (Cyrillic T) and "TING-posten" give the same key."""
+    n = unicodedata.normalize("NFKC", navn).casefold().translate(_FORVEKSLING)
+    n = n.replace("æ", "ae").replace("ø", "o").replace("å", "a")
+    n = "".join(ch for ch in unicodedata.normalize("NFKD", n) if not unicodedata.combining(ch))
+    return re.sub(r"[^0-9a-z]", "", n)
+
+
+def _epost_nokkel(epost: str) -> str:
+    """The address without a +tag, so victim+1@, victim+2@ … share one rate limit."""
+    lokal, _, domene = epost.partition("@")
+    return f"{lokal.split('+', 1)[0]}@{domene}"
 
 
 class Feil(Exception):
@@ -98,7 +124,14 @@ class Tjeneste:
         self.send_lenke, self.site_url = send_lenke, site_url.rstrip("/") + "/"
         self.umiddelbar = umiddelbar_moderering
         self._ko: queue.Queue[int] = queue.Queue()
+        self._i_ko: set[int] = set()
+        self._ko_lås = threading.Lock()
         self._traad: threading.Thread | None = None
+        self._navneforsok: dict[int, deque] = defaultdict(deque)
+        from .. import config
+
+        self.reserverte = RESERVERTE_NAVN + tuple(
+            navnenokkel(n) for n in (getattr(config, "ANSVARLIG_REDAKTOR", None), getattr(config, "UTGIVER", None)) if n)
 
     # --- login -----------------------------------------------------------------
 
@@ -108,14 +141,20 @@ class Tjeneste:
         if not _EPOST.match(epost) or len(epost) > 254:
             raise Feil(400, "Skriv en gyldig e-postadresse.")
         tilbake = tilbake if isinstance(tilbake, str) and tilbake.startswith(self.site_url) else None
-        if self.db.en("SELECT COUNT(*) AS n FROM innlogging WHERE epost = ? AND opprettet > ?",
-                      epost, siden(hours=1))["n"] >= LENKER_PER_TIME:
-            raise Feil(429, "Du har bedt om mange lenker. Prøv igjen om en time.")
+        nokkel = _epost_nokkel(epost)
         token = secrets.token_urlsafe(32)
-        with self.db.tx() as c:
+        with self.db.tx() as c:  # count and insert in one transaction: parallel requests can't slip past
             c.execute("DELETE FROM innlogging WHERE utloper < ?", (siden(days=1),))
-            c.execute("INSERT INTO innlogging (hash, epost, tilbake, opprettet, utloper) VALUES (?, ?, ?, ?, ?)",
-                      (_hash(token), epost, tilbake, iso(na()), iso(na() + LENKE_GYLDIG)))
+            if c.execute("SELECT COUNT(*) FROM innlogging WHERE epost_nokkel = ? AND opprettet > ?",
+                         (nokkel, siden(hours=1))).fetchone()[0] >= LENKER_PER_TIME:
+                raise Feil(429, "Du har bedt om mange lenker. Prøv igjen om en time.")
+            if c.execute("SELECT COUNT(*) FROM innlogging WHERE opprettet > ?",
+                         (siden(hours=1),)).fetchone()[0] >= LENKER_PER_TIME_TOTALT:
+                log.warning("login e-mail cap reached (%d per hour)", LENKER_PER_TIME_TOTALT)
+                raise Feil(503, "Innloggingen er travel akkurat nå. Prøv igjen om en stund.")
+            c.execute("INSERT INTO innlogging (hash, epost, epost_nokkel, tilbake, opprettet, utloper) "
+                      "VALUES (?, ?, ?, ?, ?, ?)",
+                      (_hash(token), epost, nokkel, tilbake, iso(na()), iso(na() + LENKE_GYLDIG)))
         try:
             self.send_lenke(epost, f"{self.site_url}bergen/logg-inn/#t={token}")
         except Exception:
@@ -163,15 +202,27 @@ class Tjeneste:
         if not NAVN_MIN <= len(navn) <= NAVN_MAKS or not _NAVN_TEGN.match(navn):
             raise Feil(400, f"Navnet må ha {NAVN_MIN}–{NAVN_MAKS} tegn: bokstaver, tall, mellomrom, punktum, "
                             "bindestrek eller apostrof.")
-        if navn.casefold() in RESERVERTE_NAVN or any(r in navn.casefold() for r in ("tingposten", "redaksjon")):
+        nokkel = navnenokkel(navn)
+        if len(nokkel) < NAVN_MIN or any(r in nokkel for r in self.reserverte):
             raise Feil(400, "Det navnet kan ikke brukes.")
-        svar = self.moderator.avgjor(f"Visningsnavn: {navn}", Sak("visningsnavn", "Et nytt visningsnavn i debatten"))
-        if svar.utfall == "avvis":
-            raise Feil(400, f"Navnet bryter debattreglene ({REGLER[svar.regel][0].lower()}).")
+        forsok = self._navneforsok[b.id]
+        while forsok and forsok[0] < time.monotonic() - 3600:
+            forsok.popleft()
+        if len(forsok) >= NAVNEFORSOK_PER_TIME:
+            raise Feil(429, "Du har prøvd mange navn. Prøv igjen om en time.")
+        forsok.append(time.monotonic())
+        if self.db.en("SELECT 1 FROM brukere WHERE navn_nokkel = ? AND id != ?", nokkel, b.id):
+            raise Feil(409, "Navnet er tatt.")
+        # Only a moderator at home sees a display name (it may identify the reader).
+        lokal = self.moderator.lokal() if self.moderator else None
+        if lokal:
+            svar = lokal.avgjor(f"Visningsnavn: {navn}", Sak("visningsnavn", "Et nytt visningsnavn i debatten"))
+            if svar.utfall == "avvis":
+                raise Feil(400, f"Navnet bryter debattreglene ({REGLER[svar.regel][0].lower()}).")
         with self.db.tx() as c:
-            if c.execute("SELECT 1 FROM brukere WHERE navn = ? AND id != ?", (navn, b.id)).fetchone():
+            if c.execute("SELECT 1 FROM brukere WHERE navn_nokkel = ? AND id != ?", (nokkel, b.id)).fetchone():
                 raise Feil(409, "Navnet er tatt.")
-            c.execute("UPDATE brukere SET navn = ? WHERE id = ?", (navn, b.id))
+            c.execute("UPDATE brukere SET navn = ?, navn_nokkel = ? WHERE id = ?", (navn, nokkel, b.id))
         return navn
 
     # --- comments --------------------------------------------------------------
@@ -191,6 +242,8 @@ class Tjeneste:
             f = self.db.en("SELECT sak, status FROM kommentarer WHERE id = ?", forelder) if type(forelder) is int else None
             if f is None or f["sak"] != sak.key or f["status"] != "publisert":
                 raise Feil(400, "Kommentaren du svarer på finnes ikke.")
+            if self._dybde(forelder) >= MAKS_DYBDE:
+                raise Feil(400, "Tråden er for lang. Svar lenger opp.")
         self._sjekk_tempo(b)
         with self.db.tx() as c:
             cur = c.execute("INSERT INTO kommentarer (sak, forelder, bruker, tekst, status, opprettet) "
@@ -198,6 +251,14 @@ class Tjeneste:
             kid = cur.lastrowid
         self._moderer_senere(kid)
         return self.kommentar(kid, b)
+
+    def _dybde(self, kid: int) -> int:
+        """How many comments up to the top of the thread (the top comment is 1)."""
+        n = 0
+        while kid is not None and n <= MAKS_DYBDE:
+            rad = self.db.en("SELECT forelder FROM kommentarer WHERE id = ?", kid)
+            kid, n = (rad["forelder"] if rad else None), n + 1
+        return n
 
     def _sjekk_tempo(self, b: Bruker) -> None:
         if self.db.en("SELECT 1 FROM kommentarer WHERE bruker = ? AND opprettet > ?", b.id,
@@ -213,9 +274,14 @@ class Tjeneste:
         egen = self._egen(b, kid)
         if egen["status"] in ("slettet", "fjernet"):
             raise Feil(400, "Kommentaren kan ikke endres.")
+        if egen["endringer"] >= MAKS_ENDRINGER:
+            raise Feil(400, "Kommentaren er endret mange ganger. Slett den og skriv en ny.")
+        if self.db.en("SELECT 1 FROM kommentarer WHERE bruker = ? AND (opprettet > ? OR endret > ?)", b.id,
+                      siden(seconds=KOMMENTAR_PAUSE_S), siden(seconds=KOMMENTAR_PAUSE_S)):
+            raise Feil(429, "Vent litt før du endrer.")
         with self.db.tx() as c:
-            c.execute("UPDATE kommentarer SET tekst = ?, status = 'venter', regel = NULL, endret = ? WHERE id = ?",
-                      (tekst, iso(na()), kid))
+            c.execute("UPDATE kommentarer SET tekst = ?, status = 'venter', regel = NULL, endret = ?, "
+                      "endringer = endringer + 1 WHERE id = ?", (tekst, iso(na()), kid))
         self._moderer_senere(kid)
         return self.kommentar(kid, b)
 
@@ -268,6 +334,10 @@ class Tjeneste:
                 "min_stemme": stemmer.get(r["id"], 0), "svar": []}
         if r["status"] in ("slettet", "fjernet"):
             node.update(tekst="", navn="")
+        elif r["status"] != "publisert" and not egen:
+            # Someone else's comment that waits or was stopped (after an edit), shown only
+            # because it has published replies: a placeholder, nothing of its text.
+            node.update(tekst="", navn="", status="skjult")
         else:
             node["tekst"] = r["tekst"]
         if egen and r["status"] == "avvist" and r["regel"] in REGLER:
@@ -284,8 +354,8 @@ class Tjeneste:
 
     def trad(self, sak_key, b: Bruker | None, sortering: str = "best") -> dict:
         """The sak's comments as a tree. Others see only published comments (and a
-        placeholder for a deleted or removed one that has published replies); the
-        reader also sees their own waiting and stopped ones."""
+        placeholder for any other comment that has published replies); the reader
+        also sees their own waiting and stopped ones."""
         sak = self._sak(sak_key)
         if sortering not in SORTERING:
             sortering = "best"
@@ -299,20 +369,24 @@ class Tjeneste:
         for r in rader:
             barn.setdefault(r["forelder"], []).append(r["id"])
 
-        def synlig(kid: int) -> bool:
+        def direkte(kid: int) -> bool:
             r, _ = noder[kid]
-            if r["status"] == "publisert" or (b is not None and r["bruker"] == b.id and r["status"] != "slettet"):
-                return True
-            return r["status"] in ("slettet", "fjernet") and any(synlig(x) for x in barn.get(kid, []))
+            return r["status"] == "publisert" or (b is not None and r["bruker"] == b.id and r["status"] != "slettet")
+
+        # Visible: shown for its own sake, or as a placeholder because a reply below it is.
+        # Children first (ids grow down the thread), so each comment is looked at once.
+        synlig: dict[int, bool] = {}
+        for kid in sorted(noder, reverse=True):
+            synlig[kid] = direkte(kid) or any(synlig.get(x, False) for x in barn.get(kid, []))
 
         nokkel = SORTERING[sortering]
 
         def bygg(forelder: int | None) -> list[dict]:
             ut = []
-            for kid in sorted((k for k in barn.get(forelder, []) if synlig(k)),
-                              key=lambda k: nokkel({**dict(noder[k][0])}), reverse=True):
+            for kid in sorted((k for k in barn.get(forelder, []) if synlig[k]),
+                              key=lambda k: nokkel(noder[k][0]), reverse=True):
                 node = noder[kid][1]
-                node["svar"] = bygg(kid)
+                node["svar"] = bygg(kid)  # depth is capped at MAKS_DYBDE when a reply is written
                 ut.append(node)
             return ut
 
@@ -324,12 +398,21 @@ class Tjeneste:
     def _moderer_senere(self, kid: int) -> None:
         if self.umiddelbar:
             self.moderer(kid)
-        else:
-            self._ko.put(kid)
+            return
+        with self._ko_lås:  # a comment edited while it waits is judged once, in its newest form
+            if kid in self._i_ko:
+                return
+            self._i_ko.add(kid)
+        self._ko.put(kid)
 
     def moderer(self, kid: int) -> None:
-        r = self.db.en("SELECT * FROM kommentarer WHERE id = ?", kid)
+        r = self.db.en("SELECT k.*, u.sperret FROM kommentarer k LEFT JOIN brukere u ON u.id = k.bruker "
+                       "WHERE k.id = ?", kid)
         if r is None or r["status"] != "venter":
+            return
+        if r["sperret"]:  # blocked while the comment waited
+            with self.db.tx() as c:
+                c.execute("UPDATE kommentarer SET status = 'fjernet' WHERE id = ? AND status = 'venter'", (kid,))
             return
         forelder = self.db.en("SELECT tekst FROM kommentarer WHERE id = ?", r["forelder"]) if r["forelder"] else None
         try:
@@ -345,12 +428,16 @@ class Tjeneste:
             if oppdatert:
                 self.db.logg_vurdering(c, kid, svar.utfall, svar.regel, self.moderator.name, {
                     "vurderinger": [v.som_dict() for v in svar.vurderinger], "feil": svar.feil})
+        if not oppdatert:  # edited while it was judged: judge the new text
+            ny = self.db.en("SELECT status FROM kommentarer WHERE id = ?", kid)
+            if ny is not None and ny["status"] == "venter":
+                self._moderer_senere(kid)
 
     def start_ko(self) -> None:
         """One worker for the whole server: the Pi judges one comment at a time.
         Comments left waiting by a restart are queued again."""
         for r in self.db.les("SELECT id FROM kommentarer WHERE status = 'venter' ORDER BY id"):
-            self._ko.put(r["id"])
+            self._moderer_senere(r["id"])
         if self._traad is None:
             self._traad = threading.Thread(target=self._arbeid, name="moderering", daemon=True)
             self._traad.start()
@@ -358,6 +445,8 @@ class Tjeneste:
     def _arbeid(self) -> None:
         while True:
             kid = self._ko.get()
+            with self._ko_lås:
+                self._i_ko.discard(kid)
             try:
                 self.moderer(kid)
             except Exception:  # one bad comment must not stop the queue; it stays 'venter'
@@ -366,34 +455,58 @@ class Tjeneste:
     # --- editor -------------------------------------------------------------------
 
     def redaktor_ko(self) -> list[dict]:
-        """Comments waiting for the editor and reported ones, oldest first."""
+        """Comments waiting for the editor and reported ones, oldest first, with the
+        moderators' last verdict (not the reader's own 'please look' entry) and the
+        reasons readers gave in their reports."""
         rader = self.db.les(
-            "SELECT k.id, k.sak, k.tekst, k.status, k.regel, k.opprettet, u.navn, "
+            "SELECT k.id, k.sak, k.tekst, k.status, k.regel, k.opprettet, k.endret, u.navn, "
             "(SELECT COUNT(*) FROM rapporter r WHERE r.kommentar = k.id AND r.behandlet = 0) AS rapporter, "
-            "(SELECT data FROM vurderinger v WHERE v.kommentar = k.id ORDER BY v.id DESC LIMIT 1) AS vurdering "
+            "(SELECT json_group_array(r.grunn) FROM rapporter r WHERE r.kommentar = k.id AND r.behandlet = 0 "
+            " AND r.grunn IS NOT NULL AND r.grunn != '') AS grunner, "
+            "(SELECT data FROM vurderinger v WHERE v.kommentar = k.id AND v.hvem NOT IN ('leseren', 'redaktør') "
+            " ORDER BY v.id DESC LIMIT 1) AS vurdering, "
+            "EXISTS (SELECT 1 FROM vurderinger v WHERE v.kommentar = k.id AND v.hvem = 'leseren') AS ba_om_vurdering "
             "FROM kommentarer k LEFT JOIN brukere u ON u.id = k.bruker "
             "WHERE k.status = 'til_redaktor' OR (k.status = 'publisert' AND EXISTS "
             "(SELECT 1 FROM rapporter r WHERE r.kommentar = k.id AND r.behandlet = 0)) ORDER BY k.id")
-        return [dict(r) for r in rader]
+        ut = []
+        for r in rader:
+            d = dict(r)
+            d["grunner"] = json.loads(d["grunner"] or "[]")
+            d["ba_om_vurdering"] = bool(d["ba_om_vurdering"])
+            ut.append(d)
+        return ut
 
-    def redaktor_avgjor(self, kid: int, utfall: str, regel: str | None = None) -> None:
-        """The editor publishes ('publiser') or removes ('fjern', optionally with the rule broken)."""
+    def redaktor_avgjor(self, kid: int, utfall: str, regel: str | None = None, tekst: str | None = None) -> None:
+        """The editor publishes ('publiser') or removes ('fjern', optionally with the rule
+        broken). Publishing needs the text the editor read: if the author changed or
+        deleted it since, nothing happens (409) and the queue shows the new state."""
         if utfall not in ("publiser", "fjern") or (regel is not None and regel not in REGLER):
             raise Feil(400, "Ugyldig avgjørelse.")
         with self.db.tx() as c:
             if c.execute("SELECT 1 FROM kommentarer WHERE id = ?", (kid,)).fetchone() is None:
                 raise Feil(404, "Fant ikke kommentaren.")
-            status = "publisert" if utfall == "publiser" else "fjernet"
-            c.execute("UPDATE kommentarer SET status = ?, regel = ? WHERE id = ?",
-                      (status, regel if utfall == "fjern" else None, kid))
+            if utfall == "publiser":
+                endret = c.execute("UPDATE kommentarer SET status = 'publisert', regel = NULL WHERE id = ? "
+                                   "AND status IN ('til_redaktor', 'publisert') AND tekst = ?", (kid, tekst)).rowcount
+            else:
+                endret = c.execute("UPDATE kommentarer SET status = 'fjernet', regel = ? WHERE id = ? "
+                                   "AND status != 'slettet'", (regel, kid)).rowcount
+            if not endret:
+                raise Feil(409, "Kommentaren er endret eller slettet siden du så den. Last inn på nytt.")
             c.execute("UPDATE rapporter SET behandlet = 1 WHERE kommentar = ?", (kid,))
             self.db.logg_vurdering(c, kid, utfall, regel, "redaktør", {})
 
     def sperr(self, kid: int) -> None:
-        """Block the author of a comment: no login, no new comments; their sessions end."""
+        """Block the author of a comment: no login, no new comments, their sessions end,
+        and what they have waiting is removed. Nothing to block if the account is gone."""
         rad = self.db.en("SELECT bruker FROM kommentarer WHERE id = ?", kid)
-        if rad is None or rad["bruker"] is None:
+        if rad is None:
             raise Feil(404, "Fant ikke kommentaren.")
+        if rad["bruker"] is None:
+            return
         with self.db.tx() as c:
             c.execute("UPDATE brukere SET sperret = 1 WHERE id = ?", (rad["bruker"],))
             c.execute("DELETE FROM okter WHERE bruker = ?", (rad["bruker"],))
+            c.execute("UPDATE kommentarer SET status = 'fjernet' WHERE bruker = ? AND status IN ('venter', 'til_redaktor')",
+                      (rad["bruker"],))

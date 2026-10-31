@@ -2,7 +2,7 @@
 
 Kommentarene ligger på Pi-en, ikke hos statichost. Den statiske siden henter dem med et lite skript (`tingposten/static/debatt.js`) fra kommentarserveren, som leserne når gjennom **Tailscale Funnel** på `https://debatt.<tailnet>.ts.net`. Ingen porter åpnes i ruteren, og hjemme-IP-en er ikke synlig.
 
-Serveren kjører i egne containere, som en egen Tailscale-maskin («debatt»), adskilt fra resten av Pi-en: den ser bare `data/debatt/` (kommentarbasen og saksoversikten som `bygg` skriver) og sin egen `debatt.env`. Den har ikke tilgang til `.env`, deploy-nøkkelen, Claude-innloggingen, Home Assistant eller kontrollpanelet.
+Serveren kjører i egne containere, som en egen Tailscale-maskin («debatt»). Filene er adskilt fra resten av Pi-en: containeren ser bare `data/debatt/` (kommentarbasen og saksoversikten som `bygg` skriver) og sin egen `debatt.env`, ikke `.env`, deploy-nøkkelen eller Claude-innloggingen. **Nettverket er ikke adskilt av seg selv:** en container på en vanlig Docker-bro kan nå Pi-en og hjemmenettet. Brannmurreglene under (steg 4) stenger det, slik at en angriper som skulle ta over kommentarserveren, ikke kommer videre til Home Assistant, kameraene eller kontrollpanelet.
 
 Alt er av til du slår det på: `DEBATT = None` i `tingposten/config.py` betyr at siden ikke viser kommentarfeltet.
 
@@ -29,7 +29,7 @@ Det viktigste i tabellen er **farlige slipp** (trussel, hets, privatperson eller
      "tagOwners": {"tag:debatt": ["autogroup:admin"]},
      "nodeAttrs": [{"target": ["tag:debatt"], "attr": ["funnel"]}]
      ```
-     Gi ikke `tag:debatt` tilgang til andre maskiner i tailnettet (ingen regel med den som kilde).
+     Gi ikke `tag:debatt` tilgang til andre maskiner i tailnettet (ingen regel med den som kilde), og ingen andre tilgang til den (ingen regel med den som mål). Bruker tailnettet standardregelen «alle kan nå alle», må den byttes ut med egne regler først. Funnel trenger ingen ACL-regel.
    - Lag en auth key (Settings → Keys): gjenbrukbar nei, forhåndsgodkjent ja, tagg `tag:debatt`.
    - Skriv den i `deploy/debatt/tailscale.env`: `TS_AUTHKEY=tskey-auth-…`
 2. **E-post:** kopier `debatt.env.example` til `debatt.env` og fyll inn SMTP for freetime.no-kontoen (Domeneshop: `smtp.domeneshop.no`, port 587, brukernavn og passord fra Domeneshop). Avsender kan være `tingposten@freetime.no` eller en egen adresse.
@@ -44,14 +44,22 @@ Det viktigste i tabellen er **farlige slipp** (trussel, hets, privatperson eller
      Modellen (`qwen3:1.7b`) er alt lastet ned under `~/.local/share/hailo-ollama/`. Tjenesten kjører som root og bruker `/root/.local/share/hailo-ollama/`; enten kjør `curl -X POST -H 'Content-Type: application/json' http://172.17.0.1:8000/api/pull -d '{"model":"qwen3:1.7b","stream":false}'` én gang, eller kjør den som din egen brukertjeneste i stedet.
    - **cpu:** legg `Qwen3.5-4B-Q4_0.gguf` i `~/tingposten/modeller/` og start med `--profile cpu` (under).
    - **claude / jev:** nøkkelen i `debatt.env`.
-4. **Start:**
+4. **Brannmur** (krever sudo; ikke prøvd på Pi-en ennå). Containerne bruker nettet 172.30.53.0/24. Det skal ut på internett (Tailscale, e-post, eventuelt Claude eller Jev), men ikke til hjemmenettet eller Pi-en, bortsett fra hailo-ollama:
+   ```sh
+   sudo iptables -I DOCKER-USER -s 172.30.53.0/24 -d 192.168.0.0/16 -j DROP
+   sudo iptables -I DOCKER-USER -s 172.30.53.0/24 -d 10.0.0.0/8 -j DROP
+   sudo iptables -I INPUT -s 172.30.53.0/24 -j DROP
+   sudo iptables -I INPUT -s 172.30.53.0/24 -d 172.17.0.1 -p tcp --dport 8000 -j ACCEPT   # bare med hailo
+   ```
+   Reglene må lagres for å overleve en omstart (f.eks. `iptables-persistent`). Test fra containeren: `docker compose exec debatt python -c "import urllib.request; urllib.request.urlopen('http://192.168.8.1', timeout=3)"` skal feile.
+5. **Start:**
    ```sh
    cd ~/tingposten/deploy/debatt
    docker compose up -d --build                 # med cpu-moderatoren: docker compose --profile cpu up -d --build
    docker compose logs -f debatt
    ```
    Adressen står i Tailscale-adminen under maskinen «debatt» (`https://debatt.<tailnet>.ts.net`). Test fra mobilen på mobilnett: `https://debatt.<tailnet>.ts.net/api/helse` skal svare `{"ok":true}`.
-5. **Slå på kommentarfeltet:** sett `DEBATT = "https://debatt.<tailnet>.ts.net/"` i `tingposten/config.py`, og bygg og publiser siden. `bygg` skriver da også `data/debatt/saker.json`, som serveren leser når filen endres.
+6. **Slå på kommentarfeltet:** sett `DEBATT = "https://debatt.<tailnet>.ts.net/"` i `tingposten/config.py`, og bygg og publiser siden. `bygg` skriver da også `data/debatt/saker.json`, som serveren leser når filen endres.
 
 ## Daglig
 

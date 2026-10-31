@@ -105,13 +105,29 @@ def test_ip_limit_counts_only_writes():
     assert teller.for_mange("5.6.7.8") is False
 
 
+def test_ip_counter_is_bounded():
+    teller = srv.IpTeller(grense=1, vindu_s=60, maks=3)
+    for ip in ("a", "b", "c", "d"):
+        teller.for_mange(ip)
+    assert list(teller._tider) == ["b", "c", "d"]  # the least recently seen went first
+
+
+def test_login_mail_has_its_own_tighter_ip_limit(klient):
+    koder = [klient.post("/api/innlogging", json={"epost": f"l{i}@b.no"}).status_code for i in range(7)]
+    assert koder[: srv.IP_GRENSE_LENKER] == [200] * srv.IP_GRENSE_LENKER and koder[-1] == 429
+
+
 def test_forwarded_address_is_trusted_only_from_loopback():
     class R:
         def __init__(self, peer, fwd):
             self.client = type("C", (), {"host": peer})()
             self.headers = {"x-forwarded-for": fwd} if fwd else {}
-    assert srv._ip(R("127.0.0.1", "9.9.9.9, 127.0.0.1")) == "9.9.9.9"
+    # The proxy appends the real address last; anything before it came from the client.
+    assert srv._ip(R("127.0.0.1", "6.6.6.6, 9.9.9.9")) == "9.9.9.9"
     assert srv._ip(R("10.0.0.5", "9.9.9.9")) == "10.0.0.5"
+    assert srv._ip(R("127.0.0.1", "2001:db8:1:2:aaaa::1")) == srv._ip(R("127.0.0.1", "2001:db8:1:2:bbbb::9")) \
+        == "2001:db8:1:2::/64"
+    assert srv._ip(R("::ffff:9.9.9.9", None)) == "9.9.9.9"
 
 
 def test_sak_index_is_reread_when_the_build_changes_it(tmp_path):

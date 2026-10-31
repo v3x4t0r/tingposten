@@ -115,7 +115,7 @@ def test_unsure_moderator_sends_the_comment_to_the_editor(tmp_path):
     ola, _ = logg_inn(svc)
     k = svc.ny_kommentar(ola, SAK, "Hmm.")
     assert k["status"] == "til_redaktor" and [r["id"] for r in svc.redaktor_ko()] == [k["id"]]
-    svc.redaktor_avgjor(k["id"], "publiser")
+    svc.redaktor_avgjor(k["id"], "publiser", tekst="Hmm.")
     assert svc.trad(SAK, None)["antall"] == 1 and svc.redaktor_ko() == []
     logg = svc.db.les("SELECT hvem, utfall FROM vurderinger WHERE kommentar = ? ORDER BY id", k["id"])
     assert [(r["hvem"], r["utfall"]) for r in logg] == [("test", "redaktor"), ("redaktør", "publiser")]
@@ -267,3 +267,177 @@ def test_text_cleaning(tekst, feil):
     else:
         assert tj.rens_tekst(tekst) == "Heidu"
     assert tj.rens_tekst("a\r\n\n\n\n\nb") == "a\n\nb"
+
+
+# --- regressions from the review of 31.10 -------------------------------------------------
+
+def test_editor_never_publishes_a_text_changed_since_they_saw_it(tmp_path, monkeypatch):
+    monkeypatch.setattr(tj, "KOMMENTAR_PAUSE_S", 0)
+    svc = lag(tmp_path, Alltid({"idiot": "personangrep", "hmm": "ok"}, p=0.5))
+    ola, _ = logg_inn(svc)
+    k = svc.ny_kommentar(ola, SAK, "Hmm, tja.")
+    assert k["status"] == "til_redaktor"
+    svc.moderator.ledd[0].p = 0.95
+    assert svc.endre(ola, k["id"], "Du er en idiot")["status"] == "avvist"
+    with pytest.raises(tj.Feil) as e:
+        svc.redaktor_avgjor(k["id"], "publiser", tekst="Hmm, tja.")  # what the editor read
+    assert e.value.kode == 409 and svc.trad(SAK, None)["antall"] == 0
+    svc.slett(ola, k["id"])
+    with pytest.raises(tj.Feil):
+        svc.redaktor_avgjor(k["id"], "publiser", tekst="")
+
+
+def test_a_broken_backend_never_publishes(tmp_path):
+    class Krasj(m.Moderator):
+        name = "krasj"
+
+        def _vurder(self, tekst, sak, forelder):
+            raise AttributeError("'list' object has no attribute 'get'")
+    svc = lag(tmp_path, Krasj())
+    svc.sett_navn = lambda b, navn: None
+    b, _ = logg_inn(svc, navn=None)
+    with svc.db.tx() as c:
+        c.execute("UPDATE brukere SET navn = 'Ola'")
+    k = svc.ny_kommentar(svc.bruker(svc.bekreft(_ny_token(svc, "ola@example.no"))["okt"]), SAK, "Hei hei")
+    assert k["status"] == "til_redaktor"
+
+
+def test_edits_are_limited(t, monkeypatch):
+    ola, _ = logg_inn(t)
+    k = t.ny_kommentar(ola, SAK, "Første versjon")
+    with pytest.raises(tj.Feil) as e:
+        t.endre(ola, k["id"], "Rett etterpå")
+    assert e.value.kode == 429
+    monkeypatch.setattr(tj, "KOMMENTAR_PAUSE_S", 0)
+    for i in range(tj.MAKS_ENDRINGER):
+        t.endre(ola, k["id"], f"Versjon {i}")
+    with pytest.raises(tj.Feil):
+        t.endre(ola, k["id"], "En for mye")
+    assert len(t.moderator.ledd[0].sett) == 1 + 1 + tj.MAKS_ENDRINGER  # name + comment + edits
+
+
+def test_name_attempts_are_limited(t):
+    b, _ = logg_inn(t, navn=None)
+    for i in range(tj.NAVNEFORSOK_PER_TIME):
+        t.sett_navn(b, f"Navn {i}")
+    with pytest.raises(tj.Feil) as e:
+        t.sett_navn(b, "Ett til")
+    assert e.value.kode == 429
+
+
+def test_published_replies_stay_visible_when_the_parent_is_edited_into_hiding(t, monkeypatch):
+    monkeypatch.setattr(tj, "KOMMENTAR_PAUSE_S", 0)
+    ola, _ = logg_inn(t)
+    kari, _ = logg_inn(t, "kari@b.no", "Kari")
+    rot = t.ny_kommentar(ola, SAK, "Et standpunkt")
+    svar = t.ny_kommentar(kari, SAK, "Et motsvar", forelder=rot["id"])
+    t.endre(ola, rot["id"], "Kari er en idiot")  # stopped
+    for hvem in (None, kari):
+        tre = t.trad(SAK, hvem)["kommentarer"]
+        assert tre[0]["status"] == "skjult" and tre[0]["tekst"] == "" and tre[0]["navn"] == ""
+        assert tre[0]["svar"][0]["id"] == svar["id"]
+    assert t.trad(SAK, ola)["kommentarer"][0]["tekst"] == "Kari er en idiot"  # the author sees their own
+
+
+def test_login_mail_limit_holds_under_parallel_requests_and_plus_tags(t):
+    import concurrent.futures
+    with concurrent.futures.ThreadPoolExecutor(10) as pool:
+        resultater = list(pool.map(lambda i: _prov(t, f"offer+{i}@b.no"), range(20)))
+    assert resultater.count("sendt") == tj.LENKER_PER_TIME and len(t.sendt) == tj.LENKER_PER_TIME
+
+
+def _prov(t, epost):
+    try:
+        t.be_om_lenke(epost)
+        return "sendt"
+    except tj.Feil as e:
+        return e.kode
+
+
+def test_global_login_mail_cap(t, monkeypatch):
+    monkeypatch.setattr(tj, "LENKER_PER_TIME_TOTALT", 2)
+    t.be_om_lenke("a@b.no")
+    t.be_om_lenke("c@d.no")
+    with pytest.raises(tj.Feil) as e:
+        t.be_om_lenke("e@f.no")
+    assert e.value.kode == 503
+
+
+def test_deleting_the_account_removes_login_links_and_moderator_notes(t):
+    ola, _ = logg_inn(t)
+    t.ny_kommentar(ola, SAK, "Ola skriver")
+    t.be_om_lenke("ola@example.no")  # an unused link
+    ubrukt = t.sendt[-1][1].split("#t=")[1]
+    assert t.db.eksport(ola.id)["innloggingslenker"] and t.db.eksport(ola.id)["vurderinger"]
+    t.db.slett_bruker(ola.id)
+    assert t.db.en("SELECT COUNT(*) AS n FROM innlogging WHERE epost = 'ola@example.no'")["n"] == 0
+    assert all(r["data"] == "{}" for r in t.db.les("SELECT data FROM vurderinger"))
+    with pytest.raises(tj.Feil):
+        t.bekreft(ubrukt)  # no account comes back from an old link
+
+
+def test_display_names_never_go_to_external_moderators(tmp_path):
+    class Ute(Alltid):
+        lokal = False
+    ute = Ute()
+    svc = lag(tmp_path, ute)
+    b, _ = logg_inn(svc, navn=None)
+    assert svc.sett_navn(b, "Ola") == "Ola" and ute.sett == []
+
+
+def test_blocking_removes_what_the_author_has_waiting(t, monkeypatch):
+    monkeypatch.setattr(tj, "KOMMENTAR_PAUSE_S", 0)
+    ola, _ = logg_inn(t)
+    synlig = t.ny_kommentar(ola, SAK, "Publisert")
+    t.umiddelbar = False
+    venter = t.ny_kommentar(ola, SAK, "Venter i køen")
+    t.sperr(synlig["id"])
+    t.moderer(venter["id"])
+    assert t.db.en("SELECT status FROM kommentarer WHERE id = ?", venter["id"])["status"] == "fjernet"
+    t.db.slett_bruker(ola.id)
+    t.sperr(synlig["id"])  # account gone: nothing to block, no error
+
+
+@pytest.mark.parametrize("navn", ["Redaktør Midttun", "Bergen kommune.", "Byrådet i Bergen", "Тingposten",
+                                  "TING-posten", "Ｔｉｎｇｐｏｓｔｅｎ", "Henrik Midttun", "RO-Studio AS"])
+def test_impersonating_names_are_refused(t, navn, monkeypatch):
+    from tingposten import config
+    monkeypatch.setattr(config, "ANSVARLIG_REDAKTOR", "Henrik Midttun")
+    svc = tj.Tjeneste(t.db, t.moderator, SAKER, t.send_lenke, "https://tingposten.no/")
+    b, _ = logg_inn(t, navn=None)
+    with pytest.raises(tj.Feil):
+        svc.sett_navn(b, navn)
+
+
+def test_names_are_unique_after_folding(t):
+    a, _ = logg_inn(t, navn="Kari Nordmann")
+    b, _ = logg_inn(t, "b@b.no", navn=None)
+    with pytest.raises(tj.Feil) as e:
+        t.sett_navn(b, "kari  NORDMANN")
+    assert e.value.kode == 409
+
+
+def test_threads_have_a_maximum_depth(t, monkeypatch):
+    monkeypatch.setattr(tj, "KOMMENTAR_PAUSE_S", 0)
+    monkeypatch.setattr(tj, "KOMMENTARER_PER_DOGN", 100)
+    monkeypatch.setattr(tj, "NYE_KONTO_PER_DOGN", 100)
+    ola, _ = logg_inn(t)
+    forelder = None
+    for i in range(tj.MAKS_DYBDE):
+        forelder = t.ny_kommentar(ola, SAK, f"Nivå {i}", forelder=forelder)["id"]
+    with pytest.raises(tj.Feil):
+        t.ny_kommentar(ola, SAK, "For dypt", forelder=forelder)
+    assert t.trad(SAK, None)["antall"] == tj.MAKS_DYBDE
+
+
+def test_editor_queue_keeps_the_models_verdict_and_report_reasons(t, monkeypatch):
+    monkeypatch.setattr(tj, "KOMMENTAR_PAUSE_S", 0)
+    ola, _ = logg_inn(t)
+    kari, _ = logg_inn(t, "kari@b.no", "Kari")
+    stopp = t.ny_kommentar(ola, SAK, "Kari er en idiot")
+    t.be_om_manuell(ola, stopp["id"])
+    k = t.ny_kommentar(ola, SAK, "Noe å rapportere")
+    t.rapporter(kari, k["id"], "Usant om meg")
+    ko = {r["id"]: r for r in t.redaktor_ko()}
+    assert ko[stopp["id"]]["ba_om_vurdering"] and '"personangrep"' in ko[stopp["id"]]["vurdering"]
+    assert ko[k["id"]]["grunner"] == ["Usant om meg"]

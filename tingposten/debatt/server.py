@@ -23,11 +23,12 @@ Request bodies are capped; every error a reader can fix comes back as
   POST   /api/kommentar/{id}/manuell  ask the editor to look at a stopped comment
 """
 
+import ipaddress
 import json
 import logging
 import os
 import time
-from collections import defaultdict, deque
+from collections import OrderedDict, deque
 from contextlib import asynccontextmanager
 
 from starlette.applications import Starlette
@@ -45,37 +46,51 @@ log = logging.getLogger(__name__)
 
 MAKS_KROPP = 8_000  # bytes; a comment is at most 3000 characters
 IP_GRENSE = 60      # requests that write, per IP and 10 minutes (memory only, never stored)
+IP_GRENSE_LENKER = 5  # login e-mails asked for, per IP and 10 minutes
 
 
 class IpTeller:
-    """Write requests per IP over a sliding window, kept in memory only."""
+    """Requests per address over a sliding window, kept in memory only, for at most
+    `maks` addresses (the least recently seen are forgotten first)."""
 
-    def __init__(self, grense: int = IP_GRENSE, vindu_s: int = 600):
-        self.grense, self.vindu = grense, vindu_s
-        self._tider: dict[str, deque] = defaultdict(deque)
+    def __init__(self, grense: int = IP_GRENSE, vindu_s: int = 600, maks: int = 10_000):
+        self.grense, self.vindu, self.maks = grense, vindu_s, maks
+        self._tider: OrderedDict[str, deque] = OrderedDict()
 
     def for_mange(self, ip: str) -> bool:
         na = time.monotonic()
-        q = self._tider[ip]
+        q = self._tider.pop(ip, None) or deque()
         while q and q[0] < na - self.vindu:
             q.popleft()
         q.append(na)
-        if len(self._tider) > 10_000:  # forget idle addresses
-            for k in [k for k, v in self._tider.items() if not v or v[-1] < na - self.vindu]:
-                del self._tider[k]
+        self._tider[ip] = q  # now the most recent
+        while len(self._tider) > self.maks:
+            self._tider.popitem(last=False)
         return len(q) > self.grense
 
 
 def _ip(request: Request) -> str:
-    """Behind Funnel the peer is tailscaled on loopback; then the first forwarded address counts."""
+    """The reader's address, as one key for the limits. Behind Funnel the peer is
+    tailscaled on loopback, which appends the real address last to X-Forwarded-For
+    (earlier values come from the client and can't be trusted). IPv6 addresses
+    count per /64, since one connection usually has a whole /64 to pick from."""
     peer = request.client.host if request.client else ""
     if peer in ("127.0.0.1", "::1") and (fwd := request.headers.get("x-forwarded-for")):
-        return fwd.split(",")[0].strip()
-    return peer
+        peer = fwd.split(",")[-1].strip()
+    try:
+        adr = ipaddress.ip_address(peer)
+    except ValueError:
+        return peer
+    if adr.version == 6:
+        if adr.ipv4_mapped:
+            return str(adr.ipv4_mapped)
+        return str(ipaddress.ip_network(f"{adr}/64", strict=False))
+    return str(adr)
 
 
 def lag_app(tjeneste: Tjeneste, opprinnelser: list[str], start_ko: bool = True) -> Starlette:
     teller = IpTeller(IP_GRENSE)
+    lenketeller = IpTeller(IP_GRENSE_LENKER)
 
     async def kropp(request: Request) -> dict:
         if int(request.headers.get("content-length") or 0) > MAKS_KROPP:
@@ -126,6 +141,8 @@ def lag_app(tjeneste: Tjeneste, opprinnelser: list[str], start_ko: bool = True) 
             raise Feil(404, "Fant ikke kommentaren.") from None
 
     async def be_om_lenke(request):
+        if lenketeller.for_mange(_ip(request)):
+            raise Feil(429, "Du har bedt om mange lenker. Vent litt.")
         body = await kropp(request)
         await _i_traad(tjeneste.be_om_lenke, body.get("epost"), body.get("tilbake"))
         return svar({"sendt": True})

@@ -404,8 +404,8 @@ function tegnDebatt(d) {
   const liste = $("debatt-ko");
   liste.replaceChildren();
   for (const k of d.ko) {
-    const grunn = k.status === "til_redaktor" ? "Modellen var usikker, eller forfatteren ba om vurdering"
-                                              : antall(k.rapporter, "rapport", "rapporter") + " fra lesere";
+    const grunn = k.status !== "til_redaktor" ? antall(k.rapporter, "rapport", "rapporter") + " fra lesere"
+                : k.ba_om_vurdering ? "Stoppet av modellen; forfatteren ba deg se på den" : "Modellen var usikker";
     const modell = k.vurderinger.map(v => `${v.modell}: ${REGELNAVN[v.regel] || v.regel}` +
       (v.sikkerhet != null ? ` ${Math.round(v.sikkerhet * 100)} %` : "") + (v.begrunnelse ? ` – ${v.begrunnelse}` : ""))
       .concat(k.feil).join(" · ");
@@ -413,7 +413,7 @@ function tegnDebatt(d) {
     const forslag = (k.vurderinger.at(-1) || {}).regel;
     const knapp = (tekst, handling, klasse) => {
       const b = el("button", {type: "button", class: klasse}, tekst);
-      b.addEventListener("click", () => avgjor(k.id, handling, forslag && forslag !== "ok" ? forslag : null));
+      b.addEventListener("click", () => avgjor(k.id, handling, forslag && forslag !== "ok" ? forslag : null, k.tekst));
       return b;
     };
     knapper.append(knapp("Publiser", "publiser", "liten"), knapp("Fjern", "fjern", "liten"),
@@ -423,14 +423,15 @@ function tegnDebatt(d) {
          el("a", {href: k.lenke}, "saken")),
       el("p", {class: "tekst"}, k.tekst),
       modell ? el("p", {class: "modell"}, modell) : null,
+      k.grunner.length ? el("p", {class: "modell"}, "Lesernes grunner: " + k.grunner.join(" · ")) : null,
       knapper));
   }
 }
-async function avgjor(id, handling, regel) {
+async function avgjor(id, handling, regel, tekst) {
   const m = $("debatt-melding");
   try {
     const r = await fetch("/debatt", {method: "POST", headers: {"Content-Type": "application/json", "X-Tingposten": "admin"},
-      body: JSON.stringify({id, handling, regel})});
+      body: JSON.stringify({id, handling, regel, tekst})});
     const svar = await r.json().catch(() => ({}));
     m.textContent = svar.melding || `Feil (HTTP ${r.status})`;
     m.classList.toggle("feil", !r.ok);

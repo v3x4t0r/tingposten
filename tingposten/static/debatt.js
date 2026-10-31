@@ -210,8 +210,9 @@
   Debatt.prototype.kommentar = function (k, dybde) {
     var self = this;
     var li = el("li", { klasse: "debatt-k" + (k.egen ? " egen" : ""), id: "k" + k.id });
-    if (k.status === "slettet" || k.status === "fjernet") {
-      li.append(el("p", { klasse: "debatt-borte", tekst: k.status === "slettet" ? "Slettet av forfatteren." : "Fjernet av redaksjonen." }));
+    if (k.status === "slettet" || k.status === "fjernet" || k.status === "skjult") {
+      li.append(el("p", { klasse: "debatt-borte", tekst: k.status === "slettet" ? "Slettet av forfatteren."
+        : k.status === "fjernet" ? "Fjernet av redaksjonen." : "Kommentaren er ikke synlig akkurat nå." }));
     } else {
       li.append(el("p", { klasse: "debatt-hvem" }, [
         el("strong", { tekst: k.navn }), document.createTextNode(" · "),

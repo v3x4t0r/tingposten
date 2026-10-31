@@ -17,7 +17,8 @@ Four backends, compared with `tingposten debatt-test` before the owner picks:
           ANTHROPIC_API_KEY: that one would make `claude -p` bill the API).
 
 Only the comment, the comment it answers and the sak's title and ingress are sent
-to a backend: never the reader's e-mail, display name or address.
+to a backend: never the reader's e-mail, display name or address. Display names
+are checked only by the local backends (Kjede.lokal()).
 """
 
 import json
@@ -98,6 +99,7 @@ def avgjor(v: Vurdering, terskel: float, stol_pa_etikett: bool = False) -> str:
 class Moderator:
     name = "?"
     stol_pa_etikett = False
+    lokal = True  # runs on Tingposten's own machine; False = the text leaves the house
 
     def vurder(self, tekst: str, sak: Sak, forelder: str | None = None) -> Vurdering:
         if len(tekst) > MAKS_TEGN:
@@ -123,6 +125,11 @@ class Kjede:
     def name(self) -> str:
         return " → ".join(m.name for m in self.ledd)
 
+    def lokal(self) -> "Kjede | None":
+        """The same chain with only the backends that run at home (for display names)."""
+        ledd = [m for m in self.ledd if m.lokal]
+        return Kjede(ledd, self.terskel) if ledd else None
+
     def avgjor(self, tekst: str, sak: Sak, forelder: str | None = None) -> Avgjorelse:
         svar = Avgjorelse("redaktor", None)
         for m in self.ledd:
@@ -131,6 +138,10 @@ class Kjede:
             except ModereringFeil as e:
                 log.warning("%s could not judge a comment on %s: %s", m.name, sak.key, e)
                 svar.feil.append(f"{m.name}: {e}")
+                continue
+            except Exception as e:  # a bug or a surprise in one backend: the next one (or the editor) decides
+                log.exception("%s failed on a comment on %s", m.name, sak.key)
+                svar.feil.append(f"{m.name}: {type(e).__name__}")
                 continue
             svar.vurderinger.append(v)
             utfall = avgjor(v, self.terskel, m.stol_pa_etikett)
@@ -226,23 +237,25 @@ class LlamaCpp(Moderator):
 
 
 def _fra_logprobs(topp: list[dict]) -> tuple[str, dict[str, float]]:
-    """(rule, probability per rule) from the top log-probabilities of one token."""
-    beste: dict[str, float] = {}
+    """(rule, probability per rule) from the top log-probabilities of one token. The
+    probabilities are absolute, not renormalised over the letters: when the model
+    mostly wanted to say something else, no rule gets near the threshold and the
+    comment waits for the editor. " A" and "A" count as the same letter."""
+    sann = {k: 0.0 for k in REGLER}
     for t in topp:
         bokstav = (t.get("token") or "").strip()
-        if bokstav in BOKSTAVER and bokstav not in beste:
-            beste[bokstav] = t["logprob"]
-    if not beste:
+        if bokstav in BOKSTAVER:
+            sann[BOKSTAVER[bokstav]] += math.exp(t["logprob"])
+    if not any(sann.values()):
         raise ModereringFeil("no rule letter among the top tokens")
-    hoyest = max(beste.values())
-    vekt = {BOKSTAVER[b]: math.exp(lp - hoyest) for b, lp in beste.items()}
-    total = sum(vekt.values())
-    sann = {k: round(vekt.get(k, 0.0) / total, 4) for k in REGLER}
+    sann = {k: round(min(v, 1.0), 4) for k, v in sann.items()}
     return max(sann, key=sann.get), sann
 
 
 class Jev(Moderator):
     """TypeSafe's System One API: the rules as one choice question, the comment as state."""
+
+    lokal = False
 
     def __init__(self, url: str, modell: str, nokkel: str | None, session=None):
         self.url, self.modell, self.nokkel = url, modell, nokkel
@@ -288,6 +301,8 @@ class Claude(Moderator):
     fallbacks are on: if the model declines, the API re-runs the request on a
     fallback model; a decline that stays a decline sends the comment to the editor."""
 
+    lokal = False
+
     def __init__(self, modell: str, nokkel: str | None, effort: str = "low", klient=None):
         self.modell, self.nokkel, self.effort = modell, nokkel, effort
         self.name = f"claude:{modell}"
@@ -325,12 +340,15 @@ class Claude(Moderator):
             data = json.loads(next(b.text for b in svar.content if b.type == "text"))
         except (StopIteration, ValueError):
             raise ModereringFeil("claude gave no JSON") from None
+        # Anything but a known rule and certainty fails closed: the next backend or the editor decides.
+        if not isinstance(data, dict) or data.get("regel") not in REGLER or data.get("sikkerhet") not in _SIKKERHET:
+            raise ModereringFeil("claude's answer does not follow the schema")
         inn, ut = CLAUDE_PRIS.get(self.modell, (0.0, 0.0))
         kostnad = (svar.usage.input_tokens * inn + svar.usage.output_tokens * ut) / 1e6
-        regel = data["regel"] if data.get("regel") in REGLER else "ok"
-        p = _SIKKERHET.get(data.get("sikkerhet"), 0.5)
+        regel = data["regel"]
+        p = _SIKKERHET[data["sikkerhet"]]
         sann = {k: (p if k == regel else round((1 - p) / (len(REGLER) - 1), 4)) for k in REGLER}
-        return Vurdering(regel, sann, f"claude:{svar.model}", 0, begrunnelse=data.get("begrunnelse", "")[:300],
+        return Vurdering(regel, sann, f"claude:{svar.model}", 0, begrunnelse=str(data.get("begrunnelse", ""))[:300],
                          kostnad_usd=round(kostnad, 6))
 
 

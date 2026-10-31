@@ -457,11 +457,13 @@ class DebattKo:
         if t is None or type(kid) is not int or handling not in self.HANDLINGER or (regel and regel not in REGLER):
             return 400, {"melding": "Ugyldig."}
         try:
-            if handling == "sperr":
-                t.sperr(kid)
-                t.redaktor_avgjor(kid, "fjern", regel or None)
+            if handling == "publiser":
+                # Only the text the panel showed: an edit since then gives 409, never a blind publish.
+                t.redaktor_avgjor(kid, "publiser", tekst=body.get("tekst"))
             else:
-                t.redaktor_avgjor(kid, handling, regel or None)
+                t.redaktor_avgjor(kid, "fjern", regel or None)
+                if handling == "sperr":
+                    t.sperr(kid)
         except Feil as e:
             return e.kode, {"melding": e.melding}
         return 200, {"melding": {"publiser": "Publisert.", "fjern": "Fjernet.", "sperr": "Fjernet, og forfatteren er sperret."}[handling]}
