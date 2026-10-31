@@ -147,8 +147,8 @@ def lag_app(tjeneste: Tjeneste, opprinnelser: list[str], start_ko: bool = True) 
         if lenketeller.for_mange(_ip(request)):
             raise Feil(429, "Du har bedt om mange lenker. Vent litt.")
         body = await kropp(request)
-        await _i_traad(tjeneste.be_om_lenke, body.get("epost"), body.get("tilbake"))
-        return svar({"sendt": True})
+        lenke = await _i_traad(tjeneste.be_om_lenke, body.get("epost"), body.get("tilbake"))
+        return svar({"sendt": True, **({"lenke": lenke} if lenke else {})})
 
     async def bekreft(request):
         return svar(tjeneste.bekreft((await kropp(request)).get("token")))

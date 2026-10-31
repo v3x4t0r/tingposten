@@ -117,13 +117,16 @@ class Bruker:
 
 class Tjeneste:
     def __init__(self, db: Db, moderator: Kjede, saker: dict[str, dict], send_lenke, site_url: str,
-                 umiddelbar_moderering: bool = False):
+                 umiddelbar_moderering: bool = False, vis_lenke: bool = False):
         """`saker`: key → {"tittel", "ingress", "lenke"} (written by bygg). `send_lenke(epost, lenke)`
         sends the login e-mail. With `umiddelbar_moderering` comments are judged inside the
         call (tests); otherwise one background thread works through the queue."""
         self.db, self.moderator, self.saker = db, moderator, saker
         self.send_lenke, self.site_url = send_lenke, site_url.rstrip("/") + "/"
         self.umiddelbar = umiddelbar_moderering
+        # Only `tingposten debatt-lokal`: the login link comes back to the page instead of
+        # by e-mail. Never on a real server: anyone could log in as any address.
+        self.vis_lenke = vis_lenke
         self._ko: queue.Queue[int] = queue.Queue()
         self._i_ko: set[int] = set()
         self._ko_lås = threading.Lock()
@@ -136,8 +139,9 @@ class Tjeneste:
 
     # --- login -----------------------------------------------------------------
 
-    def be_om_lenke(self, epost, tilbake=None) -> None:
-        """Send a login link. Says nothing about whether the address has an account."""
+    def be_om_lenke(self, epost, tilbake=None) -> str | None:
+        """Send a login link. Says nothing about whether the address has an account.
+        Returns the link only in local test mode (vis_lenke)."""
         epost = (epost or "").strip().lower() if isinstance(epost, str) else ""
         if not _EPOST.match(epost) or len(epost) > 254:
             raise Feil(400, "Skriv en gyldig e-postadresse.")
@@ -156,11 +160,13 @@ class Tjeneste:
             c.execute("INSERT INTO innlogging (hash, epost, epost_nokkel, tilbake, opprettet, utloper) "
                       "VALUES (?, ?, ?, ?, ?, ?)",
                       (_hash(token), epost, nokkel, tilbake, iso(na()), iso(na() + LENKE_GYLDIG)))
+        lenke = f"{self.site_url}bergen/logg-inn/#t={token}"
         try:
-            self.send_lenke(epost, f"{self.site_url}bergen/logg-inn/#t={token}")
+            self.send_lenke(epost, lenke)
         except Exception:
             log.exception("could not send a login e-mail")
             raise Feil(503, "Vi fikk ikke sendt e-posten akkurat nå. Prøv igjen litt senere.") from None
+        return lenke if self.vis_lenke else None
 
     def bekreft(self, token) -> dict:
         """A login link's token → a session token (kept by the reader's browser)."""

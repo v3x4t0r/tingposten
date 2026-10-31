@@ -43,12 +43,13 @@ def kjor(port_side: int = 8091, port_api: int = 8790, moderator: tuple[str, ...]
         print(f"\n  Innloggingslenke for {epost}:\n  {lenke}\n", flush=True)
 
     kjede = moderering.kjede(moderator)
-    tjeneste = Tjeneste(Db(mappe / "debatt.db"), kjede, server.Saker(mappe / "saker.json"), send_lenke, side_url)
+    tjeneste = Tjeneste(Db(mappe / "debatt.db"), kjede, server.Saker(mappe / "saker.json"), send_lenke, side_url,
+                        vis_lenke=True)
     app = server.lag_app(tjeneste, [side_url.rstrip("/")])
     print(f"""
   Tingposten med kommentarer, lokalt:  {side_url}bergen/
   Moderator: {kjede.name}
-  Redaktørkøen:  DEBATT_DIR={mappe} uv run --extra debatt tingposten admin   (i en annen terminal)
+  Innloggingslenken vises på siden (bare i denne lokale testen) og her.
   Ctrl+C for å stoppe.
 """, flush=True)
     try:

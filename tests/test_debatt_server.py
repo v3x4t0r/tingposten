@@ -169,3 +169,20 @@ def test_quiz_over_http(klient):
     r = klient.post("/api/quiz", json={"svar": alle_lov}, headers=h).json()
     assert r["bestatt"] is False and len(r["svar"]) == 5
     assert klient.post("/api/quiz", json={"svar": alle_lov}).status_code == 401
+
+
+def test_login_link_comes_back_only_in_local_test_mode(klient, tmp_path):
+    assert "lenke" not in klient.post("/api/innlogging", json={"epost": "a@b.no"}).json()
+    t = tj.Tjeneste(Db(tmp_path / "l.db"), m.Kjede([Ok()], m.Grenser.jevn(0.85)), {SAK: {"tittel": "B"}},
+                    lambda e, lenke: None, SIDE + "/", vis_lenke=True)
+    with TestClient(srv.lag_app(t, [SIDE], start_ko=False)) as c:
+        assert c.post("/api/innlogging", json={"epost": "a@b.no"}).json()["lenke"].startswith(SIDE + "/bergen/logg-inn/#t=")
+
+
+def test_the_real_server_never_shows_login_links(monkeypatch, tmp_path):
+    from tingposten import config
+    monkeypatch.setattr(config, "DEBATT_DIR", tmp_path)
+    monkeypatch.setenv("DEBATT_EPOST", "konsoll")
+    app = srv.app_fra_config()
+    with TestClient(app) as c:
+        assert "lenke" not in c.post("/api/innlogging", json={"epost": "a@b.no"}).json()

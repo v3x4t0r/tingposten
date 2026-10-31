@@ -112,7 +112,14 @@
         var knapp = skjema.querySelector("button");
         knapp.disabled = true;
         api(self.api, "POST", "/api/innlogging", { epost: epost.value, tilbake: self.side })
-          .then(function () { skjema.replaceChildren(el("p", { tekst: "Sjekk e-posten din. Lenken virker i 15 minutter, én gang." })); })
+          .then(function (svar) {
+            skjema.replaceChildren(el("p", { tekst: "Sjekk e-posten din. Lenken virker i 15 minutter, én gang." }));
+            // Local test server only (tingposten debatt-lokal): the link comes back here instead of by e-mail.
+            if (svar.lenke && svar.lenke.indexOf(location.origin + "/") === 0) {
+              skjema.append(el("p", {}, [document.createTextNode("Lokal test: "),
+                el("a", { href: svar.lenke, tekst: "logg inn nå" })]));
+            }
+          })
           .catch(function (f) { knapp.disabled = false; self.si(f.message, true); });
       } }, [
         el("label", { for: "debatt-epost", tekst: "Logg inn for å skrive. Skriv e-postadressen din, så får du en innloggingslenke:" }),
