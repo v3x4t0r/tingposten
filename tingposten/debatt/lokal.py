@@ -63,6 +63,13 @@ def kjor(port_side: int = 8091, port_api: int = 8790, moderator: tuple[str, ...]
                               debatt=admin.DebattKo(mappe / "debatt.db"))
     threading.Thread(target=panel.serve_forever, name="panel", daemon=True).start()
 
+    # Testing means writing a lot from one new account: the spam limits are for the real site.
+    from . import tjeneste as tjeneste_modul
+
+    tjeneste_modul.NYE_KONTO_PER_DOGN = tjeneste_modul.KOMMENTARER_PER_DOGN = 1000
+    tjeneste_modul.KOMMENTAR_PAUSE_S = 2
+    tjeneste_modul.NAVNEFORSOK_PER_TIME = 100
+
     kjede = moderering.kjede(moderator)
     tjeneste = Tjeneste(Db(mappe / "debatt.db"), kjede, server.Saker(mappe / "saker.json"), send_lenke, side_url,
                         vis_lenke=True)
@@ -71,7 +78,7 @@ def kjor(port_side: int = 8091, port_api: int = 8790, moderator: tuple[str, ...]
   Tingposten med kommentarer, lokalt:  {side_url}bergen/
   Moderator: {kjede.name}
   Redaktørkøen (kontrollpanelet, knappene for kjøring er av):  http://127.0.0.1:{port_panel}/
-  Innloggingslenken vises på siden (bare i denne lokale testen) og her.
+  Innloggingslenken vises på siden og her, og grensene mot spam er slått av (bare i denne lokale testen).
   Ctrl+C for å stoppe.
 """, flush=True)
     try:
