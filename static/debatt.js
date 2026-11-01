@@ -1,14 +1,33 @@
-/* Tingposten debatt: the comment section on a sak page and the login page.
+/* Tingposten debatt: the comment section (sak and debattinnlegg pages), the account box
+   and "Mest kommentert" on the Debatt page, the "Logg inn" link in the masthead, and the
+   login page.
    Talks to the comment server (data-api); the session is a bearer token kept in
    this site's localStorage, never a cookie. Reader text is only ever set with
    textContent: nothing a reader writes becomes HTML. */
 (function () {
   "use strict";
   var NOKKEL = "tingposten-debatt-okt";
+  var NAVN = "tingposten-debatt-navn";   // only for the masthead link, so other pages need no request
   var MAKS = 3000;
 
   function hentOkt() { try { return localStorage.getItem(NOKKEL); } catch (e) { return null; } }
-  function lagreOkt(o) { try { if (o) localStorage.setItem(NOKKEL, o); else localStorage.removeItem(NOKKEL); } catch (e) {} }
+  function lagreOkt(o) {
+    try { if (o) localStorage.setItem(NOKKEL, o); else { localStorage.removeItem(NOKKEL); localStorage.removeItem(NAVN); } } catch (e) {}
+    if (!o) visKonto();
+  }
+
+  /* The masthead's "Logg inn" link: the display name once logged in, from this browser alone. */
+  function visKonto(meg) {
+    if (meg !== undefined) {
+      try { if (meg && meg.navn) localStorage.setItem(NAVN, meg.navn); else localStorage.removeItem(NAVN); } catch (e) {}
+    }
+    var navn = null, okt = hentOkt();
+    try { navn = localStorage.getItem(NAVN); } catch (e) {}
+    document.querySelectorAll("[data-konto-lenke]").forEach(function (a) {
+      a.textContent = okt ? (navn || "Min konto") : "Logg inn";
+      a.classList.toggle("innlogget", !!okt);
+    });
+  }
 
   function el(tag, attrs, barn) {
     var e = document.createElement(tag);
@@ -73,11 +92,15 @@
   Debatt.prototype.start = function () {
     var self = this;
     var meg = hentOkt() ? api(this.api, "GET", "/api/meg").catch(function () { return null; }) : Promise.resolve(null);
-    meg.then(function (m) { self.meg = m; return self.last(); });
+    meg.then(function (m) { self.meg = m; visKonto(m); return self.last(); });
   };
 
   Debatt.prototype.last = function () {
     var self = this;
+    if (!this.sak) {  // the account box on the Debatt page: no comments to load
+      this.innhold.replaceChildren(this.konto(), this.melding);
+      return Promise.resolve();
+    }
     return api(this.api, "GET", "/api/sak/" + this.sak + "/kommentarer?sortering=" + this.sortering)
       .then(function (data) { self.tegn(data); })
       .catch(function () {
@@ -122,7 +145,8 @@
           })
           .catch(function (f) { knapp.disabled = false; self.si(f.message, true); });
       } }, [
-        el("label", { for: "debatt-epost", tekst: "Logg inn for å skrive. Skriv e-postadressen din, så får du en innloggingslenke:" }),
+        el("label", { for: "debatt-epost", tekst: (this.sak ? "Logg inn for å skrive. " : "Logg inn for å kommentere sakene. ")
+          + "Skriv e-postadressen din, så får du en innloggingslenke:" }),
         el("div", { klasse: "debatt-rad" }, [epost, el("button", { type: "submit", tekst: "Send lenke" })]),
         el("p", { klasse: "smaatekst" }, [document.createTextNode("Ingen passord. Les "),
           el("a", { href: this.regler, tekst: "debattreglene" }), document.createTextNode(" og hva vi lagrer.")]),
@@ -137,7 +161,7 @@
         knapp.disabled = true;
         self.si("Sjekker navnet mot debattreglene …");
         api(self.api, "POST", "/api/meg", { navn: navn.value })
-          .then(function (m) { self.meg.navn = m.navn; self.si(""); self.last(); })
+          .then(function (m) { self.meg.navn = m.navn; visKonto(self.meg); self.si(""); self.last(); })
           .catch(function (f) { knapp.disabled = false; self.si(f.message, true); });
       } }, [
         el("label", { for: "debatt-navn", tekst: "Velg navnet som vises over kommentarene dine (det kan være et kallenavn):" }),
@@ -147,9 +171,10 @@
     }
     if (!this.meg.quiz) return this.quiz();
     return el("div", { klasse: "debatt-skriv" }, [
-      this.skjema(null, null, function () { self.last(); }),
+      this.sak ? this.skjema(null, null, function () { self.last(); }) : null,
       el("p", { klasse: "debatt-meg smaatekst" }, [
-        document.createTextNode("Du skriver som "), el("strong", { tekst: this.meg.navn }), document.createTextNode(". "),
+        document.createTextNode(this.sak ? "Du skriver som " : "Du er logget inn som "), el("strong", { tekst: this.meg.navn }),
+        document.createTextNode(this.sak ? ". " : ". Kommenter på sakene og debattinnleggene. "),
         el("button", { type: "button", klasse: "lenkeknapp", tekst: "Logg ut", onclick: function () {
           api(self.api, "POST", "/api/utlogging", {}).finally(function () { lagreOkt(null); self.meg = null; self.last(); });
         } }),
@@ -194,7 +219,7 @@
           if (r.bestatt) {
             self.meg.quiz = true;
             self.si("Alt riktig. Du kan skrive nå.");
-            skjema.querySelector("button").replaceWith(el("button", { type: "button", tekst: "Skriv en kommentar",
+            skjema.querySelector("button").replaceWith(el("button", { type: "button", tekst: self.sak ? "Skriv en kommentar" : "Ferdig",
               onclick: function () { self.si(""); self.last(); } }));
           } else {
             self.si("Ikke alt var riktig. Les forklaringene og prøv igjen.", true);
@@ -385,10 +410,31 @@
       lagreOkt(svar.okt);
       var tilbake = svar.tilbake && svar.tilbake.indexOf(location.origin + "/") === 0 ? svar.tilbake : rot.dataset.forside;
       status.textContent = "Du er logget inn.";
-      location.replace(tilbake + "#debatt");
+      location.replace(tilbake + (/\/bergen\/debatt\/$/.test(tilbake) ? "#konto" : "#debatt"));
     }).catch(function (f) { status.textContent = f.message; });
   }
 
+  /* --- "Mest kommentert" on the Debatt page ------------------------------- */
+
+  function mestKommentert(rot) {
+    var liste = rot.querySelector(".mest-liste"), valg = rot.querySelector("select");
+    function hent() {
+      api(rot.dataset.api, "GET", "/api/mest-kommentert?periode=" + encodeURIComponent(valg.value)).then(function (data) {
+        var rader = data.saker.filter(function (s) { return /^https:\/\//.test(s.lenke); }).map(function (s) {
+          return el("li", {}, [el("a", { href: s.lenke, tekst: s.tittel }),
+            el("span", { klasse: "mest-antall", tekst: s.antall === 1 ? "1 kommentar" : s.antall + " kommentarer" })]);
+        });
+        liste.replaceChildren.apply(liste, rader.length ? rader : [el("li", { klasse: "mest-tom", tekst: "Ingen kommentarer i perioden ennå." })]);
+      }).catch(function () {
+        liste.replaceChildren(el("li", { klasse: "mest-tom", tekst: "Listen er utilgjengelig akkurat nå." }));
+      });
+    }
+    valg.addEventListener("change", hent);
+    hent();
+  }
+
+  visKonto();
   document.querySelectorAll("[data-debatt-sak]").forEach(function (rot) { new Debatt(rot); });
+  document.querySelectorAll("[data-mest-kommentert]").forEach(mestKommentert);
   document.querySelectorAll("[data-debatt-innlogging]").forEach(loggInn);
 })();

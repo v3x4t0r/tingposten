@@ -860,3 +860,57 @@ main > .sidehode:first-child { padding-top: 38px; }
 .debatt-forklaring .debatt-dom { font-weight: 700; }
 .debatt-forklaring.riktig .debatt-dom { color: var(--riktig); }
 .debatt-forklaring.feil .debatt-dom { color: var(--feil); }
+
+/* === Debatt page, debattinnlegg and the masthead's "Logg inn" (1.11) === */
+.masthode { position: relative; padding-top: 26px; }
+.konto-lenke { position: absolute; top: 3px; right: var(--gutter); margin: 0; font: 500 0.8125rem/1.3 var(--sans); }
+.konto-lenke a { color: var(--blekk); text-decoration-color: var(--linje-2); padding: 4px 0; }
+.konto-lenke a:hover { text-decoration-color: currentColor; }
+.konto-lenke a::before { content: ""; display: inline-block; width: 0.55em; height: 0.55em; margin-right: 0.45em; vertical-align: 0.05em;
+  border: 1.5px solid currentColor; border-radius: 50%; }
+.konto-lenke a.innlogget::before { background: currentColor; }
+
+.debattside { padding-bottom: 32px; }
+.debatt-oppsett { display: grid; grid-template-columns: minmax(0, 1fr); gap: 36px; padding-top: 10px; }
+@media (min-width: 960px) { .debatt-oppsett { grid-template-columns: minmax(0, 1fr) var(--rail); column-gap: 52px; align-items: start; } }
+.innlegg-del > h2, .debatt-rail h2.etikett { margin: 0 0 14px; }
+.innlegg-forste { padding-bottom: 22px; border-bottom: 1px solid var(--sterk); }
+.innlegg-forste-tittel { margin: 0; font: 700 clamp(1.9rem, 1.3rem + 2.4vw, 3rem)/1.06 var(--didone); letter-spacing: -0.01em; word-spacing: 0.07em; text-wrap: balance; }
+.innlegg-av { margin: 8px 0 0; font: 400 0.875rem/1.4 var(--sans); color: var(--dempet); }
+.innlegg-utdrag { margin: 12px 0 0; max-width: 38em; font: 400 1.125rem/1.55 var(--serif); color: var(--blekk-2); }
+.innlegg-liste { list-style: none; margin: 0; padding: 0; }
+.innlegg-liste li { padding: 14px 0 15px; border-bottom: 1px solid var(--linje); }
+.innlegg-liste-tittel { margin: 0; font: 700 1.3rem/1.18 var(--didone); word-spacing: 0.07em; text-wrap: balance; }
+
+.debatt-rail { display: grid; gap: 34px; }
+.mest-hode { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; }
+.mest-hode h2.etikett { flex: 1 1 100%; }
+.mest-periode select { font: 500 0.875rem/1.3 var(--sans); color: var(--blekk); background: var(--papir); border: 1px solid var(--linje-2);
+  border-radius: 2px; padding: 7px 8px; min-height: 36px; }
+.mest-liste { list-style: none; counter-reset: mest; margin: 12px 0 0; padding: 0; }
+.mest-liste li { counter-increment: mest; display: grid; grid-template-columns: 1.6em minmax(0, 1fr); column-gap: 6px;
+  padding: 9px 0 10px; border-top: 1px solid var(--linje); }
+.mest-liste li::before { content: counter(mest); grid-row: span 2; font: 700 1.25rem/1.1 var(--didone); color: var(--blekk); }
+.mest-liste li.mest-tom { display: block; color: var(--dempet); font: 400 0.9375rem/1.45 var(--serif); }
+.mest-liste li.mest-tom::before { content: none; }
+.mest-liste a { font: 700 1.0625rem/1.25 var(--didone); color: var(--blekk); text-decoration-color: var(--linje-2); word-spacing: 0.07em; }
+.mest-liste a:hover { text-decoration-color: currentColor; }
+.mest-antall { grid-column: 2; font: 400 0.8125rem/1.4 var(--sans); color: var(--dempet); }
+
+.send-inn { background: var(--boks); border-top: 3px solid var(--sterk); padding: 14px 20px 16px; font: 400 0.9375rem/1.5 var(--sans); color: var(--blekk-2); }
+.send-inn h2 { margin: 0 0 8px; font: 700 1.25rem/1.2 var(--didone); color: var(--blekk); }
+.send-inn p { margin: 0 0 8px; }
+.send-inn ul { margin: 0 0 10px; padding-left: 1.1em; }
+.send-inn li { margin: 4px 0; }
+.debatt.konto { margin-top: 0; }
+
+/* One debattinnlegg: like a sak page, with the writer's name where the sources would be */
+.innleggside { padding-bottom: 24px; }
+.innlegg { padding: 22px 0 10px; }
+.innlegg-byline { margin: 14px 0 0; padding-bottom: 12px; border-bottom: 1px solid var(--linje); font: 400 0.9375rem/1.45 var(--sans); color: var(--dempet); }
+.innlegg-navn { font-weight: 700; color: var(--blekk); }
+.innlegg-om::before { content: ", "; }
+.innlegg-sak { margin: 10px 0 0; font: 400 0.875rem/1.45 var(--sans); color: var(--dempet); }
+.innlegg-merknad { max-width: 37em; margin: 18px 0 0; padding-top: 12px; border-top: 1px solid var(--linje); font: italic 400 0.9375rem/1.5 var(--didone); color: var(--dempet); }
+.innleggside .rad .innlegg-av { margin-top: 4px; }
+@media print { .konto-lenke, .mest-kommentert, .send-inn, .debatt.konto { display: none !important; } }
