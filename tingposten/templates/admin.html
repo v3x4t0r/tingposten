@@ -95,6 +95,8 @@ ol.steg li.na::before { border-color: var(--fokus); background: var(--fokus); an
 
 details { margin-top: 10px; font: 14px/1.4 var(--sans); }
 summary { cursor: pointer; color: var(--blekk-2); padding: 6px 0; }
+.lenke-boks { padding: 8px 10px; background: var(--boks); border: 1px solid var(--boks-kant); font: 13px/1.5 var(--sans); word-break: break-all; }
+.testpanel-moter { list-style: none; padding: 0; margin: 6px 0; font: 14px/1.6 var(--sans); }
 pre.logg { background: var(--boks); border: 1px solid var(--boks-kant); padding: 10px; margin: 6px 0 0; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   white-space: pre-wrap; overflow-wrap: anywhere; max-height: 360px; overflow: auto; }
 
@@ -190,6 +192,27 @@ footer { padding: 0 var(--gutter) 30px; font: 13px/1.4 var(--sans); color: var(-
           <div class="knapper"><button type="submit" class="liten">Publiser innlegget</button></div>
         </form>
       </details>
+    </section>
+    <section class="blokk" aria-labelledby="testpanel-tittel" id="testpanel" hidden>
+      <h2 id="testpanel-tittel">Testpanel</h2>
+      <p class="plan" id="testpanel-plan"></p>
+      <p class="melding" id="testpanel-melding" aria-live="polite"></p>
+      <p class="lenke-boks" id="testpanel-lenke" hidden></p>
+      <ul class="debatt-ko" id="testpanel-testere"></ul>
+      <form id="testpanel-ny" class="knapper">
+        <label class="innlegg-felt">Ny tester (navn) <input name="navn" required maxlength="60" placeholder="Kari"></label>
+        <button type="submit" class="liten">Lag invitasjonslenke</button>
+      </form>
+      <details>
+        <summary>Hvilke møter testerne ser</summary>
+        <p class="smaa">Uten valg ser de de to nyeste møtene i bystyret og byrådet.</p>
+        <ul class="testpanel-moter" id="testpanel-moter"></ul>
+        <div class="knapper">
+          <button type="button" class="liten" id="testpanel-lagre-moter">Lagre valget</button>
+          <button type="button" class="liten" id="testpanel-nyeste">Bruk de nyeste</button>
+        </div>
+      </details>
+      <p class="smaa"><a href="/testpanel-resultater.json" download="testpanel-resultater.json">Last ned alle vurderingene (JSON)</a></p>
     </section>
     <section class="blokk" aria-labelledby="moter-tittel">
       <h2 id="moter-tittel">Møter</h2>
@@ -606,6 +629,76 @@ $("innlegg-ny").addEventListener("submit", e => {
   const f = new FormData(e.target);
   innleggHandling({handling: "ny", ...Object.fromEntries(f.entries())});
 });
+/* The test panel: testers, their invite links, which meetings they see (debatt/testpanel.py) */
+async function lastTestpanel() {
+  try {
+    const r = await fetch("/testpanel.json", {cache: "no-store"});
+    if (!r.ok) return;
+    tegnTestpanel(await r.json());
+  } catch (e) { /* the panel works without it */ }
+}
+function tegnTestpanel(d) {
+  $("testpanel").hidden = !d.aktiv;
+  if (!d.aktiv) return;
+  const aktive = d.testere.filter(t => !t.stengt);
+  const vurdert = d.testere.reduce((n, t) => n + t.vurdert, 0);
+  const saker = d.moter.filter(m => m.valgt).reduce((n, m) => n + m.saker, 0);
+  $("testpanel-plan").textContent = `${antall(aktive.length, "aktiv tester", "aktive testere")}, ${antall(vurdert, "vurdering", "vurderinger")} i alt. ` +
+    `Testerne ser ${antall(saker, "sak", "saker")}${d.egne_valg ? " fra møtene du valgte" : " fra de nyeste møtene"}.`;
+  const liste = $("testpanel-testere");
+  liste.replaceChildren(...d.testere.map(t => {
+    const knapper = el("div", {class: "knapper"});
+    if (t.stengt) {
+      const b = el("button", {type: "button", class: "liten"}, "Åpne med ny lenke");
+      b.addEventListener("click", () => testpanelHandling({handling: "ny_lenke", id: t.id}));
+      knapper.append(b);
+    } else {
+      const ny = el("button", {type: "button", class: "liten"}, "Ny lenke");
+      ny.addEventListener("click", () => testpanelHandling({handling: "ny_lenke", id: t.id}));
+      const steng = el("button", {type: "button", class: "liten"}, "Steng lenken");
+      steng.addEventListener("click", () => testpanelHandling({handling: "steng", id: t.id}));
+      knapper.append(ny, steng);
+    }
+    return el("li", null, el("p", {class: "hvem"},
+      `${t.navn} · ${antall(t.vurdert, "sak", "saker")} vurdert · ` +
+      (t.stengt ? "lenken er stengt" : t.sist ? `sist aktiv ${tid(t.sist)}` : "har ikke åpnet ennå")), knapper);
+  }));
+  const ml = $("testpanel-moter");
+  if (!ml.contains(document.activeElement)) {
+    ml.replaceChildren(...d.moter.map(m => el("li", null, el("label", null,
+      el("input", {type: "checkbox", value: m.id, ...(m.valgt ? {checked: ""} : {})}), ` ${m.navn} (${antall(m.saker, "sak", "saker")})`))));
+  }
+}
+async function testpanelHandling(body) {
+  const m = $("testpanel-melding"), lenke = $("testpanel-lenke");
+  try {
+    const r = await fetch("/testpanel", {method: "POST", headers: {"Content-Type": "application/json", "X-Tingposten": "admin"},
+      body: JSON.stringify(body)});
+    const svar = await r.json().catch(() => ({}));
+    m.textContent = svar.melding || `Feil (HTTP ${r.status})`;
+    m.classList.toggle("feil", !r.ok);
+    lenke.hidden = !svar.lenke;
+    if (svar.lenke) {
+      const kopier = el("button", {type: "button", class: "liten"}, "Kopier");
+      kopier.addEventListener("click", () => navigator.clipboard.writeText(svar.lenke).then(() => { kopier.textContent = "Kopiert"; }));
+      lenke.replaceChildren(el("code", null, svar.lenke), " ", kopier);
+    }
+    if (r.ok && body.handling === "ny") $("testpanel-ny").reset();
+  } catch (e) {
+    m.textContent = "Fikk ikke kontakt med Pi-en: " + e.message;
+    m.classList.add("feil");
+  }
+  lastTestpanel();
+}
+$("testpanel-ny").addEventListener("submit", e => {
+  e.preventDefault();
+  testpanelHandling({handling: "ny", navn: new FormData(e.target).get("navn")});
+});
+$("testpanel-lagre-moter").addEventListener("click", () => testpanelHandling({handling: "moter",
+  moter: [...document.querySelectorAll("#testpanel-moter input:checked")].map(i => i.value)}));
+$("testpanel-nyeste").addEventListener("click", () => testpanelHandling({handling: "moter", moter: []}));
+lastTestpanel();
+setInterval(lastTestpanel, 60000);
 lastInnlegg();
 setInterval(lastInnlegg, 60000);
 lastDebatt();

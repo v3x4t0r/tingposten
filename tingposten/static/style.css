@@ -940,3 +940,28 @@ main > .sidehode:first-child { padding-top: 38px; }
 .godkjenn-tekst h2 { margin: 0 0 6px; font: 700 1.6rem/1.15 var(--didone); }
 [data-innlegg-godkjenn] > button { font: 600 0.9375rem/1.2 var(--sans); color: var(--papir); background: var(--blekk); border: 0;
   border-radius: 2px; padding: 12px 18px; min-height: 44px; cursor: pointer; }
+
+/* The test panel (templates/testpanel.html, static/testpanel.js) */
+.testpanel { max-width: 46rem; }
+.testpanel-hjelp ul { padding-left: 1.2rem; }
+.testpanel-status, .testpanel-hei { font: 600 0.9375rem/1.4 var(--sans); }
+.testpanel-mote { margin-top: 2rem; }
+.testpanel-sak { padding: 1.1rem 0 1.3rem; border-bottom: 1px solid var(--linje); }
+.testpanel-sak .kicker { margin-bottom: 0.3rem; }
+.testpanel-tittel { margin: 0 0 0.4rem; font: 700 1.3rem/1.2 var(--didone); }
+.testpanel-ingress { margin: 0 0 0.5rem; font: 400 1.0625rem/1.45 var(--serif); }
+.testpanel-sak details { margin: 0.4rem 0; font: 400 0.9375rem/1.45 var(--serif); }
+.testpanel-sak summary { cursor: pointer; font: 600 0.8125rem/1.4 var(--sans); }
+.testpanel-felt dt { margin-top: 0.5rem; font: 600 0.8125rem/1.3 var(--sans); }
+.testpanel-felt dd { margin: 0.1rem 0 0; }
+.testpanel-svar { display: grid; gap: 0.7rem; margin-top: 0.8rem; padding: 0.8rem; background: var(--boks); }
+.testpanel-etikett { margin: 0 0 0.3rem; font: 600 0.8125rem/1.3 var(--sans); }
+.testpanel-knapper { display: flex; flex-wrap: wrap; gap: 6px; }
+.testpanel-knapper button { padding: 5px 11px; font: 500 0.8125rem/1.2 var(--sans); color: var(--blekk); background: var(--papir);
+  border: 1px solid var(--linje-2); border-radius: 3px; cursor: pointer; }
+.testpanel-knapper button[aria-pressed="true"] { color: var(--papir); background: var(--blekk); border-color: var(--blekk); }
+.testpanel-svar textarea { width: 100%; box-sizing: border-box; padding: 6px 8px; font: 400 0.9375rem/1.4 var(--sans);
+  color: var(--blekk); background: var(--papir); border: 1px solid var(--linje-2); }
+.testpanel-melding { margin: 0; min-height: 1.2em; color: var(--dempet); }
+.testpanel-andre { margin-top: 0.6rem; padding-left: 0.8rem; border-left: 3px solid var(--linje-2); }
+.testpanel-andre ul { margin: 0.3rem 0 0; padding-left: 1rem; }

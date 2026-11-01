@@ -35,7 +35,7 @@ from . import config
 
 log = logging.getLogger(__name__)
 
-STENGT = ("bergen/logg-inn/", "bergen/debatt/godkjenn/")
+STENGT = ("bergen/logg-inn/", "bergen/debatt/godkjenn/", "bergen/testpanel/")
 INDEXNOW = "https://api.indexnow.org/indexnow"
 NYLIG_DAGER = 2  # IndexNow: pages changed in the last two days
 VENT_MAKS, VENT_STEG = 600, 15   # seconds: how long to wait for statichost's deploy, and how often to look

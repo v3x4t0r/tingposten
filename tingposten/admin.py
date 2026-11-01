@@ -803,15 +803,84 @@ class InnleggKo:
             return 502, {"melding": "E-posten kunne ikke sendes. Prøv igjen."}
 
 
+class TestpanelKo:
+    """The test panel's testers, invite links, meetings and results (debatt/testpanel.py),
+    in the comment server's database. An invite link is shown once, when it is made."""
+
+    def __init__(self, debatt: "DebattKo", saker_path: Path | None = None):
+        self.debatt = debatt
+        self.saker_path = saker_path or config.DEBATT_DIR / "testpanel.json"
+
+    def _db(self):
+        t = self.debatt.tjeneste()
+        return t.db if t else None
+
+    def _moter(self) -> list[dict]:
+        from .debatt import testpanel
+
+        return testpanel.Saker(self.saker_path).moter()
+
+    @staticmethod
+    def lenke(token: str) -> str:
+        return f"{config.SITE_URL}bergen/testpanel/#t={token}"
+
+    def status(self) -> dict:
+        from .debatt import testpanel
+
+        db = self._db()
+        if db is None:
+            return {"aktiv": False}
+        alle = self._moter()
+        aktuelle = {m["id"] for m in testpanel.aktuelle(db, alle)}
+        return {"aktiv": True, "testere": testpanel.testere(db), "egne_valg": bool(testpanel.valgte(db)),
+                "moter": [{"id": m["id"], "navn": f"{m['organ']} {m['dato_tekst']}", "saker": len(m["saker"]),
+                           "valgt": m["id"] in aktuelle} for m in alle]}
+
+    def resultater(self) -> dict:
+        from .debatt import testpanel
+
+        db = self._db()
+        return testpanel.resultater(db) if db else {}
+
+    def handle(self, body: dict) -> tuple[int, dict]:
+        from .debatt import testpanel
+        from .debatt.tjeneste import Feil
+
+        db = self._db()
+        if db is None:
+            return 409, {"melding": "Kommentardatabasen finnes ikke her."}
+        handling = body.get("handling")
+        try:
+            if handling == "ny":
+                _, token = testpanel.ny_tester(db, body.get("navn"))
+                return 200, {"melding": "Testeren er lagt til. Send lenken; den vises bare nå.", "lenke": self.lenke(token)}
+            tid = body.get("id")
+            if handling in ("steng", "apne", "ny_lenke") and type(tid) is not int:
+                return 400, {"melding": "Ugyldig tester."}
+            if handling == "steng":
+                testpanel.steng(db, tid)
+                return 200, {"melding": "Lenken er stengt."}
+            if handling == "ny_lenke":
+                return 200, {"melding": "Ny lenke laget; den gamle virker ikke lenger.",
+                             "lenke": self.lenke(testpanel.ny_lenke(db, tid))}
+            if handling == "moter":
+                testpanel.velg(db, body.get("moter") or [])
+                return 200, {"melding": "Møtene er lagret." if body.get("moter") else "Testerne ser de nyeste møtene."}
+        except Feil as e:
+            return e.kode, {"melding": e.melding}
+        return 400, {"melding": "Ukjent handling."}
+
+
 def make_server(vert: str = "127.0.0.1", port: int = 8787, passord: str | None = None,
                 kjorer: Kjorer | None = None, site_dir: Path = config.SITE_DIR,
                 idag: date | None = None, debatt: DebattKo | None = None,
-                innlegg: InnleggKo | None = None) -> ThreadingHTTPServer:
+                innlegg: InnleggKo | None = None, testpanel: TestpanelKo | None = None) -> ThreadingHTTPServer:
     if not passord and not _loopback(vert):
         raise ValueError(f"set {PASSORD_ENV} in .env before the panel listens on {vert}")
     kjorer = kjorer or Kjorer()
     debatt = debatt or DebattKo()
     innlegg = innlegg or InnleggKo(debatt, kjorer)
+    testpanel = testpanel or TestpanelKo(debatt)
     page = SIDE.read_bytes()
     expected = passord.encode() if passord else b""
 
@@ -828,6 +897,10 @@ def make_server(vert: str = "127.0.0.1", port: int = 8787, passord: str | None =
                 self._json(200, debatt.status())
             elif path == "/innlegg.json":
                 self._json(200, innlegg.status())
+            elif path == "/testpanel.json":
+                self._json(200, testpanel.status())
+            elif path == "/testpanel-resultater.json":
+                self._json(200, testpanel.resultater())
             elif path.startswith("/static/"):
                 self._static(path.removeprefix("/static/"))
             else:
@@ -841,7 +914,7 @@ def make_server(vert: str = "127.0.0.1", port: int = 8787, passord: str | None =
                     origin and urlsplit(origin).netloc != self.headers.get("Host")):
                 return self._json(403, {"melding": "Avvist."})
             sti = urlsplit(self.path).path
-            if sti not in ("/start", "/debatt", "/innlegg"):
+            if sti not in ("/start", "/debatt", "/innlegg", "/testpanel"):
                 return self._json(404, {"melding": "Finnes ikke."})
             try:
                 length = int(self.headers.get("Content-Length") or 0)
@@ -855,6 +928,9 @@ def make_server(vert: str = "127.0.0.1", port: int = 8787, passord: str | None =
                 return self._json(code, svar)
             if sti == "/innlegg":
                 code, svar = innlegg.handle(body)
+                return self._json(code, svar)
+            if sti == "/testpanel":
+                code, svar = testpanel.handle(body)
                 return self._json(code, svar)
             modus = body.get("modus")
             if modus not in MODUSER:

@@ -98,6 +98,26 @@ CREATE TABLE IF NOT EXISTS innsendt (
   endret TEXT
 );
 CREATE INDEX IF NOT EXISTS innsendt_status ON innsendt(status, opprettet);
+CREATE TABLE IF NOT EXISTS testere (       -- the test panel's raters (testpanel.py): invite link, no account
+  id INTEGER PRIMARY KEY,
+  navn TEXT NOT NULL,
+  token_hash TEXT UNIQUE NOT NULL,           -- sha256 of the link's token; the token itself is never stored
+  opprettet TEXT NOT NULL,
+  stengt TEXT,
+  sist TEXT
+);
+CREATE TABLE IF NOT EXISTS testvurderinger (
+  tester INTEGER NOT NULL REFERENCES testere(id) ON DELETE CASCADE,
+  sak TEXT NOT NULL,
+  bor_vite INTEGER,                          -- 1–5: should residents know about this?
+  konkret INTEGER,                           -- 1–5: does something concrete change in everyday life now?
+  bunke TEXT,                                -- forside | kort | stoy
+  klar TEXT,                                 -- ja | delvis | nei: is the card clear?
+  kommentar TEXT,
+  tid TEXT NOT NULL,
+  PRIMARY KEY (tester, sak)
+);
+CREATE TABLE IF NOT EXISTS testpanel_moter (mote TEXT PRIMARY KEY);  -- the editor's choice; none = the newest
 CREATE TABLE IF NOT EXISTS rapporter (
   kommentar INTEGER NOT NULL REFERENCES kommentarer(id) ON DELETE CASCADE,
   bruker INTEGER NOT NULL REFERENCES brukere(id) ON DELETE CASCADE,
