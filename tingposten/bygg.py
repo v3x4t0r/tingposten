@@ -256,6 +256,8 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
         if getattr(config, "INDEXNOW_NOKKEL", None):
             navn, innhold = synlighet.nokkelfil(config.INDEXNOW_NOKKEL)
             (tmp / navn).write_text(innhold)
+        if getattr(config, "BING_VERIFISERING", None):
+            (tmp / "BingSiteAuth.xml").write_text(synlighet.bing_fil(config.BING_VERIFISERING))
     if config.CNAME:
         (tmp / "CNAME").write_text(config.CNAME + "\n")
 

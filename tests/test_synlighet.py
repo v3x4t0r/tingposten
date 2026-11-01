@@ -36,6 +36,7 @@ def test_robots_sitemap_and_llms_txt(monkeypatch, tmp_path, data_dir):  # noqa: 
     llms = (site / "llms.txt").read_text()
     assert llms.startswith("# Tingposten\n\n> ") and f"]({sak})" in llms and "Bergen kommune" in llms
     assert (site / "abc123abc123.txt").read_text() == "abc123abc123\n"
+    assert "<user>" + config.BING_VERIFISERING + "</user>" in (site / "BingSiteAuth.xml").read_text()
 
 
 def test_sak_without_summary_stays_out_of_search(monkeypatch, tmp_path, data_dir):  # noqa: F811

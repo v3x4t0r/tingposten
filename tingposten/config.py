@@ -80,6 +80,8 @@ SITE_URL = ("https://tingposten.no/" if PUBLISER_TIL.startswith("statichost")
 SKJUL_FOR_SOK = False
 # IndexNow (Bing, Yandex, Seznam …): public by design, it is served as /<key>.txt.
 INDEXNOW_NOKKEL = "1cbc9a497b4fcdf1a215bf05b9ace10a"
+# Bing Webmaster Tools ownership (/BingSiteAuth.xml), 1.11.2026: the DNS check failed on Bing's side.
+BING_VERIFISERING = "A7423E3FCC1B8025DBA4A01A0F11634A"
 # Visitor counts: GoatCounter (cookieless, no IP addresses stored). The count.js
 # in static/ is GoatCounter's own script (ISC), unmodified and served from this
 # site; only the count goes to this endpoint. None = no counting.

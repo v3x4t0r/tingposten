@@ -176,6 +176,11 @@ def nokkelfil(nokkel: str) -> tuple[str, str]:
     return f"{nokkel}.txt", nokkel + "\n"
 
 
+def bing_fil(kode: str) -> str:
+    """Bing Webmaster Tools' ownership file, served as /BingSiteAuth.xml."""
+    return f'<?xml version="1.0"?>\n<users>\n\t<user>{kode}</user>\n</users>'
+
+
 def nylige(sitemap_xml: str, idag: date, dager: int = NYLIG_DAGER) -> list[str]:
     import re
 
