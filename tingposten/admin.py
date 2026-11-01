@@ -305,6 +305,9 @@ _PDF = re.compile(r"(\d+) PDF\(s\) to fetch across (\d+) meeting")
 _RESULTAT = re.compile(r"INFO (skriv|artikkel|omskriv)( artikkel)?: (\{.*\})$")
 _BYGD = re.compile(r"INFO built .*?\{'sider': \d+, 'saker': (\d+), 'fremhevet': (\d+)")
 _INDEXNOW = re.compile(r"IndexNow: (\d+) sider meldt")
+# Codex (ChatGPT plan) out of quota: «You’ve hit your usage limit. … try again at Nov 4th, 2026 8:38 AM.»
+_CODEX_KVOTE = re.compile(r"hit your usage limit.*?try again at ([A-Z][a-z]{2})\w* (\d{1,2})\w*, \d{4},? (\d{1,2}):(\d\d) ([AP]M)")
+_MANEDER = dict(zip(("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"), MONTHS))
 _GRENSE = re.compile(r"hit your [\w-]+ limit[^\n\"']*?resets (\d{1,2})(?::(\d\d))?\s?([ap]m)")
 
 
@@ -381,6 +384,12 @@ def oppsummer(run: list[str], forrige_bygg: tuple[int, int] | None = None) -> di
     if "codex" in tekst and "401 Unauthorized" in tekst:
         advarsler.append("Codex er logget ut på Pi-en, så Claude tok over faktasjekken. Logg inn igjen: "
                          "ssh til Pi-en og kjør «codex login».")
+    elif m := _CODEX_KVOTE.search(tekst):
+        time = int(m.group(3)) % 12 + (12 if m.group(5) == "PM" else 0)
+        dag = f"{int(m.group(2))}. {_MANEDER.get(m.group(1), m.group(1))}"
+        advarsler.append(f"Codex har brukt opp kvoten sin til {dag} kl. {time:02d}.{m.group(4)}, så Claude tar "
+                         "faktasjekken så lenge. Ingenting å gjøre, med mindre du vil kjøpe mer på "
+                         "chatgpt.com/settings/usage.")
     elif "takes over for the rest of this run" in tekst:
         advarsler.append("Faktasjekken byttet til reservemodellen underveis.")
     if feilet:

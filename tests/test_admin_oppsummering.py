@@ -64,3 +64,12 @@ def test_the_last_run_carries_its_summary_and_the_build_before(tmp_path):
 
 def test_waiting_work_on_an_empty_data_dir(tmp_path):
     assert admin.arbeid([], tmp_path, vent=True) == {"kort": 0, "omskriv": 0, "artikler": 0}
+
+
+def test_codex_out_of_quota_is_named_with_the_date():
+    run = ["2026-11-02T08:00:00+01:00 start (manuell)", "2026-11-02T08:00:01+01:00 == kjor",
+           "2026-11-02 08:01:00,000 WARNING codex:standard can't answer (codex failed (exit 1): ERROR: You’ve hit your "
+           "usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit https://chatgpt.com/settings/usage to "
+           "purchase more credits or try again at Nov 4th, 2026 8:38 AM.); claude:fable takes over for the rest of this run"]
+    a = admin.oppsummer(run)["advarsler"]
+    assert a == [a[0]] and "Codex har brukt opp kvoten sin til 4. november kl. 08.38" in a[0]
