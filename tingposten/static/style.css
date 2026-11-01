@@ -853,6 +853,10 @@ main > .sidehode:first-child { padding-top: 38px; }
 .regelliste dd { margin: 4px 0 0; }
 .debatt-sporsmal { margin: 14px 0 0; padding: 0; border: 0; }
 .debatt-sporsmal legend { padding: 0; margin-bottom: 6px; font: 400 1rem/1.5 var(--serif); }
+.debatt-sporsmal legend > span { display: block; }
+.debatt-eksempel-nr { font: 600 .72rem/1.4 var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--dempet); }
+.debatt-eksempel { margin: 4px 0; padding-left: 12px; border-left: 3px solid var(--linje-2); font-style: italic; }
+.debatt-eksempel-sporsmal { font: 400 .9rem/1.4 var(--sans); }
 .debatt-sporsmal label { display: inline-flex; align-items: center; gap: 6px; margin: 0 18px 0 0; }
 .debatt-forklaring { margin: 6px 0 0; font: 400 0.875rem/1.45 var(--sans); color: var(--dempet); }
 .debatt-forklaring.riktig { color: var(--blekk); }
