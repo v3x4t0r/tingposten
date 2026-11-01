@@ -1,8 +1,10 @@
 {% extends "base.html" %}
-{% from "macros.html" import debatt_seksjon %}
+{% from "macros.html" import debatt_seksjon, del_lenker %}
 {# One debattinnlegg: the writer's text as the editor approved it, signed with full name. #}
 {% block title %}{{ i.tittel }} · Debatt · Tingposten{% endblock %}
 {% block description %}Debattinnlegg av {{ i.forfatter }}: {{ i.avsnitt[0]|truncate(150) }}{% endblock %}
+{% block meta %}<meta property="article:published_time" content="{{ i.dato.isoformat() }}">
+{% endblock %}
 {% block hovedklasse %}innleggside{% endblock %}
 {% block main %}
 <nav class="brodsmule" aria-label="Brødsmuler"><ol>
@@ -15,6 +17,7 @@
   <div>
     <h1 class="sak-tittel">{{ i.tittel|typo }}</h1>
     <p class="innlegg-byline"><span class="innlegg-navn">{{ i.forfatter }}</span>{% if i.om %}<span class="innlegg-om">{{ i.om }}</span>{% endif %}</p>
+    {{ del_lenker(site_url ~ i.side, i.tittel) }}
     {% if sak %}<p class="innlegg-sak">Om saken: <a href="{{ root }}{{ sak.side }}">{{ sak.overskrift|tittel }}</a></p>{% endif %}
     <div class="brodtekst">
       {% for a in i.avsnitt %}<p{% if loop.first %} class="forste"{% endif %}>{{ a|typo }}</p>
