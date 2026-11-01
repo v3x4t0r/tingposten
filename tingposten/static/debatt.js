@@ -186,7 +186,9 @@
         api(self.api, "POST", "/api/quiz", { svar: svar }).then(function (r) {
           r.svar.forEach(function (x) {
             var f = skjema.querySelector("[data-forklaring='" + x.id + "']");
-            f.textContent = (x.riktig ? "Riktig. " : "Feil. ") + x.forklaring;
+            f.textContent = "";
+            f.append(el("strong", { klasse: "debatt-dom", tekst: x.riktig ? "Riktig." : "Feil." }),
+              document.createTextNode(" " + x.forklaring));
             f.className = "debatt-forklaring " + (x.riktig ? "riktig" : "feil");
           });
           if (r.bestatt) {
