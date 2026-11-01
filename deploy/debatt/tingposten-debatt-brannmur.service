@@ -1,0 +1,12 @@
+[Unit]
+Description=Tingposten debatt: firewall for the comment server's containers
+Wants=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/tingposten-debatt-brannmur
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

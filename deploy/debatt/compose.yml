@@ -18,6 +18,7 @@ services:
   tailscale:
     image: tailscale/tailscale:v1.104.4
     hostname: debatt
+    dns: [9.9.9.9, 149.112.112.112]  # Quad9: the Pi's own DNS (100.100.100.100) is blocked by brannmur.sh
     env_file: tailscale.env          # TS_AUTHKEY=tskey-auth-… (tagged tag:debatt)
     environment:
       TS_STATE_DIR: /var/lib/tailscale
@@ -27,8 +28,6 @@ services:
     volumes:
       - ./tailscale-state:/var/lib/tailscale
       - ./funnel.json:/config/funnel.json:ro
-    extra_hosts:
-      - "vert:host-gateway"          # the Pi itself, for hailo-ollama (see README)
     cap_drop: [ALL]                  # userspace networking needs no capabilities
     security_opt: ["no-new-privileges:true"]
     restart: unless-stopped
@@ -41,7 +40,6 @@ services:
     depends_on: [tailscale]
     env_file: debatt.env             # SMTP, API keys (copy debatt.env.example)
     environment:
-      DEBATT_HAILO_URL: http://vert:8000
       DEBATT_CPU_URL: http://modell:8080
     volumes:
       - ../../data/debatt:/data/debatt   # debatt.db and saker.json (written by bygg)

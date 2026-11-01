@@ -44,14 +44,14 @@ Det viktigste i tabellen er **farlige slipp** (trussel, hets, privatperson eller
      Modellen (`qwen3:1.7b`) er alt lastet ned under `~/.local/share/hailo-ollama/`. Tjenesten kjører som root og bruker `/root/.local/share/hailo-ollama/`; enten kjør `curl -X POST -H 'Content-Type: application/json' http://172.17.0.1:8000/api/pull -d '{"model":"qwen3:1.7b","stream":false}'` én gang, eller kjør den som din egen brukertjeneste i stedet.
    - **cpu:** legg `Qwen3.5-4B-Q4_0.gguf` i `~/tingposten/modeller/` og start med `--profile cpu` (under).
    - **claude / jev:** nøkkelen i `debatt.env`.
-4. **Brannmur** (krever sudo; ikke prøvd på Pi-en ennå). Containerne bruker nettet 172.30.53.0/24. Det skal ut på internett (Tailscale, e-post, eventuelt Claude eller Jev), men ikke til hjemmenettet eller Pi-en, bortsett fra hailo-ollama:
+4. **Brannmur** (krever sudo, én gang). Containerne bruker nettet 172.30.53.0/24. De skal ut på internett (Tailscale, e-post, Jev), men ikke til hjemmenettene, andre Docker-nett, tailnettet (100.64.0.0/10: trafikk dit ville gått ut gjennom Pi-ens egen Tailscale-maskin, som Pi-en) eller Pi-en selv. `brannmur.sh` setter reglene, og en systemd-tjeneste setter dem på nytt etter Docker ved hver oppstart (ikke `iptables-persistent`, som også ville lagret Dockers egne regler):
    ```sh
-   sudo iptables -I DOCKER-USER -s 172.30.53.0/24 -d 192.168.0.0/16 -j DROP
-   sudo iptables -I DOCKER-USER -s 172.30.53.0/24 -d 10.0.0.0/8 -j DROP
-   sudo iptables -I INPUT -s 172.30.53.0/24 -j DROP
-   sudo iptables -I INPUT -s 172.30.53.0/24 -d 172.17.0.1 -p tcp --dport 8000 -j ACCEPT   # bare med hailo
+   cd ~/tingposten/deploy/debatt
+   sudo install -m 755 brannmur.sh /usr/local/sbin/tingposten-debatt-brannmur
+   sudo install -m 644 tingposten-debatt-brannmur.service /etc/systemd/system/
+   sudo systemctl daemon-reload && sudo systemctl enable --now tingposten-debatt-brannmur
    ```
-   Reglene må lagres for å overleve en omstart (f.eks. `iptables-persistent`). Test fra containeren: `docker compose exec debatt python -c "import urllib.request; urllib.request.urlopen('http://192.168.8.1', timeout=3)"` skal feile.
+   Fordi Pi-ens egen DNS (100.100.100.100) er stengt, bruker containerne Quad9 (`dns:` i compose.yml). Test fra containeren: `docker compose exec debatt python -c "import urllib.request; urllib.request.urlopen('http://192.168.8.1', timeout=3)"` skal feile.
 5. **Start:**
    ```sh
    cd ~/tingposten/deploy/debatt
