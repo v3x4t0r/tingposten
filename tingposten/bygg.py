@@ -311,6 +311,7 @@ def skriv_sak_indeks(saker: list[dict], debatt_dir: Path, innlegg: list[dict] = 
 
 
 TESTPANEL_DAGER = 120  # meetings the editor can pick for the test panel
+INGEN_NY_BESLUTNING = IKKE_AVGJORT | {"orientering", "falt"}
 
 
 def skriv_testpanel(saker: list[dict], debatt_dir: Path, idag: date) -> Path:
@@ -327,6 +328,8 @@ def skriv_testpanel(saker: list[dict], debatt_dir: Path, idag: date) -> Path:
             "key": s_["key"], "nr": s_["nr_etikett"], "overskrift": s_["overskrift"], "ingress": s_["dek"] or "",
             "felt": [{"label": f["label"], "tekst": f["tekst"]} for f in s_["kort_felt"] if f.get("tekst")],
             "status": s_["status_tekst"], "lenke": _site_url() + s_["lenke"],
+            # For part 2 (testpanel.funn): nothing new was decided, so nothing changes now.
+            "ingen_ny_beslutning": s_["status_kode"] in INGEN_NY_BESLUTNING,
         })
     path = debatt_dir / "testpanel.json"
     path.parent.mkdir(parents=True, exist_ok=True)

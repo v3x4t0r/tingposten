@@ -15,6 +15,11 @@ the ratings:
   is read again when it changes.
 - The other testers' ratings of a sak are shown only once the tester has rated it
   (both scores and the pile), so nobody is steered. Comments are shown without names.
+- Part 2 (owner, 1.11.2026: in his own first round the piles and the scores didn't
+  agree, and he corrected some once it was pointed out): when every sak is rated, funn()
+  points out answers that don't fit together, and the tester changes them or keeps them
+  («Behold svaret»). Every answer is logged with its part (testlogg), so the first
+  answers survive the review.
 """
 
 import hashlib
@@ -29,6 +34,7 @@ BUNKER = ("forside", "kort", "stoy")
 KLAR = ("ja", "delvis", "nei")
 MAKS_KOMMENTAR = 1000
 NYESTE_PER_ORGAN = 2       # without the editor's choice: the two newest meetings of each organ
+BUNKE_RANG = {"forside": 2, "kort": 1, "stoy": 0}
 
 
 def _hash(token: str) -> str:
@@ -142,6 +148,9 @@ def vurder(db: Db, t: dict, alle: list[dict], data: dict) -> dict:
             if data[navn] is not None and data[navn] not in lov:
                 raise Feil(400, "Ugyldig valg.")
             felt[navn] = data[navn]
+    del_ = 2 if data.get("del") == 2 else 1
+    if data.get("behold") is True:
+        felt["bekreftet"] = 1
     if "kommentar" in data:
         k = data["kommentar"]
         if k is not None and not isinstance(k, str):
@@ -150,14 +159,18 @@ def vurder(db: Db, t: dict, alle: list[dict], data: dict) -> dict:
     with db.tx() as c:
         c.execute("INSERT OR IGNORE INTO testvurderinger (tester, sak, tid) VALUES (?, ?, ?)", (t["id"], sak, iso(na())))
         if felt:
+            if any(k in felt for k in ("bor_vite", "konkret", "bunke")) and "bekreftet" not in felt:
+                felt["bekreftet"] = 0     # a changed answer is checked again
             c.execute(f"UPDATE testvurderinger SET {', '.join(f'{k} = ?' for k in felt)}, tid = ? WHERE tester = ? AND sak = ?",
                       (*felt.values(), iso(na()), t["id"], sak))
+            c.executemany("INSERT INTO testlogg (tester, sak, felt, verdi, del, tid) VALUES (?, ?, ?, ?, ?, ?)",
+                          [(t["id"], sak, k, None if v is None else str(v), del_, iso(na())) for k, v in felt.items()])
         c.execute("UPDATE testere SET sist = ? WHERE id = ?", (iso(na()), t["id"]))
     mine = _mine(db, t["id"]).get(sak)
     return {"mine": mine, "andre": _andre(db, t["id"], [sak]).get(sak, {"antall": 0}) if _ferdig(mine) else None}
 
 
-_FELT = ("bor_vite", "konkret", "bunke", "klar", "kommentar")
+_FELT = ("bor_vite", "konkret", "bunke", "klar", "kommentar", "bekreftet")
 
 
 def _mine(db: Db, tid: int) -> dict[str, dict]:
@@ -187,6 +200,47 @@ def _andre(db: Db, tid: int, saker: list[str]) -> dict[str, dict]:
     return ut
 
 
+def funn(saker: list[dict], mine: dict[str, dict]) -> dict:
+    """Part 2: answers that contradict each other, per sak (kept answers left out). Only
+    the tester's own contradictions, phrased as questions; once every sak is rated."""
+    vurdert = [s for s in saker if _ferdig(mine.get(s["key"]))]
+    if not saker or len(vurdert) < len(saker):
+        return {"klar": False, "saker": {}, "forside": None}
+    grunner: dict[str, list[str]] = {}
+
+    def legg(key, tekst):
+        grunner.setdefault(key, []).append(tekst)
+
+    for s in vurdert:
+        v = mine[s["key"]]
+        if v["bunke"] == "forside" and v["bor_vite"] <= 2:
+            legg(s["key"], f"Du la saken på forsiden, men ga «bør folk vite» {v['bor_vite']}. Er det det du mener?")
+        if v["bunke"] == "stoy" and v["bor_vite"] >= 4:
+            legg(s["key"], f"Du kalte saken støy, men ga «bør folk vite» {v['bor_vite']}. Er det det du mener?")
+        if v["konkret"] >= 4 and v["bor_vite"] <= 2:
+            legg(s["key"], f"Du mener mye endrer seg i hverdagen ({v['konkret']}), men at få trenger å vite om det "
+                           f"({v['bor_vite']}). Er det det du mener?")
+        if s.get("ingen_ny_beslutning") and v["konkret"] >= 3:
+            legg(s["key"], f"Ingenting nytt er vedtatt i saken ({s.get('status') or 'ikke avgjort'}), men du ga "
+                           f"«endrer hverdagen» {v['konkret']}. Er det det du mener?")
+    # Two saker that contradict each other: clearly higher «bør folk vite», lower pile.
+    par = []
+    for a in vurdert:
+        for b in vurdert:
+            va, vb = mine[a["key"]], mine[b["key"]]
+            if va["bor_vite"] >= vb["bor_vite"] + 2 and BUNKE_RANG[va["bunke"]] < BUNKE_RANG[vb["bunke"]]:
+                par.append((va["bor_vite"] - vb["bor_vite"], a, b))
+    for _, a, b in sorted(par, key=lambda x: -x[0])[:3]:
+        va, vb = mine[a["key"]], mine[b["key"]]
+        legg(b["key"], f"«{a['overskrift']}» fikk «bør folk vite» {va['bor_vite']} og ligger som {va['bunke']}, mens "
+                       f"denne fikk {vb['bor_vite']} og ligger som {vb['bunke']}. Er det det du mener?")
+    for key in [k for k in grunner if mine[k].get("bekreftet")]:
+        del grunner[key]
+    # No nudge about how many saker belong on forside (owner, 1.11.2026): that is the
+    # editor's rule, not the tester's judgement; the share is counted afterwards instead.
+    return {"klar": True, "saker": grunner, "forside": None}
+
+
 def side(db: Db, t: dict, alle: list[dict]) -> dict:
     """Everything the tester's page shows: the meetings, the saker, the tester's own
     ratings, and the others' where the tester has rated."""
@@ -200,7 +254,8 @@ def side(db: Db, t: dict, alle: list[dict]) -> dict:
                   "andre": andre.get(s["key"], {"antall": 0}) if s["key"] in ferdige else None}
                  for s in m["saker"]]
         ut.append({k: m[k] for k in ("id", "organ", "dato", "dato_tekst")} | {"saker": saker})
-    return {"navn": t["navn"], "moter": ut}
+    saker = [s for m in moter for s in m["saker"]]
+    return {"navn": t["navn"], "moter": ut, "del2": funn(saker, mine)}
 
 
 # --- results (the control panel) -------------------------------------------------------
@@ -208,6 +263,9 @@ def side(db: Db, t: dict, alle: list[dict]) -> dict:
 def resultater(db: Db) -> dict:
     """Every rating with the tester's name, for the editor and for calibrating the score."""
     rader = db.les("SELECT t.navn, v.* FROM testvurderinger v JOIN testere t ON t.id = v.tester ORDER BY v.sak, t.id")
+    logg = db.les("SELECT t.navn, l.* FROM testlogg l JOIN testere t ON t.id = l.tester ORDER BY l.tid")
     return {"testere": testere(db), "valgte_moter": valgte(db),
             "vurderinger": [{"tester": r["navn"], "sak": r["sak"], **{k: r[k] for k in _FELT}, "tid": r["tid"]}
-                            for r in rader]}
+                            for r in rader],
+            "logg": [{"tester": r["navn"], "sak": r["sak"], "felt": r["felt"], "verdi": r["verdi"], "del": r["del"],
+                      "tid": r["tid"]} for r in logg]}

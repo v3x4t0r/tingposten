@@ -69,7 +69,7 @@ def test_rating_saves_each_click_and_shows_the_others_only_after_rating(db):
     sak = side["moter"][0]["saker"][0]
     assert sak["key"] == A and sak["andre"] is None
     r = tp.vurder(db, kari, MOTER, {"sak": A, "konkret": 3, "bunke": "kort"})
-    assert r["mine"] == {"bor_vite": 4, "konkret": 3, "bunke": "kort", "klar": None, "kommentar": None}
+    assert r["mine"] == {"bor_vite": 4, "konkret": 3, "bunke": "kort", "klar": None, "kommentar": None, "bekreftet": 0}
     assert r["andre"] == {"antall": 1, "bor_vite": 5.0, "konkret": 2.0, "bunker": {"forside": 1}, "klar": {"ja": 1},
                           "kommentarer": ["Bra"]}                        # no names
     r = tp.vurder(db, kari, MOTER, {"sak": A, "bunke": None})          # a second press undoes
@@ -128,3 +128,25 @@ def test_build_writes_the_cards_and_a_hidden_page(monkeypatch, tmp_path, data_di
     assert 'name="robots" content="noindex' in side and "static/testpanel.js" in side and "data-testpanel" in side
     assert "Disallow: /bergen/testpanel/" in (site / "robots.txt").read_text()
     assert "testpanel" not in (site / "sitemap.xml").read_text()
+
+
+def test_part_two_points_out_own_contradictions_and_kept_answers_go_away(db):
+    kari = {"id": tp.ny_tester(db, "Kari")[0], "navn": "Kari"}
+    saker = [{**s, "ingen_ny_beslutning": s["key"] == B} for m_ in MOTER[:1] for s in m_["saker"]]
+    moter = [{**MOTER[0], "saker": saker}] + MOTER[1:]
+    tp.velg(db, [MOTER[0]["id"]])
+    tp.vurder(db, kari, moter, {"sak": A, "bor_vite": 2, "konkret": 1, "bunke": "forside"})
+    assert tp.side(db, kari, moter)["del2"]["klar"] is False             # not before every sak is rated
+    tp.vurder(db, kari, moter, {"sak": B, "bor_vite": 5, "konkret": 4, "bunke": "kort"})
+    d = tp.side(db, kari, moter)["del2"]
+    assert d["klar"] and d["forside"] is None                              # no nudge about the forside share
+    assert any("forsiden" in g for g in d["saker"][A])                     # forside, but «bør vite» 2
+    assert any("Overskrift " + B in g for g in d["saker"][A])              # B: higher «bør vite», lower pile
+    assert any("Ingenting nytt er vedtatt" in g for g in d["saker"][B])
+    tp.vurder(db, kari, moter, {"sak": A, "behold": True, "del": 2})
+    assert A not in tp.side(db, kari, moter)["del2"]["saker"]
+    tp.vurder(db, kari, moter, {"sak": B, "konkret": 1, "del": 2})        # corrected in the review
+    assert B not in tp.side(db, kari, moter)["del2"]["saker"]
+    logg = tp.resultater(db)["logg"]
+    assert ("konkret", "4", 1) in [(r["felt"], r["verdi"], r["del"]) for r in logg if r["sak"] == B]
+    assert ("konkret", "1", 2) in [(r["felt"], r["verdi"], r["del"]) for r in logg if r["sak"] == B]

@@ -965,3 +965,11 @@ main > .sidehode:first-child { padding-top: 38px; }
 .testpanel-melding { margin: 0; min-height: 1.2em; color: var(--dempet); }
 .testpanel-andre { margin-top: 0.6rem; padding-left: 0.8rem; border-left: 3px solid var(--linje-2); }
 .testpanel-andre ul { margin: 0.3rem 0 0; padding-left: 1rem; }
+.testpanel-del2 { margin: 1rem 0 0; padding: 0.9rem 1rem; background: var(--boks); }
+.testpanel-del2 h2 { margin-top: 0; }
+.testpanel-forside { font-weight: 600; }
+.testpanel-funn { margin: 0.8rem 0 0; padding: 0.6rem 0.8rem; border-left: 3px solid var(--blekk); background: var(--boks); }
+.testpanel-funn ul { margin: 0.2rem 0 0.4rem; padding-left: 1.1rem; }
+.testpanel-funn button { padding: 5px 11px; font: 600 0.8125rem/1.2 var(--sans); color: var(--papir); background: var(--blekk);
+  border: 1px solid var(--blekk); border-radius: 3px; cursor: pointer; }
+.testpanel.gjennomgang .testpanel-sak:not(.har-funn) { display: none; }

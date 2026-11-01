@@ -114,8 +114,17 @@ CREATE TABLE IF NOT EXISTS testvurderinger (
   bunke TEXT,                                -- forside | kort | stoy
   klar TEXT,                                 -- ja | delvis | nei: is the card clear?
   kommentar TEXT,
+  bekreftet INTEGER NOT NULL DEFAULT 0,      -- part 2: the tester kept a flagged answer on purpose
   tid TEXT NOT NULL,
   PRIMARY KEY (tester, sak)
+);
+CREATE TABLE IF NOT EXISTS testlogg (        -- every answer as given, part 1 or the part 2 review
+  tester INTEGER NOT NULL REFERENCES testere(id) ON DELETE CASCADE,
+  sak TEXT NOT NULL,
+  felt TEXT NOT NULL,
+  verdi TEXT,
+  del INTEGER NOT NULL,
+  tid TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS testpanel_moter (mote TEXT PRIMARY KEY);  -- the editor's choice; none = the newest
 CREATE TABLE IF NOT EXISTS rapporter (
