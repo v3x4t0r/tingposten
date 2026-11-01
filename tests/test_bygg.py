@@ -361,7 +361,7 @@ def test_tema_tiles_pages_and_breadcrumb(site):
     forside = (site / "bergen/index.html").read_text()
     # a tile only for a tema with saker left over: annet; okonomi's one sak (240) is a story
     assert 'id="tema-annet"' in forside and 'id="tema-okonomi"' not in forside
-    assert "Flere vedtak" not in forside  # only 3 stories, so no list after the four
+    assert "I korthet" not in forside  # only 3 stories, so no list after the four
     annet = re.search(r'id="tema-annet".*?</section>', forside, re.S).group(0)
     assert 'href="../bergen/tema/annet/">Alle 3 vedtak<' in annet  # the count link at the tile's foot
     assert "Klarsignal" not in annet  # the lead isn't repeated in its tile
@@ -387,8 +387,9 @@ def test_article_rendering_and_cue(site):
     assert '<h2 class="etikett etikett-strek artikkel-etikett" id="artikkel-tittel">Saken</h2>' in artikkel
     assert "Bygger på saksframlegget og protokollen" in artikkel and "Ca. 1 minutt å lese" in artikkel
     assert "Hallen har vært planlagt siden 2019. &lt;b&gt;fet&lt;/b&gt;" in artikkel  # escaped
-    # footnote numbers per paragraph, sources in the list below, every page a link
-    assert '<sup class="fn"><a href="#kilde-1"' in artikkel and 'id="kilde-2"' in artikkel
+    # each paragraph's sources beside it (a margin note), every page a link; no footnote numbers
+    assert '<p class="randnote" id="kilde-1"><span class="randnote-etikett">Kilde</span>' in artikkel and 'id="kilde-2"' in artikkel
+    assert 'class="fn"' not in artikkel and "fotnoter" not in artikkel
     assert "/fil/bk360/111/Framstilling-x#page=2" in artikkel and "/fil/bk360/222/Protokoll-x#page=1" in artikkel
     assert "bilag" not in artikkel  # only the two known documents become links
     assert artikkel.index("Hallen har vært") < artikkel.index("Byggestart")

@@ -43,14 +43,14 @@
 {% set ns = namespace(kart=false) %}
 {% for s in sekundaer %}{% if figur(s, "kart") %}{% set ns.kart = true %}{% endif %}{% endfor %}
 <section class="fire fire-{{ sekundaer|length }}" aria-labelledby="fire-tittel">
-<h2 class="vh" id="fire-tittel">Flere viktige vedtak</h2>
+<h2 class="fire-tittel" id="fire-tittel">Flere viktige vedtak</h2>
 {% for s in sekundaer %}{{ sek(s, root, std) }}{% endfor %}
 {% if ns.kart %}<p class="fire-kilde">Kart: © OpenStreetMap (ODbL)</p>{% endif %}
 </section>
 {% endif %}
 {% if liste %}
 <section class="seksjon flere" aria-labelledby="flere-tittel">
-  <div class="seksjon-hode"><h2 id="flere-tittel">Flere vedtak</h2><p>{{ liste|length }} {{ "sak" if liste|length == 1 else "saker" }} til fra perioden</p></div>
+  <div class="seksjon-hode"><h2 id="flere-tittel">I korthet</h2><p>{{ liste|length }} {{ "sak" if liste|length == 1 else "saker" }} til fra perioden</p></div>
   <ul class="rader">
     {% for s in liste %}{{ rad(s, root, vis_mote=s.mote != std) }}{% endfor %}
   </ul>
