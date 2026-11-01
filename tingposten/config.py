@@ -101,10 +101,10 @@ UTGIVER_ORGNR = "938 625 999"
 UTGIVER_OGSA = ("Freetime", "https://freetime.no/")  # "som også står bak …" (a reference, not an ad)
 KONTAKT_EPOST = "tingposten@freetime.no"  # Domeneshop alias on freetime.no, forwarded to the editor (30.10.2026)
 
-# Debatt (reader comments, branch `debatt`). The comment server's public address
-# (Tailscale Funnel on the Pi, e.g. "https://debatt.<tailnet>.ts.net/"); the sak
-# pages get a comment section that talks to it. None = no comments on the site.
-DEBATT = None
+# Debatt (reader comments). The comment server's public address (Tailscale Funnel
+# on the Pi, deploy/debatt/README.md); the sak pages get a comment section that
+# talks to it. None = no comments on the site. Switched on 1.11.2026.
+DEBATT = "https://debatt.tailab9cf1.ts.net/"
 # Moderators asked in turn until one is sure (tingposten/debatt/moderering.py):
 # "hailo", "cpu", "laya", "jev", "claude". Chosen from `tingposten debatt-test` (31.10,
 # 150 test comments): Jev (TypeSafe, yes/no per rule) got the rule right 87–89 % of the

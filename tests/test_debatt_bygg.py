@@ -24,8 +24,8 @@ def med_debatt(monkeypatch, tmp_path, data_dir):  # noqa: F811
     return site, debatt_dir
 
 
-def test_off_by_default(tmp_path, data_dir):  # noqa: F811
-    assert config.DEBATT is None
+def test_switched_off_builds_no_comments(monkeypatch, tmp_path, data_dir):  # noqa: F811
+    monkeypatch.setattr(config, "DEBATT", None)
     site = tmp_path / "site"
     bygg.build(site, data_dir, idag=date(2026, 10, 1), debatt_dir=tmp_path / "debatt")
     side = sak_page(site, "238/26").read_text()
