@@ -1,7 +1,7 @@
-"""The login e-mail, sent through the freetime.no mail account (SMTP).
+"""The login e-mail, sent from freetime.no through the same SMTP service as Freetime (Scaleway TEM, 1.11).
 
 Settings come from the environment (the server's own env file, never the
-pipeline's .env): DEBATT_SMTP_HOST, DEBATT_SMTP_PORT (465 = TLS, 587 = STARTTLS),
+pipeline's .env): DEBATT_SMTP_HOST, DEBATT_SMTP_PORT (465 = TLS, otherwise STARTTLS, e.g. 587 or 2587),
 DEBATT_SMTP_BRUKER, DEBATT_SMTP_PASSORD, DEBATT_AVSENDER. DEBATT_EPOST=konsoll
 writes the link to the log instead, for testing on one's own machine.
 """
@@ -11,7 +11,7 @@ import os
 import smtplib
 import ssl
 from email.message import EmailMessage
-from email.utils import formataddr, make_msgid
+from email.utils import formataddr, make_msgid, formatdate
 
 from .. import config
 
@@ -41,6 +41,7 @@ def melding(til: str, lenke: str, avsender: str) -> EmailMessage:
     msg["From"] = formataddr(("Tingposten", avsender))
     msg["To"] = til
     msg["Message-ID"] = make_msgid(domain=avsender.rsplit("@", 1)[-1])
+    msg["Date"] = formatdate(localtime=True)  # smtplib adds none, and some providers count that as spam
     msg["Auto-Submitted"] = "auto-generated"
     msg.set_content(TEKST.format(lenke=lenke, regler=f"{config.SITE_URL}om/debattregler/",
                                  utgiver=f"utgitt av {config.UTGIVER}" if config.UTGIVER else "tingposten.no"))
