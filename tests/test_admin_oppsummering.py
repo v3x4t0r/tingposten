@@ -36,15 +36,15 @@ MANUELL = """2026-11-01T20:05:35+01:00 start (manuell)
 def test_a_check_with_nothing_new_says_so():
     o = admin.oppsummer(SJEKK)
     assert o["punkter"] == ["Ingen nye saker eller vedtak hos Bergen kommune.",
-                            "1 PDF fra 1 møte kan hentes med «Last ned og publiser»."]
+                            "1 dokument fra 1 møte kan hentes med «Last ned og publiser»."]
     assert o["advarsler"] == []
 
 
 def test_a_run_counts_new_work_not_the_classifier_and_names_the_problems():
     o = admin.oppsummer(MANUELL, forrige_bygg=(537, 52))
     p = o["punkter"]
-    assert "Nytt hos Bergen kommune: Bergen bystyre (5)." in p and "Hentet 4 PDF-er fra 1 møte." in p
-    assert "Skrev 2 nye kort." in p and "Skrev om 4 avviste kort." in p and "Skrev 8 bakgrunnsartikler." in p
+    assert "Nytt hos Bergen kommune: Bergen bystyre (5)." in p and "Hentet 4 dokumenter fra 1 møte." in p
+    assert "Skrev 2 nye sammendrag." in p and "Skrev om 4 avviste sammendrag." in p and "Skrev 8 bakgrunnsartikler." in p
     assert "1 sak kunne ikke skrives denne gangen." in p
     assert "Siden har 537 saker, 59 av dem fremhevet (før 52)." in p and "Publisert på tingposten.no." in p
     assert not any("87" in x for x in p)          # «klassifiser: 87 saker» is not 87 new saker

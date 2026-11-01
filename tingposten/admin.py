@@ -169,14 +169,18 @@ def moter(data_dir: Path = config.DATA_DIR, idag: date | None = None) -> list[di
         for dato, saker in per_mote.items():
             d, key = date.fromisoformat(dato), f"{uid}/{dato}"
             uten = sum(1 for i in saker if not i.get("vedtakFilId"))
+            klare = [pipeline.protokoll_klar(i, data_dir) for i in saker]
             # Only cards the site shows: a card written from an older protokoll waits.
-            redigert = [read_json(data_dir / "redigert" / f"{pdf.key(i)}.json") if pipeline.protokoll_klar(i, data_dir)
-                        else None for i in saker]
+            redigert = [read_json(data_dir / "redigert" / f"{pdf.key(i)}.json") if k else None
+                        for i, k in zip(saker, klare)]
             m = {
                 "organ": ORGAN_KORT.get(uid, uid), "dato": dato, "dag": _dag(d), "saker": len(saker),
                 "kort": sum(1 for r in redigert if r and not r.get("avvist")),
                 "avvist": sum(1 for r in redigert if r and r.get("avvist")),
-                "pdf": nye[key] + pa_nytt[key], "merknad": "",
+                "pdf": nye[key] + pa_nytt[key], "nye_pdf": nye[key], "merknad": "",
+                # The saker still waiting for the kommune (no protokoll covering this meeting yet).
+                "venter_saker": [{"nr": i.get("referansenr") or "", "tittel": " ".join((i.get("tittel") or "").split())}
+                                 for i, k in zip(saker, klare) if not k],
             }
             if d > idag:
                 m["status"] = "kommende"
@@ -200,25 +204,39 @@ def moter(data_dir: Path = config.DATA_DIR, idag: date | None = None) -> list[di
     return sorted(out, key=lambda m: (m["dato"], m["organ"]), reverse=True)
 
 
+def _venter_linje(m: dict) -> str:
+    """«Bystyret tirsdag 27. oktober: 85 av 86 saker er ute. 1 venter på kommunen: 357/26 …»"""
+    vent = m.get("venter_saker") or []
+    ute = m["saker"] - len(vent)
+    navn = "; ".join(f"{v['nr']} {v['tittel'][:70].rstrip()}{'…' if len(v['tittel']) > 70 else ''}" for v in vent[:2])
+    flere = f" og {len(vent) - 2} til" if len(vent) > 2 else ""
+    slutt = "" if (navn + flere).endswith(("…", ".")) else "."
+    if not ute:
+        return f"{m['organ']} {m['dag']}: protokollen er ikke lagt ut ennå. {m['merknad']}".strip()
+    return (f"{m['organ']} {m['dag']}: {ute} av {m['saker']} saker er ute. "
+            f"{len(vent)} venter på at kommunen oppdaterer protokollen: {navn}{flere}{slutt}")
+
+
 def neste(moter_: list[dict]) -> dict:
-    """The panel's headline: what to do, or which protokoll is due next."""
+    """The panel's headline: is there anything to do now, and what comes next. The
+    meetings still waiting for the kommune are listed under it (detaljer)."""
     klar = [m for m in moter_ if m["status"] == "klar"]
+    venter = [m for m in moter_ if m["status"] in ("venter", "mangler")]  # newest first
+    detaljer = [("Mangler: " if m["status"] == "mangler" else "Venter: ") + _venter_linje(m) for m in venter]
     if klar:
         hvilke = ", ".join(f"{m['organ']} {m['dag']}" for m in reversed(klar))
         return {"type": "klar", "tittel": "Nye dokumenter er klare",
-                "tekst": f"{hvilke}. Trykk «Last ned og publiser»."}
-    venter = [m for m in moter_ if m["status"] == "venter"]  # newest first
-    if venter:
-        m = venter[0]
-        n = len(venter) - 1
-        flere = "" if not n else " Ett møte til venter også." if n == 1 else f" {n} møter til venter også."
-        return {"type": "venter", "tittel": f"{m['organ']} {m['dag']} venter på protokoll",
-                "tekst": (m["merknad"] or "Protokollen er ikke lagt ut ennå.") + flere}
+                "tekst": f"{hvilke}. Trykk «Last ned og publiser».", "detaljer": detaljer}
     kommende = sorted((m for m in moter_ if m["status"] == "kommende"), key=lambda m: m["dato"])
     if kommende:
         m = kommende[0]
-        return {"type": "kommende", "tittel": f"Neste møte: {m['organ']} {m['dag']}", "tekst": m["merknad"]}
-    return {"type": "ferdig", "tittel": "Ingen møter venter på protokoll", "tekst": ""}
+        return {"type": "kommende", "tittel": f"Neste møte: {m['organ']} {m['dag']}",
+                "tekst": " ".join(filter(None, [m["merknad"], "Til da er det ingenting du må gjøre."])),
+                "detaljer": detaljer}
+    if venter:
+        return {"type": "venter", "tittel": "Venter på kommunen", "tekst": "Ingenting du må gjøre nå.",
+                "detaljer": detaljer}
+    return {"type": "ferdig", "tittel": "Alt er oppdatert", "tekst": "Ingen møter venter på protokoll.", "detaljer": []}
 
 
 # The site, the machine and the runs
@@ -333,11 +351,11 @@ def oppsummer(run: list[str], forrige_bygg: tuple[int, int] | None = None) -> di
     if m := _PDF.search(tekst):
         n, moter_ = int(m.group(1)), _flertall(int(m.group(2)), "møte", "møter")
         if not n:
-            punkter.append("Ingen nye PDF-er å hente.")
+            punkter.append("Ingen nye dokumenter å hente.")
         elif "start (manuell)" in run[0] and "PDF download stopped" not in tekst:
-            punkter.append(f"Hentet {_flertall(n, 'PDF', 'PDF-er')} fra {moter_}.")
+            punkter.append(f"Hentet {_flertall(n, 'dokument', 'dokumenter')} fra {moter_}.")
         else:
-            punkter.append(f"{_flertall(n, 'PDF', 'PDF-er')} fra {moter_} kan hentes med «Last ned og publiser».")
+            punkter.append(f"{_flertall(n, 'dokument', 'dokumenter')} fra {moter_} kan hentes med «Last ned og publiser».")
     if m := _VEDLEGGSLISTER.search(tekst):
         punkter.append(f"Fant {_flertall(int(m.group(2)), 'vedlegg', 'vedlegg')} til "
                        f"{_flertall(int(m.group(1)), 'ny sak', 'nye saker')}.")
@@ -364,15 +382,15 @@ def oppsummer(run: list[str], forrige_bygg: tuple[int, int] | None = None) -> di
             nytt[m.group(1)] += sum(n for k, n in antall.items() if k.startswith("skrevet"))
             feilet += antall.get("feil", 0)
     if nytt["skriv"]:
-        punkter.append(f"Skrev {_flertall(nytt['skriv'], 'nytt kort', 'nye kort')}.")
+        punkter.append(f"Skrev {_flertall(nytt['skriv'], 'nytt sammendrag', 'nye sammendrag')}.")
     if omskrevet["skriv"]:
-        punkter.append(f"Skrev om {_flertall(omskrevet['skriv'], 'avvist kort', 'avviste kort')}.")
+        punkter.append(f"Skrev om {_flertall(omskrevet['skriv'], 'avvist sammendrag', 'avviste sammendrag')}.")
     if nytt["artikkel"]:
         punkter.append(f"Skrev {_flertall(nytt['artikkel'], 'bakgrunnsartikkel', 'bakgrunnsartikler')}.")
     if omskrevet["artikkel"]:
         punkter.append(f"Skrev om {_flertall(omskrevet['artikkel'], 'avvist artikkel', 'avviste artikler')}.")
     if "== kjor" in tekst and not any(nytt.values()) and not any(omskrevet.values()) and not feilet:
-        punkter.append("Ingen nye kort eller artikler å skrive.")
+        punkter.append("Ingen nye sammendrag eller artikler å skrive.")
     bygd = [(int(m.group(1)), int(m.group(2))) for m in _BYGD.finditer(tekst)]
     if bygd:
         saker, fremhevet = bygd[-1]
@@ -420,7 +438,7 @@ def oppsummer(run: list[str], forrige_bygg: tuple[int, int] | None = None) -> di
     if "IndexNow svarte" in tekst:
         advarsler.append("Bing (IndexNow) avviste varselet. Siden er publisert likevel.")
     if "PDF download stopped" in tekst:
-        advarsler.append("Nedlastingen av PDF-er stoppet underveis. Neste kjøring tar resten.")
+        advarsler.append("Nedlastingen av dokumenter stoppet underveis. Neste kjøring tar resten.")
     return {"punkter": punkter, "advarsler": advarsler}
 
 
