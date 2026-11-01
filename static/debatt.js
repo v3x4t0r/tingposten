@@ -195,7 +195,7 @@
     var self = this;
     var boks = el("div", { klasse: "debatt-inn debatt-quiz" }, [
       el("p", {}, [el("strong", { tekst: "Før du skriver første gang: " }),
-        document.createTextNode("her er fem oppdiktede kommentarer. Ingen har skrevet dem; de viser bare hvor grensen går. "
+        document.createTextNode("her er seks oppdiktede kommentarer. Ingen har skrevet dem; de viser bare hvor grensen går. "
           + "Svar for hver av dem om den ville vært lov på Tingposten. Alle må være riktige; du ser forklaringen "
           + "etterpå og kan prøve igjen. "),
         el("a", { href: this.regler, tekst: "Les debattreglene" }), document.createTextNode(".")]),
