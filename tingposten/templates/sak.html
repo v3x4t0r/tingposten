@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "macros.html" import ikon, kildelinje, kildegrupper_html, figur_sak, rad, meld_feil as meld_feil_lenker %}
+{% from "macros.html" import ikon, kildelinje, kildegrupper_html, figur_sak, rad, debatt_seksjon, meld_feil as meld_feil_lenker %}
 {% block title %}{{ s.overskrift }} · Tingposten{% endblock %}
 {% block description %}{{ s.dek or s.tittel }}{% endblock %}
 {% block hovedklasse %}sakside{% endblock %}
@@ -124,13 +124,7 @@
   </div>
 </article>
 {% if debatt %}
-<section class="debatt lag" id="debatt" aria-labelledby="debatt-tittel" data-debatt-sak="{{ s.key }}" data-api="{{ debatt }}" data-side="{{ site_url }}{{ s.lenke }}" data-regler="{{ root }}om/debattregler/">
-  <h2 class="etikett etikett-strek" id="debatt-tittel">Debatt</h2>
-  <div class="debatt-innhold">
-    <noscript><p>Kommentarene trenger JavaScript. <a href="{{ root }}om/debattregler/">Les debattreglene</a>.</p></noscript>
-  </div>
-</section>
-<script src="{{ root }}static/debatt.js" defer></script>
+{{ debatt_seksjon(s.key, s.lenke, root) }}
 {% endif %}
 {% if relaterte %}
 <section class="relaterte lag" aria-labelledby="relaterte-tittel">

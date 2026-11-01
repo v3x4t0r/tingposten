@@ -60,6 +60,17 @@ def main(argv: list[str] | None = None) -> int:
     byggp.add_argument("--idag", type=date.fromisoformat, help="pretend today is YYYY-MM-DD (for previews)")
     byggp.add_argument("--til", type=Path, help="build into this directory instead of site/")
 
+    innp = sub.add_parser(
+        "innlegg", help="publiser et debattinnlegg fra en leser (bygg og publiser etterpå)",
+        description="Lagrer et debattinnlegg i data/bergen/innlegg/. Det vises på Debatt-siden og får en egen side "
+                    "med kommentarfelt ved neste bygg. Teksten er skribentens egen, slik redaktøren har godkjent den.")
+    innp.add_argument("--tittel", required=True)
+    innp.add_argument("--forfatter", required=True, help="fullt navn (fornavn og etternavn)")
+    innp.add_argument("--om", default="", help="hvem skribenten er, f.eks. «lærer, bor i Åsane» (valgfritt)")
+    innp.add_argument("--fil", type=Path, required=True, help="teksten, avsnitt skilt med en tom linje")
+    innp.add_argument("--sak", help="saken innlegget svarer på (nøkkel, f.eks. 900102/2026-10-29/1187-26)")
+    innp.add_argument("--dato", type=date.fromisoformat, help="publiseringsdato YYYY-MM-DD (standard: i dag)")
+
     rettp = sub.add_parser(
         "rett", help="legg til en synlig rettelse på en sak (bygger og publiserer ikke)",
         description="Legger til en rettelse med dagens dato i data/bergen/rettelser/. Saken får en merknad om "
@@ -190,6 +201,14 @@ def main(argv: list[str] | None = None) -> int:
         return _score(args)
     elif args.cmd == "rett":
         return _rett(args)
+    elif args.cmd == "innlegg":
+        from . import innlegg
+
+        tekst = args.fil.read_text(encoding="utf-8")
+        path = innlegg.ny(args.tittel, args.forfatter, tekst, om=args.om, dato=args.dato, sak=args.sak)
+        if len(tekst) > innlegg.MAKS_TEGN:
+            logging.warning("innlegget har %d tegn (siden ber om høyst %d)", len(tekst), innlegg.MAKS_TEGN)
+        logging.info("lagret %s; bygg og publiser for å vise det", path)
     elif args.cmd == "rediger":
         from . import redaktor
 

@@ -489,3 +489,25 @@ def test_quiz_examples_follow_the_rules():
     etter_id = {q["id"]: q for q in QUIZ}
     assert len(QUIZ) == 5 and etter_id["q2"]["lov"] is True and etter_id["q3"]["lov"] is False
     assert sum(q["lov"] for q in QUIZ) == 2
+
+
+def test_most_commented_counts_published_comments_in_the_period(t, tmp_path):
+    import sqlite3
+    from datetime import timedelta
+
+    from tingposten.debatt.db import iso, na
+
+    andre = "900102/2026-10-29/1187-26"
+    t.saker[andre] = {"tittel": "Åtte informasjonspunkt", "lenke": "https://tingposten.no/bergen/sak/900102/2026-10-29/1187-26/"}
+    ola, _ = logg_inn(t)
+    nå, gammel = iso(na()), iso(na() - timedelta(days=12))
+    with sqlite3.connect(tmp_path / "d.db") as c:
+        rader = [(SAK, "publisert", nå)] * 2 + [(andre, "publisert", nå)] * 3 + [(andre, "avvist", nå)] * 5 \
+            + [(SAK, "publisert", gammel)] * 4 + [("borte/sak", "publisert", nå)] * 9
+        c.executemany("INSERT INTO kommentarer (sak, forelder, bruker, tekst, status, opprettet) VALUES (?, NULL, ?, 'x', ?, ?)",
+                      [(sak, ola.id, status, tid) for sak, status, tid in rader])
+    uke = t.mest_kommentert("7")
+    assert [(s["sak"], s["antall"]) for s in uke["saker"]] == [(andre, 3), (SAK, 2)]  # stopped and unknown saker left out
+    assert uke["saker"][0]["tittel"] == "Åtte informasjonspunkt" and uke["saker"][0]["lenke"].startswith("https://")
+    assert [(s["sak"], s["antall"]) for s in t.mest_kommentert("30")["saker"]] == [(SAK, 6), (andre, 3)]
+    assert t.mest_kommentert("tull")["periode"] == "7"

@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{# The Debatt page: the editor's debattinnlegg (newest first, the newest large), the most
+   commented saker (live from the comment server, debatt.js), how to send an innlegg,
+   and the reader's account (#konto, where the "Logg inn" link in the masthead leads). #}
+{% block title %}Debatt · Tingposten{% endblock %}
+{% block description %}Debattinnlegg fra leserne og de mest kommenterte sakene om hva Bergen kommune vedtar.{% endblock %}
+{% block hovedklasse %}debattside{% endblock %}
+{% block main %}
+<header class="sidehode">
+  <h1 class="side-tittel">Debatt</h1>
+  <p class="side-ingress">Leserne har ordet: debattinnlegg om det kommunen vedtar, og sakene flest diskuterer.</p>
+</header>
+
+<div class="debatt-oppsett">
+<section class="innlegg-del" aria-labelledby="innlegg-tittel">
+  <h2 class="etikett etikett-strek" id="innlegg-tittel">Debattinnlegg</h2>
+  {% if innlegg %}
+  {% set forste = innlegg[0] %}
+  <article class="blokk innlegg-forste">
+    <h3 class="innlegg-forste-tittel"><a class="blokklenke" href="{{ root }}{{ forste.side }}">{{ forste.tittel|typo }}</a></h3>
+    <p class="innlegg-av">{{ forste.forfatter }}{% if forste.om %}, {{ forste.om }}{% endif %} · <time datetime="{{ forste.dato.isoformat() }}">{{ forste.dato|kort_dato(short=False) }}</time></p>
+    <p class="innlegg-utdrag">{{ forste.avsnitt[0]|typo }}</p>
+  </article>
+  {% if innlegg|length > 1 %}
+  <ul class="innlegg-liste">
+    {% for i in innlegg[1:] %}<li class="blokk"><h3 class="innlegg-liste-tittel"><a class="blokklenke" href="{{ root }}{{ i.side }}">{{ i.tittel|typo }}</a></h3><p class="innlegg-av">{{ i.forfatter }} · <time datetime="{{ i.dato.isoformat() }}">{{ i.dato|kort_dato(short=False) }}</time></p></li>{% endfor %}
+  </ul>
+  {% endif %}
+  {% else %}
+  <p class="tomt">Ingen debattinnlegg ennå. Har du noe på hjertet om en sak i kommunen? <a href="#send-inn">Send oss et innlegg</a>.</p>
+  {% endif %}
+</section>
+
+<aside class="debatt-rail">
+  {% if debatt %}
+  <section class="mest-kommentert" aria-labelledby="mest-tittel" data-mest-kommentert data-api="{{ debatt }}">
+    <div class="mest-hode">
+      <h2 class="etikett etikett-strek" id="mest-tittel">Mest kommentert</h2>
+      <label class="mest-periode"><span class="vh">Periode</span>
+        <select name="periode">
+          <option value="7" selected>Siste 7 dager</option>
+          <option value="30">Siste 30 dager</option>
+          <option value="aar">I år</option>
+        </select>
+      </label>
+    </div>
+    <ol class="mest-liste" aria-live="polite"><li class="mest-tom">Henter …</li></ol>
+    <noscript><p class="smaatekst">Listen trenger JavaScript.</p></noscript>
+  </section>
+  {% endif %}
+
+  <section class="send-inn" id="send-inn" aria-labelledby="send-inn-tittel">
+    <h2 id="send-inn-tittel">Skriv et debattinnlegg</h2>
+    <p>Send innlegget ditt til <a href="mailto:{{ kontakt_epost }}?subject=Debattinnlegg">{{ kontakt_epost }}</a>, med tittel, teksten og fullt navn.</p>
+    <ul>
+      <li>Inntil {{ "{:,}".format(maks_tegn).replace(",", "&nbsp;")|safe }} tegn, og helst om en sak kommunen har behandlet eller skal behandle.</li>
+      <li>Innlegget trykkes med fullt navn. Du kan legge til hvem du er, for eksempel «lærer» eller «bor i Åsane».</li>
+      <li>Teksten må være din egen og ikke trykket andre steder.</li>
+      <li>Redaktøren bestemmer hva som trykkes, og kan korte ned. Du får se endringer før innlegget publiseres.</li>
+    </ul>
+    <p class="smaatekst">Meninger i debattinnlegg er skribentens egne. Debattreglene gjelder også her: åpen debatt, men ikke hat, trusler eller trakassering.</p>
+  </section>
+
+  {% if debatt %}
+  <section class="debatt konto" id="konto" aria-labelledby="konto-tittel" data-debatt-sak="" data-api="{{ debatt }}" data-side="{{ site_url }}bergen/debatt/" data-regler="{{ root }}om/debattregler/">
+    <h2 class="etikett etikett-strek" id="konto-tittel">Din konto</h2>
+    <div class="debatt-innhold">
+      <noscript><p>Innloggingen trenger JavaScript.</p></noscript>
+    </div>
+  </section>
+  {% endif %}
+</aside>
+</div>
+{% endblock %}

@@ -91,3 +91,55 @@ def test_script_never_turns_reader_text_into_html():
         assert farlig not in js, farlig
     # Sessions are bearer tokens, never cookies.
     assert "document.cookie" not in js and "credentials" not in js
+
+
+def _innlegg(data_dir):
+    from tingposten import innlegg
+
+    return innlegg.ny("Bybanen må til Åsane nå", "Kari Nordmann",
+                      "Første avsnitt om Bybanen.\n\nAndre avsnitt, med   ekstra  mellomrom.",
+                      om="lærer, bor i Åsane", dato=date(2026, 9, 30), sak="571424/2026-09-23/238-26", data_dir=data_dir)
+
+
+def test_innlegg_file_round_trip_and_full_name(tmp_path):
+    from tingposten import innlegg
+
+    path = _innlegg(tmp_path)
+    assert path.name == "2026-09-30-bybanen-ma-til-asane-na.txt"
+    i = innlegg.last(tmp_path)[0]
+    assert (i["tittel"], i["forfatter"], i["om"]) == ("Bybanen må til Åsane nå", "Kari Nordmann", "lærer, bor i Åsane")
+    assert i["avsnitt"] == ["Første avsnitt om Bybanen.", "Andre avsnitt, med ekstra mellomrom."]
+    assert i["key"] == "innlegg/2026-09-30-bybanen-ma-til-asane-na" and i["side"] == "bergen/debatt/2026-09-30-bybanen-ma-til-asane-na/"
+    with pytest.raises(ValueError, match="fullt navn"):
+        innlegg.ny("Tittel", "Kari", "Tekst", data_dir=tmp_path)
+
+
+def test_debatt_page_innlegg_and_login_link(monkeypatch, tmp_path, data_dir):  # noqa: F811
+    monkeypatch.setattr(config, "DEBATT", API + "/")
+    _innlegg(data_dir)
+    site, debatt_dir = tmp_path / "site", tmp_path / "debatt"
+    bygg.build(site, data_dir, idag=date(2026, 10, 1), debatt_dir=debatt_dir)
+    forside = (site / "bergen/index.html").read_text()
+    # menu: Forside · Debatt · Møter · Om, and "Logg inn" in the corner; the script on every page
+    meny = re.search(r'<nav class="meny"[^>]*>(.*?)</nav>', forside, re.S).group(1)
+    assert re.findall(r">([^<]+)</a>", meny) == ["Forside", "Debatt", "Møter", "Om"]
+    assert '<a href="../bergen/debatt/#konto" data-konto-lenke>Logg inn</a>' in forside and "static/debatt.js" in forside
+    side = (site / "bergen/debatt/index.html").read_text()
+    assert "Bybanen må til Åsane nå" in side and "Kari Nordmann, lærer, bor i Åsane" in side
+    assert "data-mest-kommentert" in side and 'value="aar"' in side and 'id="konto"' in side
+    assert 'href="mailto:' in side and "fullt navn" in side
+    innlegg_side = (site / "bergen/debatt/2026-09-30-bybanen-ma-til-asane-na/index.html").read_text()
+    assert 'data-debatt-sak="innlegg/2026-09-30-bybanen-ma-til-asane-na"' in innlegg_side
+    assert "Andre avsnitt, med ekstra mellomrom." in innlegg_side and "Om saken:" in innlegg_side
+    assert innlegg_side.count("static/debatt.js") == 1   # once, from base.html
+    indeks = json.loads((debatt_dir / "saker.json").read_text())
+    assert indeks["innlegg/2026-09-30-bybanen-ma-til-asane-na"]["lenke"].endswith("/bergen/debatt/2026-09-30-bybanen-ma-til-asane-na/")
+
+
+def test_debatt_page_without_comment_server(monkeypatch, tmp_path, data_dir):  # noqa: F811
+    monkeypatch.setattr(config, "DEBATT", None)
+    site = tmp_path / "site"
+    bygg.build(site, data_dir, idag=date(2026, 10, 1), debatt_dir=tmp_path / "debatt")
+    side = (site / "bergen/debatt/index.html").read_text()
+    assert "Ingen debattinnlegg ennå" in side and "data-mest-kommentert" not in side and 'id="konto"' not in side
+    assert "data-konto-lenke" not in (site / "bergen/index.html").read_text()

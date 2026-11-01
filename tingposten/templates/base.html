@@ -35,7 +35,7 @@
 <a class="hopp" href="#innhold">Hopp til innholdet</a>
 {# "page" on the page itself; "true" on a page inside the section (one meeting under Møter). #}
 {% set meny %}
-<a href="{{ root }}bergen/"{% if side == "forside" %} aria-current="page"{% endif %}>Forside</a><a href="{{ root }}bergen/moter/"{% if side == "moter" %} aria-current="page"{% elif side == "mote" %} aria-current="true"{% endif %}>Møter</a><a href="{{ root }}om/"{% if side == "om" %} aria-current="page"{% endif %}>Om</a>
+<a href="{{ root }}bergen/"{% if side == "forside" %} aria-current="page"{% endif %}>Forside</a><a href="{{ root }}bergen/debatt/"{% if side == "debatt" %} aria-current="page"{% elif side == "innlegg" %} aria-current="true"{% endif %}>Debatt</a><a href="{{ root }}bergen/moter/"{% if side == "moter" %} aria-current="page"{% elif side == "mote" %} aria-current="true"{% endif %}>Møter</a><a href="{{ root }}om/"{% if side == "om" %} aria-current="page"{% endif %}>Om</a>
 {% endset %}
 {# One masthead on every page, as in a printed paper: the nameplate in a double frame between two ears.
    Narrow screens hide the ears and set the name smaller, so the headline is on the first screen. #}
@@ -49,6 +49,7 @@
     <p class="ore ore-h">{% if idag_tekst is defined %}<span class="ore-topp">{{ idag_tekst }}</span><span class="ore-bunn">Det viktigste først</span>{% else %}<span class="ore-topp">Med kilde til alt</span><span class="ore-bunn">Kommunens dokumenter</span>{% endif %}</p>
   </div>
   <nav class="meny" aria-label="Hovedmeny">{{ meny }}</nav>
+  {% if debatt %}<p class="konto-lenke"><a href="{{ root }}bergen/debatt/#konto" data-konto-lenke>Logg inn</a></p>{% endif %}
 </header>
 {% block forhode %}{% endblock %}
 <main id="innhold" class="ramme {% block hovedklasse %}vanlig{% endblock %}">
@@ -62,5 +63,6 @@
     <p class="bunn-lenker"><a href="{{ root }}om/">Om Tingposten og rangeringen</a> · <a href="{{ root }}bergen/rss.xml">RSS</a> · <a href="https://github.com/{{ repo }}">Åpen kildekode</a></p>
   </div>
 </footer>
-</body>
+{% if debatt %}<script src="{{ root }}static/debatt.js" defer></script>
+{% endif %}</body>
 </html>

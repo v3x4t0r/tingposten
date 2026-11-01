@@ -37,7 +37,7 @@ from urllib.parse import quote, urlencode, urlsplit
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 from markupsafe import Markup, escape
 
-from . import config, grafikk, pdf, rettelser as rettelser_mod, score
+from . import config, grafikk, innlegg as innlegg_mod, pdf, rettelser as rettelser_mod, score
 from .klassifiserer import TEMA
 from .saksframlegg import saksbydeler
 from . import status as status_mod
@@ -200,13 +200,20 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
         write(s_["side"] + "index.html", "sak.html", side="sak", s=s_, mote=meeting,
               relaterte=related(s_, meeting))
     write("om/index.html", "om.html", side="om", signaler=_weights(), terskel=_terskel())
+    # Debatt: the editor's published debattinnlegg (data/bergen/innlegg) and the page that lists them.
+    innlegg = innlegg_mod.last(data_dir)
+    sak_etter_key = {s_["key"]: s_ for s_ in saker}
+    for i in innlegg:
+        write(i["side"] + "index.html", "innlegg.html", side="innlegg", i=i, sak=sak_etter_key.get(i["sak"]),
+              andre=[x for x in innlegg if x is not i][:4])
+    write("bergen/debatt/index.html", "debatt.html", side="debatt", innlegg=innlegg, maks_tegn=innlegg_mod.MAKS_TEGN)
     if env.globals["debatt"]:
         from .debatt.regler import REGLER, STRENGE
 
         write("bergen/logg-inn/index.html", "logg_inn.html", side="logg-inn", noindex=True)
         write("om/debattregler/index.html", "debattregler.html", side="om", regler=REGLER, strenge=STRENGE,
               eksterne_moderatorer=_eksterne_moderatorer())
-        skriv_sak_indeks(saker, debatt_dir or config.DEBATT_DIR)
+        skriv_sak_indeks(saker, debatt_dir or config.DEBATT_DIR, innlegg)
     # statichost serves /404.html for a missing path at any depth, so its links
     # can't be relative: they start at the site's own root path ("/").
     write("404.html", "404.html", side="404", root=urlsplit(_site_url()).path, sti=None, noindex=True)
@@ -254,11 +261,14 @@ def _eksterne_moderatorer() -> list[str]:
     return [_EKSTERNE[m] for m in getattr(config, "DEBATT_MODERATOR", ()) if m in _EKSTERNE]
 
 
-def skriv_sak_indeks(saker: list[dict], debatt_dir: Path) -> Path:
-    """data/debatt/saker.json: every sak with a page, for the comment server (which saker
-    take comments, and the title and ingress the moderator sees)."""
+def skriv_sak_indeks(saker: list[dict], debatt_dir: Path, innlegg: list[dict] = ()) -> Path:
+    """data/debatt/saker.json: every sak and debattinnlegg with a page, for the comment server
+    (which pages take comments, and the title and ingress the moderator sees)."""
     indeks = {s_["key"]: {"tittel": s_["overskrift"], "ingress": s_["dek"] or "", "lenke": _site_url() + s_["lenke"]}
               for s_ in saker}
+    for i in innlegg:
+        indeks[i["key"]] = {"tittel": i["tittel"], "ingress": f"Debattinnlegg av {i['forfatter']}. " + i["avsnitt"][0],
+                            "lenke": _site_url() + i["side"]}
     path = debatt_dir / "saker.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")

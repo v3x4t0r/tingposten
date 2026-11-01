@@ -65,6 +65,9 @@ def _epost_nokkel(epost: str) -> str:
     return f"{lokal.split('+', 1)[0]}@{domene}"
 
 
+PERIODER = {"7": 7, "30": 30, "aar": None}   # "Mest kommentert" on the Debatt page
+
+
 class Feil(Exception):
     def __init__(self, kode: int, melding: str):
         super().__init__(melding)
@@ -426,6 +429,27 @@ class Tjeneste:
 
         antall = sum(1 for r in rader if r["status"] == "publisert")
         return {"sak": sak.key, "sortering": sortering, "antall": antall, "kommentarer": bygg(None)}
+
+    def mest_kommentert(self, periode: str = "7", antall: int = 10) -> dict:
+        """The saker (and debattinnlegg) with the most published comments written in the
+        period: "7" or "30" days, or "aar" (this year). Only keys the site still has a page
+        for are listed, with the title and link from the sak index."""
+        if periode not in PERIODER:
+            periode = "7"
+        dager = PERIODER[periode]
+        fra = siden(days=dager) if dager else iso(na().replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0))
+        rader = self.db.les("SELECT sak, COUNT(*) AS antall, MAX(opprettet) AS siste FROM kommentarer "
+                            "WHERE status = 'publisert' AND opprettet >= ? GROUP BY sak "
+                            "ORDER BY antall DESC, siste DESC", fra)
+        ut = []
+        for r in rader:
+            info = self.saker.get(r["sak"])
+            if info:
+                ut.append({"sak": r["sak"], "tittel": info.get("tittel", ""), "lenke": info.get("lenke", ""),
+                           "antall": r["antall"]})
+            if len(ut) == antall:
+                break
+        return {"periode": periode, "saker": ut}
 
     # --- moderation ---------------------------------------------------------------
 

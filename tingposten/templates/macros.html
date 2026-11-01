@@ -183,3 +183,13 @@
 {% macro meld_feil(s) -%}
 {% if s.meld_feil_epost %}<a href="{{ s.meld_feil_epost }}">Skriv til oss</a> eller <a href="{{ s.meld_feil }}">meld feilen på GitHub</a>{% else %}<a href="{{ s.meld_feil }}">Meld feil</a>{% endif %}
 {%- endmacro %}
+
+{# The comment section (debatt.js fills it), on sak pages and debattinnlegg pages. #}
+{% macro debatt_seksjon(key, lenke, root) -%}
+<section class="debatt lag" id="debatt" aria-labelledby="debatt-tittel" data-debatt-sak="{{ key }}" data-api="{{ debatt }}" data-side="{{ site_url }}{{ lenke }}" data-regler="{{ root }}om/debattregler/">
+  <h2 class="etikett etikett-strek" id="debatt-tittel">Debatt</h2>
+  <div class="debatt-innhold">
+    <noscript><p>Kommentarene trenger JavaScript. <a href="{{ root }}om/debattregler/">Les debattreglene</a>.</p></noscript>
+  </div>
+</section>
+{%- endmacro %}

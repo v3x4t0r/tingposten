@@ -16,6 +16,7 @@ Request bodies are capped; every error a reader can fix comes back as
   DELETE /api/meg                     delete the account and everything in it
   GET    /api/meg/eksport             everything stored about the reader (JSON)
   GET    /api/sak/{sak:path}/kommentarer?sortering=best|topp|nye
+  GET    /api/mest-kommentert?periode=7|30|aar   the most commented saker (the Debatt page)
   POST   /api/kommentar               {sak, tekst, forelder}
   GET    /api/kommentar/{id}          (the author polls this while it is judged)
   PUT    /api/kommentar/{id}          {tekst}
@@ -183,6 +184,10 @@ def lag_app(tjeneste: Tjeneste, opprinnelser: list[str], start_ko: bool = True) 
         headers = {"Cache-Control": "no-store" if b else "public, max-age=15"}
         return JSONResponse(data, headers=headers)
 
+    async def mest_kommentert(request):
+        data = tjeneste.mest_kommentert(request.query_params.get("periode", "7"))
+        return JSONResponse(data, headers={"Cache-Control": "public, max-age=60"})
+
     async def ny(request):
         b = innlogget(request)
         body = await kropp(request)
@@ -221,6 +226,7 @@ def lag_app(tjeneste: Tjeneste, opprinnelser: list[str], start_ko: bool = True) 
         Route("/api/meg/eksport", endepunkt(eksport)),
         Route("/api/quiz", endepunkt(quiz, True), methods=["GET", "POST"]),
         Route("/api/sak/{sak:path}/kommentarer", endepunkt(trad)),
+        Route("/api/mest-kommentert", endepunkt(mest_kommentert)),
         Route("/api/kommentar", endepunkt(ny, True), methods=["POST"]),
         Route("/api/kommentar/{id}", endepunkt(kommentar, True), methods=["GET", "PUT", "DELETE"]),
         Route("/api/kommentar/{id}/stem", endepunkt(stem, True), methods=["POST"]),

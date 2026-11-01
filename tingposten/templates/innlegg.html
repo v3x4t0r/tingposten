@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% from "macros.html" import debatt_seksjon %}
+{# One debattinnlegg: the writer's text as the editor approved it, signed with full name. #}
+{% block title %}{{ i.tittel }} · Debatt · Tingposten{% endblock %}
+{% block description %}Debattinnlegg av {{ i.forfatter }}: {{ i.avsnitt[0]|truncate(150) }}{% endblock %}
+{% block hovedklasse %}innleggside{% endblock %}
+{% block main %}
+<nav class="brodsmule" aria-label="Brødsmuler"><ol>
+  <li><a href="{{ root }}bergen/">Forsiden</a></li>
+  <li><a href="{{ root }}bergen/debatt/">Debatt</a></li>
+</ol></nav>
+<article class="innlegg lag">
+  <p class="dateline"><span class="kicker">Debattinnlegg</span>
+    <span class="dateline-rad"><time datetime="{{ i.dato.isoformat() }}">{{ i.dato|kort_dato(short=False, year=True) }}</time></span></p>
+  <div>
+    <h1 class="sak-tittel">{{ i.tittel|typo }}</h1>
+    <p class="innlegg-byline"><span class="innlegg-navn">{{ i.forfatter }}</span>{% if i.om %}<span class="innlegg-om">{{ i.om }}</span>{% endif %}</p>
+    {% if sak %}<p class="innlegg-sak">Om saken: <a href="{{ root }}{{ sak.side }}">{{ sak.overskrift|tittel }}</a></p>{% endif %}
+    <div class="brodtekst">
+      {% for a in i.avsnitt %}<p{% if loop.first %} class="forste"{% endif %}>{{ a|typo }}</p>
+      {% endfor %}
+    </div>
+    <p class="innlegg-merknad">Dette er et debattinnlegg. Meninger i innlegget er skribentens egne. <a href="{{ root }}bergen/debatt/#send-inn">Skriv et innlegg selv</a>.</p>
+  </div>
+</article>
+{% if debatt %}
+{{ debatt_seksjon(i.key, i.side, root) }}
+{% endif %}
+{% if andre %}
+<section class="relaterte lag" aria-labelledby="andre-tittel">
+  <div class="relaterte-hode"><h2 id="andre-tittel">Flere innlegg</h2><p class="andre"><a class="pil" href="{{ root }}bergen/debatt/">Alle debattinnlegg</a></p></div>
+  <ul class="rader">
+    {% for x in andre %}<li class="blokk rad"><h3 class="rad-tittel"><a class="blokklenke" href="{{ root }}{{ x.side }}">{{ x.tittel|typo }}</a></h3><p class="innlegg-av">{{ x.forfatter }} · <time datetime="{{ x.dato.isoformat() }}">{{ x.dato|kort_dato(short=False) }}</time></p></li>{% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% endblock %}
