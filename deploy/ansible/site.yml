@@ -1,0 +1,12 @@
+# Tingposten on the Pi, from this repository (#21). Safe to run again; on a Pi that is
+# already as described, a run changes nothing. The base system (Docker, Hailo, the camera
+# stack) is ~/Projects/rpi-setup's playbook.
+#
+#   cd deploy/ansible
+#   ansible-playbook site.yml --check --diff                 what a run would change, changing nothing
+#   ansible-playbook site.yml -K                             set up / bring back (sudo password for the firewall)
+#   ansible-playbook site.yml --skip-tags system             without sudo: everything but the firewall and linger
+- name: Tingposten
+  hosts: all
+  roles:
+    - tingposten

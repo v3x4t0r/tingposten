@@ -1,0 +1,16 @@
+# The comment server: Tailscale (Funnel to debatt.<tailnet>.ts.net) and the app, as in
+# deploy/debatt/compose.yml. Built here on the Pi; deploy.yml rebuilds when its code changes.
+- name: Which comment server containers run?
+  ansible.builtin.command:
+    cmd: docker compose ps --services --status running
+    chdir: "{{ tingposten_dir }}/deploy/debatt"
+  register: tingposten_compose_ps
+  changed_when: false
+  check_mode: false
+
+- name: Start the comment server (builds the image the first time)
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: "{{ tingposten_dir }}/deploy/debatt"
+  when: "'debatt' not in tingposten_compose_ps.stdout_lines or 'tailscale' not in tingposten_compose_ps.stdout_lines"
+  changed_when: true

@@ -1,0 +1,16 @@
+# The daily run in the user's crontab (deploy/crontab.example). Off by default: runs are
+# started from the control panel. PUBLISER in the repo decides whether it also publishes.
+- name: PATH for cron (uv, claude, codex)
+  ansible.builtin.cron:
+    name: PATH
+    env: true
+    job: "/home/{{ tingposten_bruker }}/.local/bin:/usr/local/bin:/usr/bin:/bin"
+    state: "{{ 'present' if tingposten_daglig_kjoring else 'absent' }}"
+
+- name: The daily run
+  ansible.builtin.cron:
+    name: tingposten daglig kjøring
+    minute: "{{ tingposten_daglig_minutt }}"
+    hour: "{{ tingposten_daglig_time }}"
+    job: "{{ tingposten_dir }}/deploy/run-daily.sh"
+    state: "{{ 'present' if tingposten_daglig_kjoring else 'absent' }}"

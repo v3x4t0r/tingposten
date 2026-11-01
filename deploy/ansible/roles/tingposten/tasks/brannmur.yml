@@ -1,0 +1,31 @@
+# The firewall that keeps the comment server's containers away from the home network and the
+# tailnet (deploy/debatt/brannmur.sh). Root: run with -K, or skip with --skip-tags system.
+- name: The firewall script
+  become: true
+  ansible.builtin.copy:
+    src: "{{ tingposten_dir }}/deploy/debatt/brannmur.sh"
+    remote_src: true
+    dest: /usr/local/sbin/tingposten-debatt-brannmur
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Restart brannmuren
+
+- name: The firewall's service (after Docker, at boot)
+  become: true
+  ansible.builtin.copy:
+    src: "{{ tingposten_dir }}/deploy/debatt/tingposten-debatt-brannmur.service"
+    remote_src: true
+    dest: /etc/systemd/system/tingposten-debatt-brannmur.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart brannmuren
+
+- name: The firewall is on and starts with the Pi
+  become: true
+  ansible.builtin.systemd_service:
+    name: tingposten-debatt-brannmur
+    enabled: true
+    state: started
+    daemon_reload: true
