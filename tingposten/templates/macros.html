@@ -193,3 +193,9 @@
   </div>
 </section>
 {%- endmacro %}
+
+{# Share links under the headline. Plain links, no scripts from Facebook and no tracking; del.js
+   adds the phone's own share menu (Instagram, Messenger, SMS …) and «Kopier lenke». #}
+{% macro del_lenker(url, tittel) %}
+<p class="del" data-del data-url="{{ url }}" data-tittel="{{ tittel }}"><span class="del-etikett">Del</span><a href="https://www.facebook.com/sharer/sharer.php?u={{ url|urlencode }}" target="_blank" rel="noopener">Facebook</a><a href="mailto:?subject={{ tittel|urlencode }}&amp;body={{ url|urlencode }}">E-post</a></p>
+{%- endmacro %}

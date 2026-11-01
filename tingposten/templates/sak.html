@@ -1,7 +1,9 @@
 {% extends "base.html" %}
-{% from "macros.html" import ikon, kildelinje, kildegrupper_html, figur_sak, rad, debatt_seksjon, meld_feil as meld_feil_lenker %}
+{% from "macros.html" import ikon, kildelinje, kildegrupper_html, figur_sak, rad, debatt_seksjon, del_lenker, meld_feil as meld_feil_lenker %}
 {% block title %}{{ s.overskrift }} · Tingposten{% endblock %}
 {% block description %}{{ s.dek or s.tittel }}{% endblock %}
+{% block meta %}<meta property="article:published_time" content="{{ s.dato.isoformat() }}">
+{% endblock %}
 {% block hovedklasse %}sakside{% endblock %}
 {% block main %}
 {% set FELT = (("hva_endres", "Hva endres"), ("hvem_pavirkes", "Hvem påvirkes"), ("hvorfor", "Hvorfor"), ("status", "Status"), ("nar_og_hvor", "Når og hvor")) %}
@@ -35,6 +37,7 @@
       {% if s.har_sammendrag or s.artikkel %}
       <p class="paa-siden"><span>På siden:</span>{% if s.artikkel %}<span><a href="#artikkel">Saken</a>, ca.&nbsp;{{ s.lesetid }}&nbsp;min</span>{% endif %}{% if s.har_sammendrag %}<a href="#kort">Kort fortalt</a>{% endif %}<a href="#dokumenter">Dokumenter</a></p>
       {% endif %}
+      {{ del_lenker(site_url ~ s.lenke, s.overskrift) }}
     </div>
   </header>
   {% if s.rettelser %}

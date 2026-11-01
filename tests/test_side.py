@@ -149,7 +149,8 @@ def test_editor_contact_and_email_report(tmp_path, data_dir, monkeypatch):
     om = (tmp_path / "uten" / "om" / "index.html").read_text()
     assert "Ansvarlig redaktør er" not in om and "mailto:" not in om and "som en offentlig sak på GitHub" in om
     sak = next((tmp_path / "uten" / "bergen" / "sak").rglob("index.html")).read_text()
-    assert "mailto:" not in sak and ">Meld feil</a>" in sak
+    # no address anywhere; the only mailto is the share link, which leaves the recipient to the reader
+    assert re.findall(r"mailto:[^?\"]", sak) == [] and ">Meld feil</a>" in sak
 
 
 def test_root_goes_straight_to_bergen_on_statichost(tmp_path, data_dir, monkeypatch):
