@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{# The test panel (debatt/testpanel.py): invited testers rate the newest saker. The invite
+   link carries the token (#t=…); the page keeps it in this browser. Hidden from search. #}
+{% block title %}Testpanel · Tingposten{% endblock %}
+{% block description %}Testpanel for inviterte testlesere.{% endblock %}
+{% block hovedklasse %}omside testpanelside{% endblock %}
+{% block main %}
+<header class="sidehode">
+  <h1 class="side-tittel">Testpanel</h1>
+  <p class="side-ingress">Hjelp oss å finne ut hvilke saker som betyr mest for folk i Bergen, og om kortene er lette å forstå.</p>
+</header>
+<div class="lesetekst testpanel-hjelp">
+  <p>For hver sak svarer du på fire ting. Det finnes ingen fasit: vi vil vite hva <em>du</em> mener.</p>
+  <ul>
+    <li><strong>Bør folk vite om dette?</strong> 1 er «trenger ingen å vite», 5 er «alle i Bergen bør få med seg dette».</li>
+    <li><strong>Endrer noe seg i hverdagen nå?</strong> 1 er «ingenting merkes», 5 er «mange merker det med en gang».</li>
+    <li><strong>Hvor hører saken hjemme?</strong> Forside (blant de viktigste), Kort (med, men lenger ned) eller Støy (trenger ikke vises).</li>
+    <li><strong>Er kortet klart?</strong> Forstår du hva som er vedtatt, og hvorfor, uten å kunne noe om saken fra før?</li>
+  </ul>
+  <p>Alt lagres med en gang du trykker. Når du har svart på en sak, ser du hva de andre testerne mente.</p>
+</div>
+<div class="testpanel" data-testpanel data-api="{{ debatt }}">
+  <p class="testpanel-status" role="status" aria-live="polite">Henter sakene …</p>
+  <noscript><p>Testpanelet trenger JavaScript.</p></noscript>
+</div>
+<script src="{{ root }}static/testpanel.js" defer></script>
+{% endblock %}

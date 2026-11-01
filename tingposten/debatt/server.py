@@ -46,7 +46,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
-from . import innsendt
+from . import innsendt, testpanel
 from .regler import REGLER_VERSJON
 from .tjeneste import Feil, Tjeneste
 
@@ -96,7 +96,8 @@ def _ip(request: Request) -> str:
     return str(adr)
 
 
-def lag_app(tjeneste: Tjeneste, opprinnelser: list[str], start_ko: bool = True) -> Starlette:
+def lag_app(tjeneste: Tjeneste, opprinnelser: list[str], start_ko: bool = True,
+            testpanel_saker: "testpanel.Saker | None" = None) -> Starlette:
     teller = IpTeller(IP_GRENSE)
     lenketeller = IpTeller(IP_GRENSE_LENKER)
 
@@ -229,11 +230,27 @@ def lag_app(tjeneste: Tjeneste, opprinnelser: list[str], start_ko: bool = True) 
     async def manuell(request):
         return svar(tjeneste.be_om_manuell(innlogget(request), kid(request)))
 
+    # The test panel (testpanel.py): the invite link's token, not a reader session.
+    def testerkonto(request: Request) -> dict:
+        t = testpanel.tester(tjeneste.db, okt(request))
+        if t is None or testpanel_saker is None:
+            raise Feil(401, "Lenken virker ikke. Be redaktøren om en ny.")
+        return t
+
+    async def testpanel_side(request):
+        return svar(testpanel.side(tjeneste.db, testerkonto(request), testpanel_saker.moter()))
+
+    async def testpanel_vurder(request):
+        t = testerkonto(request)
+        return svar(testpanel.vurder(tjeneste.db, t, testpanel_saker.moter(), await kropp(request)))
+
     async def helse(request):
         return svar({"ok": True})
 
     ruter = [
         Route("/api/helse", endepunkt(helse)),
+        Route("/api/testpanel", endepunkt(testpanel_side)),
+        Route("/api/testpanel/vurdering", endepunkt(testpanel_vurder), methods=["POST"]),
         Route("/api/innlogging", endepunkt(be_om_lenke, True), methods=["POST"]),
         Route("/api/innlogging/bekreft", endepunkt(bekreft, True), methods=["POST"]),
         Route("/api/utlogging", endepunkt(logg_ut, True), methods=["POST"]),
@@ -313,4 +330,5 @@ def app_fra_config() -> Starlette:
 
     tjeneste = Tjeneste(Db(config.DEBATT_DIR / "debatt.db"), moderering.kjede(),
                         Saker(config.DEBATT_DIR / "saker.json"), epost.sender_fra_miljo(), config.SITE_URL)
-    return lag_app(tjeneste, opprinnelser_fra_config())
+    return lag_app(tjeneste, opprinnelser_fra_config(),
+                   testpanel_saker=testpanel.Saker(config.DEBATT_DIR / "testpanel.json"))

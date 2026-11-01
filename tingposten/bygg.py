@@ -233,6 +233,8 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
         write("om/debattregler/index.html", "debattregler.html", side="om", regler=REGLER, strenge=STRENGE,
               eksterne_moderatorer=_eksterne_moderatorer())
         skriv_sak_indeks(saker, debatt_dir or config.DEBATT_DIR, innlegg)
+        skriv_testpanel(saker, debatt_dir or config.DEBATT_DIR, idag)
+        write("bergen/testpanel/index.html", "testpanel.html", side="testpanel", noindex=True)
     # statichost serves /404.html for a missing path at any depth, so its links
     # can't be relative: they start at the site's own root path ("/").
     write("404.html", "404.html", side="404", root=urlsplit(_site_url()).path, sti=None, noindex=True)
@@ -304,6 +306,36 @@ def skriv_sak_indeks(saker: list[dict], debatt_dir: Path, innlegg: list[dict] = 
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(indeks, ensure_ascii=False, indent=1))
+    os.replace(tmp, path)
+    return path
+
+
+TESTPANEL_DAGER = 120  # meetings the editor can pick for the test panel
+INGEN_NY_BESLUTNING = IKKE_AVGJORT | {"orientering", "falt"}
+
+
+def skriv_testpanel(saker: list[dict], debatt_dir: Path, idag: date) -> Path:
+    """data/debatt/testpanel.json: the published cards of recent meetings, for the test
+    panel on the comment server (debatt/testpanel.py). No score: testers rate blind."""
+    grense = idag - timedelta(days=TESTPANEL_DAGER)
+    moter: dict[str, dict] = {}
+    for s_ in sorted(saker, key=lambda x: (x["dato"], x["seq"])):
+        if s_["dato"] < grense or s_["dato"] > idag or not s_["har_sammendrag"]:
+            continue
+        m = moter.setdefault(s_["mote"], {"id": f"{s_['utvalg']}/{s_['dato'].isoformat()}", "organ": s_["organ_kort"],
+                                          "dato": s_["dato"].isoformat(), "dato_tekst": s_["dato_tekst"], "saker": []})
+        m["saker"].append({
+            "key": s_["key"], "nr": s_["nr_etikett"], "overskrift": s_["overskrift"], "ingress": s_["dek"] or "",
+            "felt": [{"label": f["label"], "tekst": f["tekst"]} for f in s_["kort_felt"] if f.get("tekst")],
+            "status": s_["status_tekst"], "lenke": _site_url() + s_["lenke"],
+            # For part 2 (testpanel.funn): nothing new was decided, so nothing changes now.
+            "ingen_ny_beslutning": s_["status_kode"] in INGEN_NY_BESLUTNING,
+        })
+    path = debatt_dir / "testpanel.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps({"moter": sorted(moter.values(), key=lambda m: m["dato"], reverse=True)},
+                              ensure_ascii=False))
     os.replace(tmp, path)
     return path
 
