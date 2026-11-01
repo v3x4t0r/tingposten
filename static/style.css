@@ -358,6 +358,11 @@ a:hover { text-decoration-thickness: 2px; }
 .kommunetittel strong { font-weight: 600; color: var(--blekk-2); }
 .paa-siden { margin: 1.2rem 0 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font: 500 0.8125rem/1.3 var(--sans); color: var(--dempet); }
 .paa-siden a { font-weight: 600; }
+/* Share links (macros.html del_lenker, del.js) */
+.del { margin: 0.9rem 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; font: 500 0.8125rem/1.3 var(--sans); color: var(--dempet); }
+.del-etikett { font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; font-size: 0.6875rem; color: var(--blekk); }
+.del a { font-weight: 600; }
+.del-knapp { padding: 0; border: 0; background: none; font: inherit; font-weight: 600; color: var(--lenke); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.18em; cursor: pointer; }
 
 /* Below 1180px the page reads in DOM order (card, figures, documents,
    background), so the visual order is the focus order. */
@@ -853,6 +858,10 @@ main > .sidehode:first-child { padding-top: 38px; }
 .regelliste dd { margin: 4px 0 0; }
 .debatt-sporsmal { margin: 14px 0 0; padding: 0; border: 0; }
 .debatt-sporsmal legend { padding: 0; margin-bottom: 6px; font: 400 1rem/1.5 var(--serif); }
+.debatt-sporsmal legend > span { display: block; }
+.debatt-eksempel-nr { font: 600 .72rem/1.4 var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--dempet); }
+.debatt-eksempel { margin: 4px 0; padding-left: 12px; border-left: 3px solid var(--linje-2); font-style: italic; }
+.debatt-eksempel-sporsmal { font: 400 .9rem/1.4 var(--sans); }
 .debatt-sporsmal label { display: inline-flex; align-items: center; gap: 6px; margin: 0 18px 0 0; }
 .debatt-forklaring { margin: 6px 0 0; font: 400 0.875rem/1.45 var(--sans); color: var(--dempet); }
 .debatt-forklaring.riktig { color: var(--blekk); }
