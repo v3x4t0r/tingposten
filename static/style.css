@@ -18,6 +18,8 @@
   --sterk: #141413;
   --lenke: #164a7a;
   --fokus: #a35c00;
+  --riktig: #2e6b30;   /* quiz feedback only: never in figures or about parties */
+  --feil: #a3261a;
   --stolpe: #3a3935;
   --stolpe-spor: #ddd6c4;
   --merket: #e6dcc3;
@@ -58,6 +60,8 @@
     --sterk: #cbc3b1;  /* softer than the text: 3 px rules glare in full white */
     --lenke: #9cc3ec;
     --fokus: #f0b85a;
+    --riktig: #8fce8a;
+    --feil: #f2907f;
     --stolpe: #d0c9b8;
     --stolpe-spor: #2f2b23;
     --merket: #2d2920;
@@ -852,4 +856,7 @@ main > .sidehode:first-child { padding-top: 38px; }
 .debatt-sporsmal label { display: inline-flex; align-items: center; gap: 6px; margin: 0 18px 0 0; }
 .debatt-forklaring { margin: 6px 0 0; font: 400 0.875rem/1.45 var(--sans); color: var(--dempet); }
 .debatt-forklaring.riktig { color: var(--blekk); }
-.debatt-forklaring.feil { color: var(--blekk); font-weight: 600; }
+.debatt-forklaring.feil { color: var(--blekk); }
+.debatt-forklaring .debatt-dom { font-weight: 700; }
+.debatt-forklaring.riktig .debatt-dom { color: var(--riktig); }
+.debatt-forklaring.feil .debatt-dom { color: var(--feil); }
