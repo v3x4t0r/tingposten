@@ -86,19 +86,34 @@ def test_indexnow_sends_recent_pages_only(monkeypatch, tmp_path):
         ("bergen/", date(2026, 10, 1)), ("bergen/sak/gammel/", date(2026, 9, 1)),
         ("bergen/sak/ny/", date(2026, 9, 30)), ("om/", None)]))
 
+    kart = (tmp_path / "sitemap.xml").read_text()
+    svar = lambda kode, tekst="": type("R", (), {"status_code": kode, "text": tekst})()  # noqa: E731
+
     class Okt:
-        def __init__(self):
-            self.sendt = []
+        def __init__(self, ute_etter=0):
+            self.sendt, self.hentet, self.ute_etter = [], 0, ute_etter
+
+        def get(self, url, timeout):
+            self.hentet += 1
+            if self.hentet <= self.ute_etter * 2:        # statichost still deploying: the old site
+                return svar(404)
+            return svar(200, kart if url.endswith("sitemap.xml") else "abc123abc123\n")
 
         def post(self, url, json, timeout):
             self.sendt.append((url, json))
-            return type("R", (), {"status_code": 200, "text": ""})()
+            return svar(200)
 
-    okt = Okt()
-    assert synlighet.varsle_indexnow(tmp_path, idag=date(2026, 10, 1), session=okt) == 2
+    sovet = []
+    okt = Okt(ute_etter=2)    # live on the third look
+    assert synlighet.varsle_indexnow(tmp_path, idag=date(2026, 10, 1), session=okt, sov=sovet.append) == 2
+    assert len(sovet) == 2
     url, body = okt.sendt[0]
     assert url == synlighet.INDEXNOW and body["host"] == "tingposten.no"
     assert body["keyLocation"] == f"{URL}abc123abc123.txt"
     assert body["urlList"] == [f"{URL}bergen/", f"{URL}bergen/sak/ny/"]
+    # the deploy never shows up: nothing is sent, so IndexNow never sees a missing key file
+    treg = Okt(ute_etter=10**6)
+    assert synlighet.varsle_indexnow(tmp_path, idag=date(2026, 10, 1), session=treg, maks=0, sov=sovet.append) == 0
+    assert treg.sendt == []
     monkeypatch.setattr(config, "SKJUL_FOR_SOK", True)
     assert synlighet.varsle_indexnow(tmp_path, session=okt) == 0 and len(okt.sendt) == 1

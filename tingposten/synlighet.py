@@ -22,6 +22,7 @@ byrådet, the tema) are in titles and headings where readers see them too.
 
 import json
 import logging
+import time
 from datetime import date, timedelta
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -37,6 +38,7 @@ log = logging.getLogger(__name__)
 STENGT = ("bergen/logg-inn/", "bergen/debatt/godkjenn/")
 INDEXNOW = "https://api.indexnow.org/indexnow"
 NYLIG_DAGER = 2  # IndexNow: pages changed in the last two days
+VENT_MAKS, VENT_STEG = 600, 15   # seconds: how long to wait for statichost's deploy, and how often to look
 
 
 def robots(site_url: str) -> str:
@@ -192,9 +194,33 @@ def nylige(sitemap_xml: str, idag: date, dager: int = NYLIG_DAGER) -> list[str]:
     return ut
 
 
-def varsle_indexnow(site_dir: Path, idag: date | None = None, session=None) -> int:
-    """After a publish: tell the IndexNow engines which pages changed. Best effort;
-    returns how many URLs were sent (0 when hidden, without a key or on failure)."""
+def er_ute(site_url: str, kart_xml: str, nokkel: str, session=None, maks: float = VENT_MAKS,
+           steg: float = VENT_STEG, sov=time.sleep) -> bool:
+    """Wait until the deploy is live: the published sitemap is the one just built and the
+    key file answers. IndexNow checks the key file at once, and a check that fails while
+    statichost is still deploying makes it refuse the key for a while (1.11: 403
+    "UserForbiddedToAccessSite")."""
+    http = session or requests
+    nokkel_url = f"{site_url}{nokkelfil(nokkel)[0]}"
+    frist = time.monotonic() + maks
+    while True:
+        try:
+            kart = http.get(f"{site_url}sitemap.xml", timeout=20)
+            fil = http.get(nokkel_url, timeout=20)
+            if kart.status_code == 200 and kart.text == kart_xml and fil.status_code == 200 \
+                    and fil.text.strip() == nokkel:
+                return True
+        except requests.RequestException:
+            pass
+        if time.monotonic() >= frist:
+            return False
+        sov(steg)
+
+
+def varsle_indexnow(site_dir: Path, idag: date | None = None, session=None, **vent) -> int:
+    """After a publish: tell the IndexNow engines which pages changed, once the deploy is
+    live. Best effort; returns how many URLs were sent (0 when hidden, without a key, when
+    the deploy didn't show up in time, or on failure)."""
     nokkel = getattr(config, "INDEXNOW_NOKKEL", None)
     kart = Path(site_dir) / "sitemap.xml"
     if getattr(config, "SKJUL_FOR_SOK", False) or not nokkel or not kart.exists():
@@ -203,6 +229,9 @@ def varsle_indexnow(site_dir: Path, idag: date | None = None, session=None) -> i
     if not urler:
         return 0
     site_url = config.SITE_URL
+    if not er_ute(site_url, kart.read_text(), nokkel, session=session, **vent):
+        log.warning("IndexNow: nettstedet var ikke oppdatert etter %d sekunder; ingen sider meldt", VENT_MAKS)
+        return 0
     body = {"host": urlsplit(site_url).hostname, "key": nokkel,
             "keyLocation": f"{site_url}{nokkelfil(nokkel)[0]}", "urlList": urler}
     try:
