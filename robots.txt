@@ -2,5 +2,6 @@ User-agent: *
 Allow: /
 Disallow: /bergen/logg-inn/
 Disallow: /bergen/debatt/godkjenn/
+Disallow: /bergen/testpanel/
 
 Sitemap: https://tingposten.no/sitemap.xml
