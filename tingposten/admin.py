@@ -14,6 +14,7 @@ in .env, HTTP Basic auth). Requests must name a local host or an IP address
 site can't send without a CORS preflight that is never answered.
 """
 
+import ast
 import base64
 import fcntl
 import hmac
@@ -296,9 +297,127 @@ def laast(lock: Path) -> bool:
         return False
 
 
+# What a run did, in words (owner 1.11: «Sjekk nå» seemed to give nothing, and the
+# log's «klassifiser: 87 saker» read like 87 new saker). Read from run-daily.sh's log.
+_HENT = re.compile(r"INFO (.+?) \d{4}: \d+ items, \{'ny': (\d+), 'vedtatt': (\d+)")
+_HENT_HOPPET = "hent: the agenda was fetched less than 30 minutes ago"
+_PDF = re.compile(r"(\d+) PDF\(s\) to fetch across (\d+) meeting")
+_RESULTAT = re.compile(r"INFO (skriv|artikkel|omskriv)( artikkel)?: (\{.*\})$")
+_BYGD = re.compile(r"INFO built .*?\{'sider': \d+, 'saker': (\d+), 'fremhevet': (\d+)")
+_INDEXNOW = re.compile(r"IndexNow: (\d+) sider meldt")
+_GRENSE = re.compile(r"hit your [\w-]+ limit[^\n\"']*?resets (\d{1,2})(?::(\d\d))?\s?([ap]m)")
+
+
+def _flertall(n: int, en: str, flere: str) -> str:
+    return f"{n} {en if n == 1 else flere}"
+
+
+def oppsummer(run: list[str], forrige_bygg: tuple[int, int] | None = None) -> dict:
+    """A run's log lines as short sentences for the panel: what came from Bergen
+    kommune, what was written, built and published (punkter), and what went wrong
+    or needs a person (advarsler)."""
+    tekst = "\n".join(run)
+    punkter, advarsler = [], []
+    nye = [(m.group(1), int(m.group(2)) + int(m.group(3))) for m in _HENT.finditer(tekst)]
+    if _HENT_HOPPET in tekst:
+        punkter.append("Agendaen var hentet for under 30 minutter siden, så den ble ikke hentet på nytt.")
+    elif nye:
+        endret = [(organ, n) for organ, n in nye if n]
+        punkter.append("Nytt hos Bergen kommune: " + ", ".join(f"{organ} ({n})" for organ, n in endret) + "."
+                       if endret else "Ingen nye saker eller vedtak hos Bergen kommune.")
+    if m := _PDF.search(tekst):
+        n, moter_ = int(m.group(1)), _flertall(int(m.group(2)), "møte", "møter")
+        if not n:
+            punkter.append("Ingen nye PDF-er å hente.")
+        elif "start (manuell)" in run[0] and "PDF download stopped" not in tekst:
+            punkter.append(f"Hentet {_flertall(n, 'PDF', 'PDF-er')} fra {moter_}.")
+        else:
+            punkter.append(f"{_flertall(n, 'PDF', 'PDF-er')} fra {moter_} kan hentes med «Last ned og publiser».")
+    # The steps' result lines: «skriv: {'antall': {'skrevet': 84, 'feil': 3}, …}» for new
+    # work, «omskriv: {'omskriv': {'antall': {'omskrevet': 4}}, …}» for rewrites.
+    nytt, omskrevet, feilet = {"skriv": 0, "artikkel": 0}, {"skriv": 0, "artikkel": 0}, 0
+    for linje in run:
+        if not (m := _RESULTAT.search(linje)):
+            continue
+        try:
+            resultat = ast.literal_eval(m.group(3))
+        except (ValueError, SyntaxError):
+            continue
+        if m.group(1) == "omskriv":
+            antall = next((v.get("antall", {}) for v in resultat.values() if isinstance(v, dict)), {})
+            omskrevet["artikkel" if m.group(2) else "skriv"] += sum(
+                n for k, n in antall.items() if k.startswith("omskrevet"))
+            feilet += antall.get("feil", 0)
+        else:
+            antall = resultat.get("antall", {})
+            nytt[m.group(1)] += sum(n for k, n in antall.items() if k.startswith("skrevet"))
+            feilet += antall.get("feil", 0)
+    if nytt["skriv"]:
+        punkter.append(f"Skrev {_flertall(nytt['skriv'], 'nytt kort', 'nye kort')}.")
+    if omskrevet["skriv"]:
+        punkter.append(f"Skrev om {_flertall(omskrevet['skriv'], 'avvist kort', 'avviste kort')}.")
+    if nytt["artikkel"]:
+        punkter.append(f"Skrev {_flertall(nytt['artikkel'], 'bakgrunnsartikkel', 'bakgrunnsartikler')}.")
+    if omskrevet["artikkel"]:
+        punkter.append(f"Skrev om {_flertall(omskrevet['artikkel'], 'avvist artikkel', 'avviste artikler')}.")
+    if "== kjor" in tekst and not any(nytt.values()) and not any(omskrevet.values()) and not feilet:
+        punkter.append("Ingen nye kort eller artikler å skrive.")
+    bygd = [(int(m.group(1)), int(m.group(2))) for m in _BYGD.finditer(tekst)]
+    if bygd:
+        saker, fremhevet = bygd[-1]
+        endring = ""
+        if forrige_bygg and forrige_bygg[1] != fremhevet:
+            endring = f" (før {forrige_bygg[1]})"
+        punkter.append(f"Siden har {saker} saker, {fremhevet} av dem fremhevet{endring}.")
+    if "asked statichost to deploy" in tekst:
+        punkter.append("Publisert på tingposten.no.")
+    elif "PUBLISER not set" in tekst:
+        punkter.append("Bygget, men ikke publisert: daglig publisering er av.")
+    elif "STOP found" in tekst:
+        advarsler.append("STOP er satt, så ingenting ble publisert.")
+    if m := _INDEXNOW.search(tekst):
+        punkter.append(f"Meldte {m.group(1)} sider til Bing (IndexNow).")
+
+    if "codex" in tekst and "401 Unauthorized" in tekst:
+        advarsler.append("Codex er logget ut på Pi-en, så Claude tok over faktasjekken. Logg inn igjen: "
+                         "ssh til Pi-en og kjør «codex login».")
+    elif "takes over for the rest of this run" in tekst:
+        advarsler.append("Faktasjekken byttet til reservemodellen underveis.")
+    if feilet:
+        punkter.append(f"{_flertall(feilet, 'sak', 'saker')} kunne ikke skrives denne gangen.")
+    if "Invalid API key" in tekst:
+        advarsler.append("Claude avviste API-nøkkelen. ANTHROPIC_API_KEY må være tom på Pi-en, så abonnementet "
+                         "brukes.")
+    if m := _GRENSE.search(tekst):
+        time = int(m.group(1)) % 12 + (12 if m.group(3) == "pm" else 0)
+        advarsler.append(f"Claude-abonnementet nådde grensen sin, som nullstilles kl. {time:02d}.{m.group(2) or '00'}. "
+                         "Neste kjøring skriver det som mangler.")
+    elif "warning: kjor exit" in tekst:
+        advarsler.append("Skrivingen stoppet før den var ferdig. Neste kjøring skriver det som mangler.")
+    if "server keeps refusing us" in tekst:
+        advarsler.append("Bergen kommune avviste oss. Prøv igjen i morgen.")
+    elif "hent failed" in tekst:
+        advarsler.append("Agendaen kunne ikke hentes. Se loggen.")
+    if "bygg failed" in tekst:
+        advarsler.append("Siden kunne ikke bygges, så den ble ikke publisert. Se loggen.")
+    if "IndexNow svarte" in tekst:
+        advarsler.append("Bing (IndexNow) avviste varselet. Siden er publisert likevel.")
+    if "PDF download stopped" in tekst:
+        advarsler.append("Nedlastingen av PDF-er stoppet underveis. Neste kjøring tar resten.")
+    return {"punkter": punkter, "advarsler": advarsler}
+
+
+def _forrige_bygg(logs: list[Path], for_kjoringen: list[str]) -> tuple[int, int] | None:
+    """(saker, fremhevet) from the last build before this run, for «før 52»."""
+    for tekst in ["\n".join(for_kjoringen)] + [p.read_text(errors="replace") for p in reversed(logs[-4:-1])]:
+        if bygd := _BYGD.findall(tekst):
+            return int(bygd[-1][0]), int(bygd[-1][1])
+    return None
+
+
 def siste_kjoring(log_dir: Path) -> dict | None:
     """The last run in run-daily.sh's newest log: mode, start, current step,
-    whether it got to the end, and its last lines."""
+    whether it got to the end, its last lines, and what it did (oppsummer)."""
     logs = sorted(p for p in log_dir.glob("*.log") if re.fullmatch(r"\d{4}-\d\d-\d\d\.log", p.name))
     if not logs:
         return None
@@ -316,6 +435,7 @@ def siste_kjoring(log_dir: Path) -> dict | None:
         "ferdig": any(line.endswith(" done") for line in run),
         "slutt": run[-1].split(" ", 1)[0] if len(run) > 1 else None,
         "logg": run[-LOGG_LINJER:],
+        "oppsummering": oppsummer(run, _forrige_bygg(logs, lines[:starts[-1]])),
     }
 
 
@@ -361,6 +481,48 @@ class Kjorer:
             return 202, "Startet."
 
 
+_ARBEID: dict = {"tid": None, "verdi": None, "data_dir": None, "regner": False}
+_ARBEID_LAAS = threading.Lock()
+ARBEID_CACHE = timedelta(minutes=2)
+_UKJENT = {"kort": None, "omskriv": None, "artikler": None}
+
+
+def _tell_arbeid(items: list[dict], data_dir: Path) -> dict:
+    try:
+        return {
+            "kort": len(pipeline.todo("skriv", items, data_dir)),
+            "omskriv": len(pipeline.omskriv_kandidater(items, data_dir)),
+            "artikler": len(pipeline.todo("artikkel", pipeline.velg_artikler(items, data_dir), data_dir)),
+        }
+    except Exception:  # the panel must load even if the pipeline's bookkeeping trips
+        log.exception("admin: could not count the work waiting")
+        return dict(_UKJENT)
+
+
+def arbeid(items: list[dict], data_dir: Path, vent: bool = False) -> dict:
+    """What «Last ned og publiser» would write with the PDFs already here: new cards,
+    rejected cards to rewrite, background articles. Counting reads many files (seconds
+    on the Pi), so it runs in the background and the panel shows the last count
+    (None until the first is done); `vent` counts at once (tests)."""
+    na = datetime.now(timezone.utc)
+    with _ARBEID_LAAS:
+        fersk = _ARBEID["tid"] and na - _ARBEID["tid"] < ARBEID_CACHE and _ARBEID["data_dir"] == data_dir
+        if fersk or _ARBEID["regner"]:
+            return _ARBEID["verdi"] if _ARBEID["data_dir"] == data_dir and _ARBEID["verdi"] else dict(_UKJENT)
+        _ARBEID["regner"] = True
+
+    def regn():
+        verdi = _tell_arbeid(items, data_dir)
+        with _ARBEID_LAAS:
+            _ARBEID.update(tid=datetime.now(timezone.utc), verdi=verdi, data_dir=data_dir, regner=False)
+
+    if vent:
+        regn()
+        return _ARBEID["verdi"]
+    threading.Thread(target=regn, name="arbeid", daemon=True).start()
+    return _ARBEID["verdi"] if _ARBEID["data_dir"] == data_dir and _ARBEID["verdi"] else dict(_UKJENT)
+
+
 def status(kjorer: Kjorer, site_dir: Path = config.SITE_DIR, idag: date | None = None) -> dict:
     root, data_dir = kjorer.root, kjorer.data_dir
     idag = idag or date.today()
@@ -378,6 +540,7 @@ def status(kjorer: Kjorer, site_dir: Path = config.SITE_DIR, idag: date | None =
             "pdf_pa_nytt": sum(1 for t in mangler if t.get("oppdater")),
             "pdf_minutter": max(1, round(len(mangler) * PDF_SEKUNDER / 60)) if mangler else 0,
             "uten_kort": sum(1 for i in items if not (data_dir / "redigert" / f"{pdf.key(i)}.json").exists()),
+            **arbeid(items, data_dir),
         },
         "sist_hentet": _iso(sist_hentet(data_dir)),
         "sjekk_mulig": neste_sjekk.isoformat(timespec="seconds") if neste_sjekk else None,
