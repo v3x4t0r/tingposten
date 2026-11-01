@@ -433,8 +433,75 @@
     hent();
   }
 
+  /* --- send a debattinnlegg (the Debatt page; logged in) -------------------- */
+
+  function innleggSkjema(rot) {
+    if (!hentOkt()) return;  // the placeholder asks the reader to log in first
+    var MAKS_ANBEFALT = 4000;
+    function felt(navn, etikett, attrs) {
+      var id = "innlegg-" + navn;
+      var input = el(attrs.tag || "input", Object.assign({ id: id, name: navn }, attrs.attrs));
+      return [el("label", { for: id, tekst: etikett }), input];
+    }
+    var navn = felt("navn", "Fullt navn (innlegget trykkes med det)", { attrs: { required: true, maxlength: 80, autocomplete: "name" } });
+    var om = felt("om", "Hvem du er (valgfritt, f.eks. «lærer, bor i Åsane»)", { attrs: { maxlength: 80 } });
+    var tittel = felt("tittel", "Tittel", { attrs: { required: true, maxlength: 120 } });
+    var tekst = felt("tekst", "Teksten (tom linje mellom avsnitt)", { tag: "textarea", attrs: { required: true, rows: 14, maxlength: 6000 } });
+    var teller = el("p", { klasse: "smaatekst innlegg-teller", "aria-live": "polite" });
+    function tell() {
+      var n = tekst[1].value.length;
+      teller.textContent = n + " av " + MAKS_ANBEFALT + " tegn" + (n > MAKS_ANBEFALT ? ": lengre enn vi ber om, redaktøren kan korte ned." : "");
+    }
+    tekst[1].addEventListener("input", tell); tell();
+    var melding = el("p", { klasse: "debatt-melding", role: "status", "aria-live": "polite" });
+    var knapp = el("button", { type: "submit", tekst: "Send innlegget" });
+    var skjema = el("form", { klasse: "debatt-inn", onsubmit: function (e) {
+      e.preventDefault();
+      knapp.disabled = true;
+      melding.textContent = "Sender …";
+      melding.classList.remove("feil");
+      api(rot.dataset.api, "POST", "/api/innlegg", { navn: navn[1].value, om: om[1].value, tittel: tittel[1].value, tekst: tekst[1].value })
+        .then(function () {
+          rot.replaceChildren(el("p", { tekst: "Takk! Innlegget er sendt. Redaktøren leser det og svarer deg på e-post. "
+            + "Endrer redaktøren noe, får du se den nye versjonen før den publiseres." }));
+        })
+        .catch(function (f) { knapp.disabled = false; melding.textContent = f.message; melding.classList.add("feil"); });
+    } }, [].concat(navn, om, tittel, tekst, [teller, el("div", { klasse: "debatt-rad" }, [knapp]), melding]));
+    rot.replaceChildren(skjema);
+  }
+
+  /* --- the writer approves the editor's version (link in the e-mail) -------- */
+
+  function godkjennSide(rot) {
+    var status = rot.querySelector(".godkjenn-status");
+    var m = /[#&]t=([A-Za-z0-9_-]{20,100})/.exec(location.hash);
+    history.replaceState(null, "", location.pathname);
+    if (!m) { status.textContent = "Lenken er ufullstendig. Svar på e-posten, så ordner vi det."; return; }
+    var token = m[1];
+    api(rot.dataset.api, "POST", "/api/innlegg/godkjenning", { token: token }).then(function (d) {
+      var tekst = d.tekst.split(/\n\s*\n/).map(function (a) { return el("p", { tekst: a }); });
+      var knapp = el("button", { type: "button", tekst: "Godkjenn denne versjonen" });
+      var svar = el("p", { klasse: "debatt-melding", role: "status", "aria-live": "polite" });
+      knapp.addEventListener("click", function () {
+        knapp.disabled = true;
+        api(rot.dataset.api, "POST", "/api/innlegg/godkjenn", { token: token }).then(function () {
+          svar.textContent = "Takk! Redaktøren publiserer innlegget, og du får en e-post når det er ute.";
+          knapp.remove();
+        }).catch(function (f) { knapp.disabled = false; svar.textContent = f.message; });
+      });
+      status.textContent = d.godkjent ? "Du har allerede godkjent denne versjonen." : "Slik vil innlegget ditt stå på Tingposten:";
+      rot.append.apply(rot, [el("div", { klasse: "godkjenn-tekst" }, [el("h2", { tekst: d.tittel }),
+        el("p", { klasse: "innlegg-byline" }, [el("span", { klasse: "innlegg-navn", tekst: d.navn }), d.om ? el("span", { klasse: "innlegg-om", tekst: d.om }) : null])]
+        .concat(tekst)), d.godkjent ? null : knapp, svar,
+        el("p", { klasse: "smaatekst", tekst: "Er du ikke enig i endringene, svarer du bare på e-posten." })]
+        .filter(Boolean));
+    }).catch(function (f) { status.textContent = f.message; });
+  }
+
   visKonto();
   document.querySelectorAll("[data-debatt-sak]").forEach(function (rot) { new Debatt(rot); });
   document.querySelectorAll("[data-mest-kommentert]").forEach(mestKommentert);
+  document.querySelectorAll("[data-innlegg-skjema]").forEach(innleggSkjema);
+  document.querySelectorAll("[data-innlegg-godkjenn]").forEach(godkjennSide);
   document.querySelectorAll("[data-debatt-innlogging]").forEach(loggInn);
 })();

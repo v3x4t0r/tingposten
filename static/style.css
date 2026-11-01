@@ -914,3 +914,19 @@ main > .sidehode:first-child { padding-top: 38px; }
 .innlegg-merknad { max-width: 37em; margin: 18px 0 0; padding-top: 12px; border-top: 1px solid var(--linje); font: italic 400 0.9375rem/1.5 var(--didone); color: var(--dempet); }
 .innleggside .rad .innlegg-av { margin-top: 4px; }
 @media print { .konto-lenke, .mest-kommentert, .send-inn, .debatt.konto { display: none !important; } }
+
+/* The debattinnlegg form (Debatt page) and the writer's approval page */
+.innlegg-skjema label { display: block; margin: 10px 0 4px; font: 500 0.875rem/1.4 var(--sans); color: var(--blekk); }
+.innlegg-skjema input, .innlegg-skjema textarea { display: block; width: 100%; box-sizing: border-box; padding: 9px 10px;
+  font: 400 1rem/1.5 var(--serif); color: var(--blekk); background: var(--papir); border: 1px solid var(--linje-2); border-radius: 2px; }
+.innlegg-skjema textarea { resize: vertical; min-height: 14em; }
+.innlegg-skjema input:focus-visible, .innlegg-skjema textarea:focus-visible { outline: 3px solid var(--fokus); outline-offset: 0; }
+.innlegg-skjema button { margin-top: 10px; font: 600 0.875rem/1.2 var(--sans); color: var(--papir); background: var(--blekk);
+  border: 0; border-radius: 2px; padding: 12px 16px; min-height: 44px; cursor: pointer; }
+.innlegg-skjema button:disabled { opacity: 0.55; cursor: default; }
+.innlegg-skjema .feil { color: var(--feil); }
+.innlegg-teller { margin: 4px 0 0; }
+.godkjenn-tekst { margin: 18px 0; padding: 16px 20px; background: var(--boks); border-top: 3px solid var(--sterk); }
+.godkjenn-tekst h2 { margin: 0 0 6px; font: 700 1.6rem/1.15 var(--didone); }
+[data-innlegg-godkjenn] > button { font: 600 0.9375rem/1.2 var(--sans); color: var(--papir); background: var(--blekk); border: 0;
+  border-radius: 2px; padding: 12px 18px; min-height: 44px; cursor: pointer; }
