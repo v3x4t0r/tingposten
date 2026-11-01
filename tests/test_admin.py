@@ -102,9 +102,13 @@ def test_meetings_and_headline(data_dir):
 
     assert admin.neste(moter)["type"] == "klar"
     uten_klar = [m for m in moter if m["status"] != "klar"]
-    assert admin.neste(uten_klar)["tittel"] == "Bystyret tirsdag 27. oktober venter på protokoll"
-    bare_kommende = [m for m in moter if m["status"] in ("kommende", "ferdig", "mangler")]
-    assert admin.neste(bare_kommende)["tittel"] == "Neste møte: Byrådet torsdag 5. november"
+    neste = admin.neste(uten_klar)
+    assert neste["tittel"] == "Neste møte: Byrådet torsdag 5. november" and "ingenting du må gjøre" in neste["tekst"]
+    assert any(d.startswith("Venter: Bystyret tirsdag 27. oktober") for d in neste["detaljer"])
+    assert any(d.startswith("Mangler: Bystyret") for d in neste["detaljer"])
+    uten_kommende = [m for m in moter if m["status"] in ("venter", "ferdig")]
+    assert admin.neste(uten_kommende)["tittel"] == "Venter på kommunen"
+    assert admin.neste([m for m in moter if m["status"] == "ferdig"])["tittel"] == "Alt er oppdatert"
 
 
 def test_expected_date():
