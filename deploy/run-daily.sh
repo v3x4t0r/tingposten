@@ -7,6 +7,8 @@
 #   run-daily.sh --manuell  hent → the missing PDFs, with the same polite script a person runs
 #                           by hand → kjor → bygg → publiser. Someone pressed the button, so
 #                           PUBLISER isn't needed; STOP still wins.
+#   run-daily.sh --publiser bygg → publiser only (the panel, after the editor published a
+#                           debattinnlegg). STOP still wins.
 #
 # Exit codes: 0 ok (also when publishing is off or STOP is set),
 # 2 Bergen kommune refused the agenda fetch, 64 unknown mode, other = failure.
@@ -17,7 +19,8 @@ case "${1:-}" in
   "") ;;
   --sjekk) MODUS=sjekk ;;
   --manuell) MODUS=manuell ;;
-  *) echo "usage: $0 [--sjekk | --manuell]" >&2; exit 64 ;;
+  --publiser) MODUS=publiser ;;
+  *) echo "usage: $0 [--sjekk | --manuell | --publiser]" >&2; exit 64 ;;
 esac
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -44,6 +47,8 @@ steg() { log "== $*"; }
 run() { uv run --no-sync tingposten "$@"; }
 
 log "start ($MODUS)"
+
+if [ "$MODUS" != publiser ]; then
 
 # 1. Agenda metadata. If Bergen refuses us, nothing else happens today.
 # A run started by hand skips this when the agenda was fetched in the last
@@ -108,6 +113,8 @@ run kjor || rc=$?
 if [ "$rc" -ne 0 ]; then
   log "warning: kjor exit $rc (often a model session limit); the next run redoes what is missing"
 fi
+
+fi  # not publiser
 
 # 4. Build site/ from what is publishable. A failed build must not be published.
 steg bygg

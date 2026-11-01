@@ -44,7 +44,7 @@ log = logging.getLogger(__name__)
 PASSORD_ENV = "TINGPOSTEN_ADMIN_PASSORD"
 SJEKK_PAUSE = timedelta(minutes=30)  # run-daily.sh skips hent this soon after the last one
 PDF_SEKUNDER = 6                     # per file at the download script's pace (5 s pause + the file)
-MODUSER = ("manuell", "sjekk")
+MODUSER = ("manuell", "sjekk", "publiser")
 SIDE = Path(__file__).parent / "templates" / "admin.html"
 STATIC = Path(__file__).parent / "static"
 STATIC_TYPER = {".css": "text/css; charset=utf-8", ".woff2": "font/woff2", ".svg": "image/svg+xml",
@@ -474,13 +474,164 @@ class DebattKo:
         return 200, {"melding": {"publiser": "Publisert.", "fjern": "Fjernet.", "sperr": "Fjernet, og forfatteren er sperret."}[handling]}
 
 
+def debatt_miljo(root: Path = config.ROOT) -> dict:
+    """The comment server's settings (deploy/debatt/debatt.env): the panel sends the approval
+    and "published" e-mails with the same SMTP account."""
+    path = root / "deploy" / "debatt" / "debatt.env"
+    miljo = {}
+    if path.exists():
+        for linje in path.read_text().splitlines():
+            k, sep, v = linje.partition("=")
+            if sep and not k.lstrip().startswith("#"):
+                miljo[k.strip()] = v.strip()
+    return miljo
+
+
+class InnleggKo:
+    """Debattinnlegg sent through the form (debatt/innsendt.py): the AI check in a background
+    thread, then the editor's queue. Publishing writes data/bergen/innlegg/ and starts a
+    build-and-publish run (run-daily.sh --publiser)."""
+
+    HANDLINGER = ("publiser", "send", "avvis", "hent_tilbake", "ny")
+    PAUSE_S = 120
+
+    def __init__(self, debatt: "DebattKo", kjorer: Kjorer, modell=None, sender=None, data_dir: Path = config.DATA_DIR):
+        self.debatt, self.kjorer, self.data_dir = debatt, kjorer, data_dir
+        self._modell, self._sender = modell, sender
+        self._stopp = threading.Event()
+
+    def db(self):
+        t = self.debatt.tjeneste()
+        return t.db if t else None
+
+    def modell(self):
+        if self._modell is None:
+            from .debatt import innleggsjekk
+
+            self._modell = innleggsjekk.backend()
+        return self._modell
+
+    def sender(self):
+        """(send(msg), avsender) from deploy/debatt/debatt.env, or (None, None)."""
+        if self._sender is not None:
+            return self._sender
+        from .debatt import epost
+
+        miljo = debatt_miljo()
+        return epost.smtp_fra_miljo(miljo), miljo.get("DEBATT_AVSENDER") or config.KONTAKT_EPOST
+
+    # --- the AI check ---------------------------------------------------------------------
+
+    def sjekk(self) -> int:
+        """Check every innlegg that waits for it; returns how many were checked."""
+        from .debatt import innleggsjekk, innsendt
+        from .llm import LLMError
+
+        db = self.db()
+        if db is None:
+            return 0
+        n = 0
+        for rad in innsendt.til_vurdering(db):
+            try:
+                svar = innleggsjekk.vurder(self.modell(), rad)
+            except (LLMError, OSError) as e:
+                log.warning("innlegg %d: the AI check failed: %s", rad["id"], e)
+                innsendt.ki_feilet(db, rad["id"], str(e))
+                continue
+            status = innsendt.sett_ki(db, rad["id"], svar, self.modell().name)
+            log.info("innlegg %d: %s (%s)", rad["id"], status, svar.get("kategori"))
+            n += 1
+        return n
+
+    def start(self) -> None:
+        def loop():
+            while not self._stopp.wait(self.PAUSE_S):
+                try:
+                    self.sjekk()
+                except Exception:  # noqa: BLE001  the panel must keep running
+                    log.exception("the innlegg check stopped this round")
+        threading.Thread(target=loop, name="innleggsjekk", daemon=True).start()
+
+    # --- the editor -----------------------------------------------------------------------
+
+    def status(self) -> dict:
+        from .debatt import innsendt
+
+        db = self.db()
+        return {"aktiv": db is not None, **(innsendt.ko(db) if db else {"ko": [], "sortert_bort": []})}
+
+    def _publiser(self, tittel, forfatter, tekst, om="", sak=None) -> tuple[Path, str]:
+        from . import innlegg
+
+        path = innlegg.ny(tittel, forfatter, tekst, om=om or "", sak=sak, data_dir=self.data_dir)
+        code, melding = self.kjorer.start("publiser")
+        bygg = "Bygger og publiserer nå." if code == 202 else f"Lagret; publiseres ved neste kjøring ({melding})"
+        return path, bygg
+
+    def handle(self, body: dict) -> tuple[int, dict]:
+        from .debatt import epost, innsendt
+        from .debatt.tjeneste import Feil
+
+        handling = body.get("handling")
+        if handling not in self.HANDLINGER:
+            return 400, {"melding": "Ugyldig."}
+        try:
+            if handling == "ny":  # an innlegg that came by e-mail: the editor pastes it in
+                path, bygg = self._publiser(body.get("tittel") or "", body.get("forfatter") or "", body.get("tekst") or "",
+                                            body.get("om") or "", body.get("sak") or None)
+                return 200, {"melding": f"Lagret som {path.name}. {bygg}"}
+            db = self.db()
+            if db is None:
+                return 400, {"melding": "Ingen kommentardatabase."}
+            rad = innsendt.hent(db, body.get("id"))
+            if handling == "avvis":
+                innsendt.sett_status(db, rad["id"], "avvist")
+                return 200, {"melding": "Avvist."}
+            if handling == "hent_tilbake":
+                innsendt.sett_status(db, rad["id"], "til_redaktor")
+                return 200, {"melding": "Lagt i køen."}
+            send_msg, avsender = self.sender()
+            til = innsendt.epost(db, rad["id"])
+            if handling == "send":
+                if not (send_msg and til):
+                    return 400, {"melding": "Kan ikke sende e-post (mangler SMTP eller skribentens konto)."}
+                token = innsendt.til_godkjenning(db, rad["id"], body.get("tittel"), body.get("tekst"))
+                ny = innsendt.hent(db, rad["id"])
+                lenke = f"{config.SITE_URL}bergen/debatt/godkjenn/#t={token}"
+                send_msg(epost.melding_godkjenning(til, avsender, ny["red_tittel"], ny["red_tekst"], lenke))
+                return 200, {"melding": "Sendt til skribenten for godkjenning."}
+            # publiser: the text the panel showed (the editor's version if any, else the writer's)
+            if rad["status"] not in ("til_redaktor", "sendt_skribent", "godkjent"):
+                return 409, {"melding": "Innlegget kan ikke publiseres nå."}
+            tittel, tekst = innsendt.til_publisering(rad)
+            if body.get("tittel") not in (None, tittel) or body.get("tekst") not in (None, tekst):
+                return 409, {"melding": "Teksten er endret. Send den til skribenten først, eller last siden på nytt."}
+            path, bygg = self._publiser(tittel, rad["navn"], tekst, rad["om"], rad["sak"])
+            innsendt.sett_status(db, rad["id"], "publisert", path.name)
+            if send_msg and til:
+                try:
+                    send_msg(epost.melding_publisert(til, avsender, tittel, f"{config.SITE_URL}bergen/debatt/{path.stem}/"))
+                except OSError as e:
+                    log.warning("innlegg %d: the 'published' e-mail failed: %s", rad["id"], e)
+            return 200, {"melding": f"Publisert som {path.name}. {bygg}"}
+        except Feil as e:
+            return e.kode, {"melding": e.melding}
+        except (ValueError, FileExistsError) as e:
+            return 400, {"melding": str(e)}
+        except OSError as e:
+            log.warning("innlegg: %s", e)
+            return 502, {"melding": "E-posten kunne ikke sendes. Prøv igjen."}
+
+
 def make_server(vert: str = "127.0.0.1", port: int = 8787, passord: str | None = None,
                 kjorer: Kjorer | None = None, site_dir: Path = config.SITE_DIR,
-                idag: date | None = None, debatt: DebattKo | None = None) -> ThreadingHTTPServer:
+                idag: date | None = None, debatt: DebattKo | None = None,
+                innlegg: InnleggKo | None = None) -> ThreadingHTTPServer:
     if not passord and not _loopback(vert):
         raise ValueError(f"set {PASSORD_ENV} in .env before the panel listens on {vert}")
     kjorer = kjorer or Kjorer()
     debatt = debatt or DebattKo()
+    innlegg = innlegg or InnleggKo(debatt, kjorer)
     page = SIDE.read_bytes()
     expected = passord.encode() if passord else b""
 
@@ -495,6 +646,8 @@ def make_server(vert: str = "127.0.0.1", port: int = 8787, passord: str | None =
                 self._json(200, status(kjorer, site_dir, idag))
             elif path == "/debatt.json":
                 self._json(200, debatt.status())
+            elif path == "/innlegg.json":
+                self._json(200, innlegg.status())
             elif path.startswith("/static/"):
                 self._static(path.removeprefix("/static/"))
             else:
@@ -508,17 +661,20 @@ def make_server(vert: str = "127.0.0.1", port: int = 8787, passord: str | None =
                     origin and urlsplit(origin).netloc != self.headers.get("Host")):
                 return self._json(403, {"melding": "Avvist."})
             sti = urlsplit(self.path).path
-            if sti not in ("/start", "/debatt"):
+            if sti not in ("/start", "/debatt", "/innlegg"):
                 return self._json(404, {"melding": "Finnes ikke."})
             try:
                 length = int(self.headers.get("Content-Length") or 0)
-                body = json.loads(self.rfile.read(min(length, 1000)) or b"{}")
+                body = json.loads(self.rfile.read(min(length, 40_000 if sti == "/innlegg" else 1000)) or b"{}")
                 if not isinstance(body, dict):
                     raise ValueError
             except ValueError:
                 body = {}
             if sti == "/debatt":
                 code, svar = debatt.handle(body)
+                return self._json(code, svar)
+            if sti == "/innlegg":
+                code, svar = innlegg.handle(body)
                 return self._json(code, svar)
             modus = body.get("modus")
             if modus not in MODUSER:
@@ -571,4 +727,6 @@ def make_server(vert: str = "127.0.0.1", port: int = 8787, passord: str | None =
         def log_message(self, fmt, *args):
             log.debug("admin: " + fmt, *args)
 
-    return ThreadingHTTPServer((vert, port), Handler)
+    server = ThreadingHTTPServer((vert, port), Handler)
+    server.innlegg = innlegg  # the CLI starts its AI check thread (tests don't)
+    return server

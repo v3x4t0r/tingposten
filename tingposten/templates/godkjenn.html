@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{# The writer approves the editor's version of their debattinnlegg (link in the e-mail, #t=<token>).
+   The page shows the text first and asks for a press, so a mail scanner opening the link approves nothing. #}
+{% block title %}Godkjenn debattinnlegget · Tingposten{% endblock %}
+{% block description %}Godkjenn redaktørens versjon av debattinnlegget ditt.{% endblock %}
+{% block hovedklasse %}omside{% endblock %}
+{% block main %}
+<header class="sidehode">
+  <h1 class="side-tittel">Godkjenn debattinnlegget</h1>
+</header>
+<div class="lesetekst" data-innlegg-godkjenn data-api="{{ debatt }}">
+  <p class="godkjenn-status" role="status" aria-live="polite">Henter innlegget …</p>
+  <noscript><p>Siden trenger JavaScript. Svar på e-posten i stedet.</p></noscript>
+</div>
+{% endblock %}

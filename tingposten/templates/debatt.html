@@ -51,13 +51,21 @@
 
   <section class="send-inn" id="send-inn" aria-labelledby="send-inn-tittel">
     <h2 id="send-inn-tittel">Skriv et debattinnlegg</h2>
+    {% if debatt %}
+    <div class="innlegg-skjema" data-innlegg-skjema data-api="{{ debatt }}">
+      <p>Logg inn i boksen <a href="#konto">Din konto</a>, så får du et skjema her.</p>
+      <noscript><p>Skjemaet trenger JavaScript. Send innlegget til <a href="mailto:{{ kontakt_epost }}?subject=Debattinnlegg">{{ kontakt_epost }}</a> i stedet.</p></noscript>
+    </div>
+    {% else %}
     <p>Send innlegget ditt til <a href="mailto:{{ kontakt_epost }}?subject=Debattinnlegg">{{ kontakt_epost }}</a>, med tittel, teksten og fullt navn.</p>
+    {% endif %}
     <ul>
       <li>Inntil {{ "{:,}".format(maks_tegn).replace(",", "&nbsp;")|safe }} tegn, og helst om en sak kommunen har behandlet eller skal behandle.</li>
       <li>Innlegget trykkes med fullt navn. Du kan legge til hvem du er, for eksempel «lærer» eller «bor i Åsane».</li>
       <li>Teksten må være din egen og ikke trykket andre steder.</li>
       <li>Redaktøren bestemmer hva som trykkes, og kan korte ned. Du får se endringer før innlegget publiseres.</li>
     </ul>
+    <p class="smaatekst">Innlegg fra skjemaet sjekkes først av en språkmodell som bare sorterer bort åpenbart søppel, som spam og reklame; den vurderer aldri meningene. Redaktøren leser resten.{% if debatt %} Får du ikke til skjemaet, kan du sende innlegget til <a href="mailto:{{ kontakt_epost }}?subject=Debattinnlegg">{{ kontakt_epost }}</a>.{% endif %}</p>
     <p class="smaatekst">Meninger i debattinnlegg er skribentens egne. Debattreglene gjelder også her: åpen debatt, men ikke hat, trusler eller trakassering.</p>
   </section>
 

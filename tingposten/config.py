@@ -152,6 +152,7 @@ DEBATT_DIR = Path(os.environ.get("DEBATT_DIR") or ROOT / "data" / "debatt")
 # and classifies, Codex fact-checks — a different provider on purpose.
 MODELL_SKRIBENT = "opus"
 MODELL_KLASSIFISERER = "sonnet"
+MODELL_INNLEGG = "sonnet"  # the AI check of debattinnlegg from the form (debatt/innleggsjekk.py), effort low
 MODELL_FAKTASJEKKER = None  # None → the model set in ~/.codex/config.toml
 # When Codex can't answer (not installed, out of quota), Claude with this model
 # fact-checks instead, for the rest of that run; the check records which model did

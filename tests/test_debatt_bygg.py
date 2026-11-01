@@ -128,6 +128,9 @@ def test_debatt_page_innlegg_and_login_link(monkeypatch, tmp_path, data_dir):  #
     assert "Bybanen må til Åsane nå" in side and "Kari Nordmann, lærer, bor i Åsane" in side
     assert "data-mest-kommentert" in side and 'value="aar"' in side and 'id="konto"' in side
     assert 'href="mailto:' in side and "fullt navn" in side
+    assert "data-innlegg-skjema" in side and "aldri meningene" in side
+    godkjenn = (site / "bergen/debatt/godkjenn/index.html").read_text()
+    assert "data-innlegg-godkjenn" in godkjenn and 'name="robots" content="noindex' in godkjenn
     innlegg_side = (site / "bergen/debatt/2026-09-30-bybanen-ma-til-asane-na/index.html").read_text()
     assert 'data-debatt-sak="innlegg/2026-09-30-bybanen-ma-til-asane-na"' in innlegg_side
     assert "Andre avsnitt, med ekstra mellomrom." in innlegg_side and "Om saken:" in innlegg_side

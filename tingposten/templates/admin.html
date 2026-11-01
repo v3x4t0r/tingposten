@@ -71,6 +71,12 @@ button:disabled { opacity: .45; cursor: default; }
 .debatt-ko .tekst { white-space: pre-wrap; margin: 6px 0; }
 .debatt-ko .modell { font: 13px/1.4 var(--sans); color: var(--dempet); margin: 0 0 6px; }
 .debatt-ko .knapper { margin: 6px 0 0; }
+.innlegg-felt { display: grid; gap: 6px; margin: 8px 0; font: 14px/1.4 var(--sans); }
+.innlegg-felt input, .innlegg-felt textarea { font: 16px/1.5 var(--serif, Georgia, serif); padding: 8px 10px; border: 1px solid var(--blekk-2);
+  border-radius: 4px; background: var(--papir); color: var(--blekk); width: 100%; box-sizing: border-box; }
+.innlegg-felt textarea { min-height: 16em; resize: vertical; }
+.ki { font: 14px/1.45 var(--sans); background: var(--vent-flate, #eee); padding: 8px 10px; border-radius: 4px; margin: 6px 0; }
+.ki ul { margin: 4px 0 0; padding-left: 1.2em; }
 .advarsel { font: 600 14px/1.4 var(--sans); background: var(--vent-flate); color: var(--vent); padding: 8px 10px; border-radius: 4px; margin: 8px 0; }
 
 ol.steg { list-style: none; padding: 0; margin: 12px 0 4px; display: grid; gap: 4px; font: 15px/1.4 var(--sans); }
@@ -154,6 +160,28 @@ footer { padding: 0 var(--gutter) 30px; font: 13px/1.4 var(--sans); color: var(-
       </details>
     </section>
 
+    <section class="blokk" aria-labelledby="innlegg-tittel" id="innlegg" hidden>
+      <h2 id="innlegg-tittel">Debattinnlegg</h2>
+      <p class="plan" id="innlegg-plan"></p>
+      <p class="melding" id="innlegg-melding" aria-live="polite"></p>
+      <ul class="debatt-ko" id="innlegg-ko"></ul>
+      <details id="innlegg-bort-boks" hidden>
+        <summary id="innlegg-bort-tittel">Sortert bort av KI</summary>
+        <p class="smaa">Det KI-sjekken mente var åpenbart søppel, de siste 30 dagene. Legg det i køen hvis den tok feil.</p>
+        <ul class="debatt-ko" id="innlegg-bort"></ul>
+      </details>
+      <details>
+        <summary>Nytt debattinnlegg (kom på e-post)</summary>
+        <form id="innlegg-ny">
+          <label class="innlegg-felt">Tittel <input name="tittel" required maxlength="120"></label>
+          <label class="innlegg-felt">Fullt navn <input name="forfatter" required maxlength="80"></label>
+          <label class="innlegg-felt">Hvem skribenten er (valgfritt) <input name="om" maxlength="80" placeholder="lærer, bor i Åsane"></label>
+          <label class="innlegg-felt">Saken innlegget svarer på (valgfritt, nøkkel) <input name="sak" maxlength="80" placeholder="900102/2026-10-29/1187-26"></label>
+          <label class="innlegg-felt">Tekst (tom linje mellom avsnitt) <textarea name="tekst" required></textarea></label>
+          <div class="knapper"><button type="submit" class="liten">Publiser innlegget</button></div>
+        </form>
+      </details>
+    </section>
     <section class="blokk" aria-labelledby="moter-tittel">
       <h2 id="moter-tittel">Møter</h2>
       <ul class="moter" id="moter"></ul>
@@ -463,6 +491,95 @@ async function avgjor(id, handling, regel, tekst) {
   }
   lastDebatt();
 }
+const KATEGORI = {debattinnlegg: "debattinnlegg", henvendelse: "henvendelse til redaksjonen", spam: "spam", reklame: "reklame",
+                  tull: "uforståelig", test: "test", hets_eller_trusler: "hets eller trusler", annet: "annet"};
+const INNLEGG_STATUS = {vurderes: "KI-sjekken har ikke sett det ennå", til_redaktor: "Venter på deg",
+                        sendt_skribent: "Sendt til skribenten for godkjenning", godkjent: "Godkjent av skribenten"};
+async function lastInnlegg() {
+  try {
+    const r = await fetch("/innlegg.json", {cache: "no-store"});
+    if (!r.ok) return;
+    tegnInnlegg(await r.json());
+  } catch (e) { /* the panel works without it */ }
+}
+function kiBoks(ki) {
+  if (!ki) return null;
+  if (ki.feil) return el("div", {class: "ki"}, "KI-sjekken feilet, så innlegget er ikke sjekket: " + ki.feil);
+  return el("div", {class: "ki"},
+    el("strong", null, `KI (${KATEGORI[ki.kategori] || ki.kategori}): `), ki.sammendrag || "", " ",
+    ki.grunn ? el("span", null, `– ${ki.grunn}`) : null,
+    ki.merknader && ki.merknader.length ? el("ul", null, ...ki.merknader.map(m => el("li", null, m))) : null);
+}
+function tegnInnlegg(d) {
+  $("innlegg").hidden = !d.aktiv;
+  if (!d.aktiv) return;
+  const venter = d.ko.filter(i => i.status !== "vurderes" && i.status !== "sendt_skribent").length;
+  $("innlegg-plan").textContent = venter ? antall(venter, "innlegg venter", "innlegg venter") + " på deg." : "Ingen innlegg venter på deg.";
+  const liste = $("innlegg-ko");
+  // Don't throw away what the editor is typing when the list refreshes.
+  if (liste.contains(document.activeElement)) return;
+  liste.replaceChildren();
+  for (const i of d.ko) {
+    const tittel = el("input", {value: i.red_tittel || i.tittel, maxlength: "120"});
+    const tekst = el("textarea", null);
+    tekst.value = i.red_tekst || i.tekst;
+    const vis = {tittel: tittel.value, tekst: tekst.value};
+    const knapper = el("div", {class: "knapper"});
+    const pub = el("button", {type: "button", class: "liten"}, i.status === "sendt_skribent" ? "Publiser likevel" : "Publiser");
+    const send = el("button", {type: "button", class: "liten"}, "Send endringene til skribenten");
+    const avvis = el("button", {type: "button", class: "liten"}, "Avvis");
+    const endret = () => tittel.value !== vis.tittel || tekst.value !== vis.tekst;
+    const oppdater = () => { pub.disabled = endret() || i.status === "vurderes"; send.disabled = !endret(); };
+    tittel.addEventListener("input", oppdater); tekst.addEventListener("input", oppdater); oppdater();
+    pub.addEventListener("click", () => innleggHandling({id: i.id, handling: "publiser", tittel: vis.tittel, tekst: vis.tekst}));
+    send.addEventListener("click", () => innleggHandling({id: i.id, handling: "send", tittel: tittel.value, tekst: tekst.value}));
+    avvis.addEventListener("click", () => innleggHandling({id: i.id, handling: "avvis"}));
+    knapper.append(pub, send, avvis);
+    liste.append(el("li", null,
+      el("p", {class: "hvem"}, `${i.navn}${i.om ? ", " + i.om : ""} · ${tid(i.opprettet)} · ${INNLEGG_STATUS[i.status] || i.status}` +
+         ` · ${(i.red_tekst || i.tekst).length} tegn` + (i.sak ? ` · om sak ${i.sak}` : "")),
+      kiBoks(i.ki),
+      el("label", {class: "innlegg-felt"}, "Tittel", tittel),
+      el("label", {class: "innlegg-felt"}, "Tekst", tekst),
+      knapper));
+  }
+  const bort = d.sortert_bort || [];
+  $("innlegg-bort-boks").hidden = !bort.length;
+  $("innlegg-bort-tittel").textContent = `Sortert bort av KI (${bort.length})`;
+  const bl = $("innlegg-bort");
+  bl.replaceChildren();
+  for (const i of bort) {
+    const b = el("button", {type: "button", class: "liten"}, "Legg i køen");
+    b.addEventListener("click", () => innleggHandling({id: i.id, handling: "hent_tilbake"}));
+    bl.append(el("li", null, el("p", {class: "hvem"}, `${i.navn} · ${tid(i.opprettet)} · ${i.tittel}`),
+      kiBoks(i.ki), el("p", {class: "tekst"}, i.tekst.slice(0, 600) + (i.tekst.length > 600 ? " …" : "")),
+      el("div", {class: "knapper"}, b)));
+  }
+}
+async function innleggHandling(body) {
+  const m = $("innlegg-melding");
+  try {
+    const r = await fetch("/innlegg", {method: "POST", headers: {"Content-Type": "application/json", "X-Tingposten": "admin"},
+      body: JSON.stringify(body)});
+    const svar = await r.json().catch(() => ({}));
+    m.textContent = svar.melding || `Feil (HTTP ${r.status})`;
+    m.classList.toggle("feil", !r.ok);
+    if (r.ok && body.handling === "ny") $("innlegg-ny").reset();
+  } catch (e) {
+    m.textContent = "Fikk ikke kontakt med Pi-en: " + e.message;
+    m.classList.add("feil");
+  }
+  if (document.activeElement) document.activeElement.blur();
+  lastInnlegg();
+  last();
+}
+$("innlegg-ny").addEventListener("submit", e => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  innleggHandling({handling: "ny", ...Object.fromEntries(f.entries())});
+});
+lastInnlegg();
+setInterval(lastInnlegg, 60000);
 lastDebatt();
 setInterval(lastDebatt, 60000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) last(); });

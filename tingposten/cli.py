@@ -311,6 +311,7 @@ def _admin(args) -> int:
         return 1
     import socket
 
+    server.innlegg.start()  # the AI check of debattinnlegg from the form, every two minutes
     host = socket.gethostname() if args.vert in ("0.0.0.0", "::") else args.vert
     logging.info("kontrollpanel: http://%s:%d/ — Ctrl+C to stop", host, server.server_address[1])
     try:

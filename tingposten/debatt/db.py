@@ -1,7 +1,7 @@
 """The comment database: one SQLite file (data/debatt/debatt.db, WAL), standard library only.
 
 Personal data kept here, and nowhere else: a reader's e-mail address, display
-name, comments and votes. Login links and sessions are stored only as SHA-256
+name, comments, votes and debattinnlegg sent through the form. Login links and sessions are stored only as SHA-256
 hashes. Who voted for what is never shown to anyone, the editor included; only
 the totals are. Deleting an account removes the e-mail (also from unused login
 links), the name, the votes, the text of every comment (a comment with replies
@@ -75,6 +75,29 @@ CREATE TABLE IF NOT EXISTS vurderinger (
   hvem TEXT NOT NULL,   -- the moderator chain, or "redaktør"
   data TEXT NOT NULL    -- JSON: every backend's verdict and errors
 );
+-- Debattinnlegg sent through the form on the Debatt page (innsendt.py). The AI check runs
+-- in the control panel on the Pi; the editor publishes, rejects or sends an edit for approval.
+CREATE TABLE IF NOT EXISTS innsendt (
+  id INTEGER PRIMARY KEY,
+  bruker INTEGER REFERENCES brukere(id) ON DELETE SET NULL,
+  navn TEXT NOT NULL,          -- the full name the innlegg is signed with
+  om TEXT NOT NULL DEFAULT '',
+  tittel TEXT NOT NULL,
+  tekst TEXT NOT NULL,
+  sak TEXT,
+  -- vurderes | sortert_bort | til_redaktor | sendt_skribent | godkjent | publisert | avvist
+  status TEXT NOT NULL,
+  ki TEXT,                     -- JSON: the AI check's verdict
+  forsok INTEGER NOT NULL DEFAULT 0,
+  red_tittel TEXT,             -- the editor's version, sent to the writer for approval
+  red_tekst TEXT,
+  godkjenn_hash TEXT,
+  godkjenn_utloper TEXT,
+  fil TEXT,                    -- data/bergen/innlegg/<fil> once published
+  opprettet TEXT NOT NULL,
+  endret TEXT
+);
+CREATE INDEX IF NOT EXISTS innsendt_status ON innsendt(status, opprettet);
 CREATE TABLE IF NOT EXISTS rapporter (
   kommentar INTEGER NOT NULL REFERENCES kommentarer(id) ON DELETE CASCADE,
   bruker INTEGER NOT NULL REFERENCES brukere(id) ON DELETE CASCADE,
@@ -160,6 +183,8 @@ class Db:
                 self._tell_stemmer(c, kid)
             c.execute("UPDATE kommentarer SET tekst = '', status = 'slettet', endret = ? WHERE bruker = ?",
                       (iso(na()), bruker))
+            # Innlegg not yet published go; a published one is the writer's signed text on the site.
+            c.execute("DELETE FROM innsendt WHERE bruker = ? AND status != 'publisert'", (bruker,))
             c.execute("DELETE FROM brukere WHERE id = ?", (bruker,))
 
     def eksport(self, bruker: int) -> dict:
@@ -174,6 +199,9 @@ class Db:
                                                     bruker)],
             "innloggingslenker": [dict(r) for r in self.les(
                 "SELECT opprettet, utloper, brukt FROM innlogging WHERE epost = ?", b["epost"])] if b else [],
+            "debattinnlegg": [dict(r) for r in self.les(
+                "SELECT id, navn, om, tittel, tekst, sak, status, red_tittel, red_tekst, opprettet, endret "
+                "FROM innsendt WHERE bruker = ? ORDER BY id", bruker)],
             "vurderinger": [dict(r) for r in self.les(
                 "SELECT v.kommentar, v.tid, v.utfall, v.regel, v.hvem, v.data FROM vurderinger v "
                 "JOIN kommentarer k ON k.id = v.kommentar WHERE k.bruker = ? ORDER BY v.id", bruker)],

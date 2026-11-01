@@ -17,6 +17,9 @@ Request bodies are capped; every error a reader can fix comes back as
   GET    /api/meg/eksport             everything stored about the reader (JSON)
   GET    /api/sak/{sak:path}/kommentarer?sortering=best|topp|nye
   GET    /api/mest-kommentert?periode=7|30|aar   the most commented saker (the Debatt page)
+  POST   /api/innlegg                 {navn, om, tittel, tekst, sak}  send a debattinnlegg (logged in)
+  POST   /api/innlegg/godkjenning     {token}  the editor's version, for the writer to read
+  POST   /api/innlegg/godkjenn        {token}  the writer approves it
   POST   /api/kommentar               {sak, tekst, forelder}
   GET    /api/kommentar/{id}          (the author polls this while it is judged)
   PUT    /api/kommentar/{id}          {tekst}
@@ -43,12 +46,13 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
+from . import innsendt
 from .regler import REGLER_VERSJON
 from .tjeneste import Feil, Tjeneste
 
 log = logging.getLogger(__name__)
 
-MAKS_KROPP = 8_000  # bytes; a comment is at most 3000 characters
+MAKS_KROPP = 20_000  # bytes; a comment is at most 3000 characters, a debattinnlegg 6000 (UTF-8, JSON)
 IP_GRENSE = 60      # requests that write, per IP and 10 minutes (memory only, never stored)
 IP_GRENSE_LENKER = 5  # login e-mails asked for, per IP and 10 minutes
 
@@ -184,6 +188,17 @@ def lag_app(tjeneste: Tjeneste, opprinnelser: list[str], start_ko: bool = True) 
         headers = {"Cache-Control": "no-store" if b else "public, max-age=15"}
         return JSONResponse(data, headers=headers)
 
+    async def send_innlegg(request):
+        b = innlogget(request)
+        body = await kropp(request)
+        return svar(await _i_traad(innsendt.send_inn, tjeneste.db, b, body))
+
+    async def innlegg_godkjenning(request):
+        return svar(innsendt.for_godkjenning(tjeneste.db, (await kropp(request)).get("token")))
+
+    async def innlegg_godkjenn(request):
+        return svar(innsendt.godkjenn(tjeneste.db, (await kropp(request)).get("token")))
+
     async def mest_kommentert(request):
         data = tjeneste.mest_kommentert(request.query_params.get("periode", "7"))
         return JSONResponse(data, headers={"Cache-Control": "public, max-age=60"})
@@ -227,6 +242,9 @@ def lag_app(tjeneste: Tjeneste, opprinnelser: list[str], start_ko: bool = True) 
         Route("/api/quiz", endepunkt(quiz, True), methods=["GET", "POST"]),
         Route("/api/sak/{sak:path}/kommentarer", endepunkt(trad)),
         Route("/api/mest-kommentert", endepunkt(mest_kommentert)),
+        Route("/api/innlegg", endepunkt(send_innlegg, True), methods=["POST"]),
+        Route("/api/innlegg/godkjenning", endepunkt(innlegg_godkjenning, True), methods=["POST"]),
+        Route("/api/innlegg/godkjenn", endepunkt(innlegg_godkjenn, True), methods=["POST"]),
         Route("/api/kommentar", endepunkt(ny, True), methods=["POST"]),
         Route("/api/kommentar/{id}", endepunkt(kommentar, True), methods=["GET", "PUT", "DELETE"]),
         Route("/api/kommentar/{id}/stem", endepunkt(stem, True), methods=["POST"]),
