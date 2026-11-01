@@ -94,6 +94,20 @@ UTFALL = (
 STATUS_BOKS = ("innstillingen falt", "forslaget falt", "sendt tilbake", "utsatt", "ikke behandlet")
 DOK_NAVN = {"saksframlegg": "Saksframlegg", "protokoll": "Protokoll"}
 DOK_BESTEMT = {"saksframlegg": "saksframlegget", "protokoll": "protokollen"}
+
+
+def dok_navn(dok: str, bestemt: bool = False) -> str:
+    """"Saksframlegg", "Protokoll", "Vedlegg 2" (or "saksframlegget", "vedlegg 2")."""
+    if m := pdf.VEDLEGG_DOK.fullmatch(dok or ""):
+        return f"{'vedlegg' if bestemt else 'Vedlegg'} {m.group(1)}"
+    return (DOK_BESTEMT if bestemt else DOK_NAVN).get(dok, dok)
+
+
+def _kilde(item: dict, k: dict, data_dir: Path) -> dict | None:
+    """A citation {dok, side} as a link to the page in the kommune's own document."""
+    dok, side = k.get("dok"), k.get("side")
+    base = pdf.dok_url(item, dok, data_dir) if pdf.er_dok(dok) else None
+    return {"dok": dok, "side": side, "href": f"{base}#page={side}"} if base and isinstance(side, int) else None
 ORD_PER_MINUTT = 200  # reading time of a background article
 # Facts under a story (fakta()): proposals that fell are counted from two, as
 # the score's "N forslag falt"; an amount from 1 mill. kr, where the score's
@@ -449,8 +463,8 @@ def _sak(item: dict, ranked: dict, data_dir: Path, parsers: "_Parsers | None" = 
     slug = f"{uid}-{item['moteDato']}"
     anchor = f"sak-{pdf.tag(item)}"
     status = ranked.get("status") or {}
-    kort_felt = _fields(item, card) if usable else []
-    ingress = _ingress(item, card) if usable else None
+    kort_felt = _fields(item, card, data_dir) if usable else []
+    ingress = _ingress(item, card, data_dir) if usable else None
     if ingress:
         # A written ingress (skribent-3 cards): the dek is its own text and the fields stay whole.
         dek, dek_kilder, felt = ingress["tekst"], ingress["kilder"], kort_felt
@@ -486,9 +500,12 @@ def _sak(item: dict, ranked: dict, data_dir: Path, parsers: "_Parsers | None" = 
         "tema": tema,
         "tema_navn": TEMA[tema],
         "tema_side": None,
-        "artikkel": _article(item, art) if usable else [],
+        "artikkel": _article(item, art, data_dir) if usable else [],
         "figurer": (_figures(item, data_dir, parsers) or list(card.get("figurer", []))) if usable else [],
         "pdf": {k: u for k, _, _ in pdf.KINDS if (u := pdf.url(item, k))},
+        # The attachments, linked (never re-hosted): name and the kommune's URL.
+        "vedlegg": [{"nr": v["nr"], "navn": v.get("navn") or f"Vedlegg {v['nr']}", "href": v["url"]}
+                    for v in pdf.vedlegg_liste(item, data_dir) or []],
         "mote": slug,
         "anker": anchor,
         "key": pdf.key(item),
@@ -656,7 +673,7 @@ ROLLE_TITTEL = {
 }
 
 
-def _article(item: dict, art: dict | None) -> list[dict]:
+def _article(item: dict, art: dict | None, data_dir: Path = config.DATA_DIR) -> list[dict]:
     """The edited article's paragraphs, with links to the cited pages, the
     paragraph's role and its sidehead ("" for the first paragraph, for the
     opening role and when the role repeats the previous paragraph's), and
@@ -669,11 +686,7 @@ def _article(item: dict, art: dict | None) -> list[dict]:
         text = " ".join((a.get("tekst") or "").split())
         if not text:
             continue
-        sources = []
-        for k in a.get("kilder") or []:
-            base = pdf.url(item, k.get("dok", "")) if k.get("dok") in ("saksframlegg", "protokoll") else None
-            if base and isinstance(k.get("side"), int):
-                sources.append({"dok": k["dok"], "side": k["side"], "href": f"{base}#page={k['side']}"})
+        sources = [x for k in a.get("kilder") or [] if (x := _kilde(item, k, data_dir))]
         rolle = a.get("rolle") if a.get("rolle") in ROLLE_TITTEL else ""
         mellomtittel = ROLLE_TITTEL.get(rolle, "") if rolle and out and rolle != forrige else ""
         out.append({"tekst": text, "kilder": _dedupe(sources), "rettet": bool(a.get("rettet")),
@@ -682,29 +695,24 @@ def _article(item: dict, art: dict | None) -> list[dict]:
     return out
 
 
-def _field_sources(item: dict, card: dict, key: str) -> list[dict]:
-    sources = []
-    for k in card.get("kilder", []):
-        base = pdf.url(item, k.get("dok", "")) if k.get("dok") in ("saksframlegg", "protokoll") else None
-        if k.get("felt") == key and base and isinstance(k.get("side"), int):
-            sources.append({"dok": k["dok"], "side": k["side"], "href": f"{base}#page={k['side']}"})
-    return _dedupe(sources)
+def _field_sources(item: dict, card: dict, key: str, data_dir: Path = config.DATA_DIR) -> list[dict]:
+    return _dedupe([x for k in card.get("kilder", []) if k.get("felt") == key and (x := _kilde(item, k, data_dir))])
 
 
-def _ingress(item: dict, card: dict) -> dict | None:
+def _ingress(item: dict, card: dict, data_dir: Path = config.DATA_DIR) -> dict | None:
     """The card's written ingress with its sources, or None (older cards)."""
     text = " ".join(((card.get("felt") or {}).get("ingress") or "").split())
-    return {"tekst": text, "kilder": _field_sources(item, card, "ingress")} if text else None
+    return {"tekst": text, "kilder": _field_sources(item, card, "ingress", data_dir)} if text else None
 
 
-def _fields(item: dict, card: dict) -> list[dict]:
+def _fields(item: dict, card: dict, data_dir: Path = config.DATA_DIR) -> list[dict]:
     felt = card.get("felt") or {}
     out = []
     for key, label in FIELDS:
         text = (felt.get(key) or "").strip()
         if not text:
             continue
-        out.append({"key": key, "label": label, "tekst": text, "kilder": _field_sources(item, card, key)})
+        out.append({"key": key, "label": label, "tekst": text, "kilder": _field_sources(item, card, key, data_dir)})
     return out
 
 
@@ -752,10 +760,8 @@ def _setninger(item: dict, data_dir: Path, key: str) -> list[dict]:
     for s in check.get("setninger") or []:
         if s.get("felt") != key or s.get("stottet") is not True:
             continue
-        k = s.get("kilde") or {}
-        base = pdf.url(item, k.get("dok", "")) if k.get("dok") in ("saksframlegg", "protokoll") else None
-        kilder = [{"dok": k["dok"], "side": k["side"], "href": f"{base}#page={k['side']}"}] \
-            if base and isinstance(k.get("side"), int) else []
+        kilde = _kilde(item, s.get("kilde") or {}, data_dir)
+        kilder = [kilde] if kilde else []
         out.append({"tekst": " ".join((s.get("setning") or "").split()), "kilder": kilder})
     return out
 
@@ -1043,7 +1049,7 @@ def kildegrupper(kilder: list[dict]) -> list[dict]:
     groups: dict[str, dict] = {}
     for k in kilder or []:
         groups.setdefault(k["dok"], {}).setdefault(k["side"], k["href"])
-    return [{"dok": dok, "navn": DOK_NAVN.get(dok, dok.capitalize()),
+    return [{"dok": dok, "navn": dok_navn(dok),
              "sider": [{"side": n, "href": sider[n]} for n in sorted(sider)]} for dok, sider in groups.items()]
 
 
@@ -1054,7 +1060,7 @@ def artikkel_dokumenter(artikkel: list[dict]) -> str:
         for k in a["kilder"]:
             if k["dok"] not in docs:
                 docs.append(k["dok"])
-    names = [DOK_BESTEMT.get(d, d) for d in docs]
+    names = [dok_navn(d, bestemt=True) for d in docs]
     return " og ".join([", ".join(names[:-1]), names[-1]]) if len(names) > 1 else "".join(names)
 
 

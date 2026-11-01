@@ -6,8 +6,10 @@ script build_script() writes. We only turn the file IDs and slugs that are
 already in the (allowed) agenda metadata into URLs and tidy filenames.
 """
 
+import json
 import re
 import shlex
+from pathlib import Path
 
 from . import config
 
@@ -67,6 +69,50 @@ def url(item: dict, kind: str) -> str | None:
     _, fil_key, slug_key = next(k for k in KINDS if k[0] == kind)
     fil_id = item.get(fil_key)
     return pdf_url(str(fil_id), item.get(slug_key)) if fil_id else None
+
+
+# Attachments (vedlegg.py): the list Bergen's agendapunktfiler gave for a sak is stored as
+# <data_dir>/vedlegg/<key>.json; attachment N is cited as dok "vedlegg-N" and saved as
+# <key>_vedlegg-N.pdf.
+VEDLEGG_DOK = re.compile(r"vedlegg-([1-9]\d*)")
+
+
+def er_dok(dok) -> bool:
+    """A document a citation may name: saksframlegg, protokoll or vedlegg-N."""
+    return isinstance(dok, str) and (dok in {k for k, _, _ in KINDS} or bool(VEDLEGG_DOK.fullmatch(dok)))
+
+
+def vedlegg_liste(item: dict, data_dir: Path = config.DATA_DIR) -> list[dict] | None:
+    """The stored attachment list for a sak (None: never asked)."""
+    path = Path(data_dir) / "vedlegg" / f"{key(item)}.json"
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text()).get("vedlegg", [])
+    except (OSError, ValueError):
+        return None
+
+
+def vedlegg_fil(item: dict, nr: int) -> str:
+    return filename(item, f"vedlegg-{nr}")
+
+
+def dok_url(item: dict, dok: str, data_dir: Path = config.DATA_DIR) -> str | None:
+    """The kommune's own URL for a cited document, attachments included."""
+    if m := VEDLEGG_DOK.fullmatch(dok or ""):
+        v = next((v for v in vedlegg_liste(item, data_dir) or [] if v.get("nr") == int(m.group(1))), None)
+        return v["url"] if v else None
+    return url(item, dok) if dok in {k for k, _, _ in KINDS} else None
+
+
+def vedlegg_targets(items: list[dict], data_dir: Path = config.DATA_DIR) -> list[dict]:
+    """Download targets for the attachments of saker whose list is stored (same form as targets())."""
+    out = []
+    for item in items:
+        for v in vedlegg_liste(item, data_dir) or []:
+            out.append({"url": v["url"], "filename": vedlegg_fil(item, v["nr"]),
+                        "tittel": f"{item.get('tittel', '')}: {v.get('navn', '')}", "kind": "vedlegg"})
+    return out
 
 
 def targets(items: list[dict], drop_noise: bool = True) -> list[dict]:

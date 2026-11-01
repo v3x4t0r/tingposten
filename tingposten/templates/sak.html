@@ -121,6 +121,7 @@
         <h2 id="dok-tittel">Dokumenter</h2>
         <ul class="dokliste">
           {% for dok, href in s.pdf.items() %}<li><a href="{{ href }}">{{ ikon("dok") }}{% if dok == "protokoll" and s.venter_protokoll %}Protokoll fra en tidligere behandling{% else %}{{ dok|capitalize }}{% endif %}<span class="dok-type">PDF</span></a></li>{% endfor %}
+          {% for v in s.vedlegg %}<li><a href="{{ v.href }}">{{ ikon("dok") }}Vedlegg {{ v.nr }}: {{ v.navn }}<span class="dok-type">PDF</span></a></li>{% endfor %}
         </ul>
         <p class="smaatekst">Alt på denne siden bygger på Bergen kommunes egne dokumenter. Ser du en feil? {{ meld_feil_lenker(s) }}.</p>
       </section>

@@ -31,12 +31,12 @@ from collections import defaultdict
 from datetime import date, timedelta
 from pathlib import Path
 
-from . import config, faktasjekker, klassifiserer, pdf, protokoll, redaktor, score, skribent, status
+from . import config, faktasjekker, klassifiserer, pdf, protokoll, redaktor, score, skribent, status, vedlegg
 from .llm import ClaudeCLI, CodexCLI, MedReserve, read_json
 
 log = logging.getLogger(__name__)
 
-STEG = ("skriv", "sjekk", "klassifiser", "rediger", "artikkel", "artikkelsjekk", "artikkelrediger")
+STEG = ("vedlegg", "skriv", "sjekk", "klassifiser", "rediger", "artikkel", "artikkelsjekk", "artikkelrediger")
 MAKS_OMSKRIVINGER = 1
 
 
@@ -117,8 +117,16 @@ def todo(step: str, items: list[dict], data_dir: Path) -> list[dict]:
         redigert = _file(data_dir, "redigert", i)
         artikkel = _file(data_dir, "artikler", i)
         sources = [_pdf(data_dir, i, "protokoll"), _pdf(data_dir, i, "saksframlegg")]
-        if step == "skriv":
-            if sources[0].exists() and _stale(kort, sources) and protokoll_klar(i, data_dir):
+        if step == "vedlegg":
+            # The cheap reader (vedlegg.py): attachments on disk the digest doesn't cover yet.
+            paths = [p for _, p in vedlegg.filer(i, data_dir)]
+            if paths and _stale(_file(data_dir, "vedleggsdigest", i), paths):
+                out.append(i)
+        elif step == "skriv":
+            # The attachment digest only exists for saker from config.VEDLEGG_FRA (or named
+            # ones), so it never makes a frozen card stale.
+            if sources[0].exists() and _stale(kort, sources + [_file(data_dir, "vedleggsdigest", i)]) \
+                    and protokoll_klar(i, data_dir):
                 out.append(i)
         elif step in ("artikkel", "artikkelsjekk", "artikkelrediger"):
             if step == "artikkel" and redigert.exists() and _stale(artikkel, [redigert]):
@@ -197,7 +205,7 @@ def pdf_som_mangler(items: list[dict], data_dir: Path = config.DATA_DIR) -> list
     """Download targets (pdf.targets) for every saksframlegg/protokoll the saker
     still need: files not on disk, and protokoller that don't cover their meeting
     yet (marked "oppdater": fetched again over the old file)."""
-    alle = pdf.targets(items)
+    alle = pdf.targets(items) + pdf.vedlegg_targets(items, data_dir)
     out = [t for t in alle if not (data_dir / "pdf" / t["filename"]).exists()]
     oppdater = {pdf.filename(i, "protokoll") for i in ufullstendige_protokoller(items, data_dir)}
     return out + [{**t, "oppdater": True} for t in alle if t["filename"] in oppdater]
@@ -212,6 +220,7 @@ def kjor(data_dir: Path = config.DATA_DIR, utvalg: str | None = None, dato: str 
         hint = "" if config.ALLOW_PDF_FETCH else " (automatic download is off; see `tingposten pdf-urler`)"
         log.info("%d of %d saker have no protokoll on disk yet%s", len(missing), len(items), hint)
     llms = llms or {
+        "vedlegg": ClaudeCLI(config.MODELL_VEDLEGG, config.VEDLEGG_EFFORT),
         "skriv": ClaudeCLI(config.MODELL_SKRIBENT),
         # Codex checks; when it can't answer, Claude (config.FAKTASJEKKER_RESERVE) does.
         "sjekk": MedReserve(CodexCLI(config.MODELL_FAKTASJEKKER),
@@ -222,7 +231,7 @@ def kjor(data_dir: Path = config.DATA_DIR, utvalg: str | None = None, dato: str 
     llm = {**llms, "artikkel": llms.get("artikkel", llms.get("skriv")),
            "artikkelsjekk": llms.get("artikkelsjekk", llms.get("sjekk"))}
     runners = {
-        "skriv": skribent.run, "sjekk": faktasjekker.run, "klassifiser": klassifiserer.run,
+        "vedlegg": vedlegg.run, "skriv": skribent.run, "sjekk": faktasjekker.run, "klassifiser": klassifiserer.run,
         "artikkel": skribent.run_artikkel, "artikkelsjekk": faktasjekker.run_artikkel,
     }
     result = {}

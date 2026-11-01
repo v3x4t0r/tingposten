@@ -303,6 +303,8 @@ _HENT = re.compile(r"INFO (.+?) \d{4}: \d+ items, \{'ny': (\d+), 'vedtatt': (\d+
 _HENT_HOPPET = "hent: the agenda was fetched less than 30 minutes ago"
 _PDF = re.compile(r"(\d+) PDF\(s\) to fetch across (\d+) meeting")
 _RESULTAT = re.compile(r"INFO (skriv|artikkel|omskriv)( artikkel)?: (\{.*\})$")
+_VEDLEGGSLISTER = re.compile(r"vedleggslister: (\d+) saker, (\d+) vedlegg")
+_VEDLEGG_LEST = re.compile(r"INFO vedlegg: \{'antall': \{[^}]*'lest': (\d+)")
 _BYGD = re.compile(r"INFO built .*?\{'sider': \d+, 'saker': (\d+), 'fremhevet': (\d+)")
 _INDEXNOW = re.compile(r"IndexNow: (\d+) sider meldt")
 # Codex (ChatGPT plan) out of quota: «You’ve hit your usage limit. … try again at Nov 4th, 2026 8:38 AM.»
@@ -336,6 +338,12 @@ def oppsummer(run: list[str], forrige_bygg: tuple[int, int] | None = None) -> di
             punkter.append(f"Hentet {_flertall(n, 'PDF', 'PDF-er')} fra {moter_}.")
         else:
             punkter.append(f"{_flertall(n, 'PDF', 'PDF-er')} fra {moter_} kan hentes med «Last ned og publiser».")
+    if m := _VEDLEGGSLISTER.search(tekst):
+        punkter.append(f"Fant {_flertall(int(m.group(2)), 'vedlegg', 'vedlegg')} til "
+                       f"{_flertall(int(m.group(1)), 'ny sak', 'nye saker')}.")
+    if m := _VEDLEGG_LEST.search(tekst):
+        punkter.append(f"Leste vedleggene til {_flertall(int(m.group(1)), 'sak', 'saker')} og plukket ut sidene "
+                       "skribenten trenger.")
     # The steps' result lines: «skriv: {'antall': {'skrevet': 84, 'feil': 3}, …}» for new
     # work, «omskriv: {'omskriv': {'antall': {'omskrevet': 4}}, …}» for rewrites.
     nytt, omskrevet, feilet = {"skriv": 0, "artikkel": 0}, {"skriv": 0, "artikkel": 0}, 0

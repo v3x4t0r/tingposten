@@ -70,6 +70,17 @@ else
   hentet=yes
 fi
 
+# 1b. Attachment lists (vedlegg.py): one allowed metadata request per new sak, once.
+# Only after a fresh agenda fetch; a refusal is not a reason to stop.
+if [ "$hentet" = yes ]; then
+  steg vedlegg
+  rc=0
+  run vedlegg || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    log "warning: vedlegg exit $rc; carrying on without new attachment lists"
+  fi
+fi
+
 # 2. PDFs. A no-op until config.ALLOW_PDF_FETCH is turned on (robots.txt).
 steg last-ned
 rc=0

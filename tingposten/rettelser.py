@@ -43,7 +43,6 @@ from . import pdf
 log = logging.getLogger(__name__)
 
 FELT = ("ingress", "hva_endres", "hvem_pavirkes", "hvorfor", "status", "nar_og_hvor")
-DOKUMENTER = ("saksframlegg", "protokoll")
 _AVSNITT = re.compile(r"artikkel:([1-9]\d*)")
 # "https://tingposten.no/bergen/sak/571424/2026-09-23/266-26/", "bergen/sak/…" or the key itself.
 _SAK = re.compile(r"(?:^|/)(\d+)/(\d{4}-\d{2}-\d{2})/([A-Za-z0-9._-]+)/?$")
@@ -94,7 +93,7 @@ def _kilder(kilder, hvor: str) -> list[dict]:
     """The correction's sources, in the card's shape without "felt"."""
     out = []
     for k in kilder if isinstance(kilder, list) else []:
-        if isinstance(k, dict) and k.get("dok") in DOKUMENTER and isinstance(k.get("side"), int) and k["side"] >= 1:
+        if isinstance(k, dict) and pdf.er_dok(k.get("dok")) and isinstance(k.get("side"), int) and k["side"] >= 1:
             out.append({"dok": k["dok"], "side": k["side"]})
         else:
             log.warning("%s: kilden %r er ikke {dok, side}, hoppes over", hvor, k)
@@ -265,6 +264,6 @@ def ny(data_dir: Path, key: str, merknad: str, felt: str | None = None, tekst: s
 def kilde(arg: str) -> dict:
     """'saksframlegg:5' → {"dok": "saksframlegg", "side": 5} (for argparse)."""
     dok, _, side = arg.partition(":")
-    if dok not in DOKUMENTER or not side.isdigit() or int(side) < 1:
-        raise ValueError(f"kilden «{arg}» skal være dokument:side, f.eks. saksframlegg:5 eller protokoll:2")
+    if not pdf.er_dok(dok) or not side.isdigit() or int(side) < 1:
+        raise ValueError(f"kilden «{arg}» skal være dokument:side, f.eks. saksframlegg:5, protokoll:2 eller vedlegg-1:3")
     return {"dok": dok, "side": int(side)}

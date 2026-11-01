@@ -43,6 +43,7 @@ def load_cards(items: list[dict], dato: str, data_dir: Path = config.DATA_DIR) -
         draft = _read(data_dir / "kort" / f"{pdf.key(item)}.json")
         check = _read(data_dir / "sjekk" / f"{pdf.key(item)}.json")
         links = {k: f"/pdf/{pdf.filename(item, k)}" for k, _, _ in pdf.KINDS if pdf.url(item, k)}
+        links |= {f"vedlegg-{v['nr']}": f"/pdf/{pdf.vedlegg_fil(item, v['nr'])}" for v in pdf.vedlegg_liste(item, data_dir) or []}
         checks = check.get("setninger", [])
         cards.append({
             "nr": item.get("referansenr") or pdf.tag(item),
