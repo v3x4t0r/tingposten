@@ -29,6 +29,9 @@ def test_sak_page_has_a_preview_card_and_share_links(monkeypatch, tmp_path, data
     assert f'href="https://www.facebook.com/sharer/sharer.php?u={url.replace(":", "%3A")}"' in side
     assert 'href="mailto:?subject=' in side and f'data-url="{url}"' in side and "static/del.js" in side
     assert "connect.facebook.net" not in side
+    nett = re.findall(r'<a href="https://([^/]+)/[^"]*" target="_blank" rel="noopener">([^<]+)</a>', side)
+    assert [n for _, n in nett if n in ("Facebook", "X", "LinkedIn", "Bluesky")] == ["Facebook", "X", "LinkedIn", "Bluesky"]
+    assert "https://bsky.app/intent/compose?text=" in side and "share-offsite/?url=https%3A//tingposten.no/" in side
     assert (site / "static" / "deling.png").exists()
     # pages that are not articles: the image, but no share row and no script
     forside = (site / "bergen" / "index.html").read_text()

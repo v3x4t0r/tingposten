@@ -194,8 +194,8 @@
 </section>
 {%- endmacro %}
 
-{# Share links under the headline. Plain links, no scripts from Facebook and no tracking; del.js
+{# Share links under the headline (owner 1.11: Facebook, X, LinkedIn, Bluesky and no more). Plain links, no scripts from Facebook and no tracking; del.js
    adds the phone's own share menu (Instagram, Messenger, SMS …) and «Kopier lenke». #}
 {% macro del_lenker(url, tittel) %}
-<p class="del" data-del data-url="{{ url }}" data-tittel="{{ tittel }}"><span class="del-etikett">Del</span><a href="https://www.facebook.com/sharer/sharer.php?u={{ url|urlencode }}" target="_blank" rel="noopener">Facebook</a><a href="mailto:?subject={{ tittel|urlencode }}&amp;body={{ url|urlencode }}">E-post</a></p>
+<p class="del" data-del data-url="{{ url }}" data-tittel="{{ tittel }}"><span class="del-etikett">Del</span><a href="https://www.facebook.com/sharer/sharer.php?u={{ url|urlencode }}" target="_blank" rel="noopener">Facebook</a><a href="https://x.com/intent/tweet?url={{ url|urlencode }}&amp;text={{ tittel|urlencode }}" target="_blank" rel="noopener">X</a><a href="https://www.linkedin.com/sharing/share-offsite/?url={{ url|urlencode }}" target="_blank" rel="noopener">LinkedIn</a><a href="https://bsky.app/intent/compose?text={{ (tittel ~ ' ' ~ url)|urlencode }}" target="_blank" rel="noopener">Bluesky</a><a href="mailto:?subject={{ tittel|urlencode }}&amp;body={{ url|urlencode }}">E-post</a></p>
 {%- endmacro %}
