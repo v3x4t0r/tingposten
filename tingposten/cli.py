@@ -20,6 +20,11 @@ def main(argv: list[str] | None = None) -> int:
     hent.add_argument("--year", type=int, action="append", help="default: this year (+ last year in Jan/Feb)")
     hent.add_argument("--utvalg", action="append", help="utvalgId; default: Tier 1 organs")
 
+    vedl = sub.add_parser("vedlegg", help="list the saker's attachments from Bergen's API (once per sak; the files "
+                                          "come with the PDF download script)")
+    vedl.add_argument("--sak", action="append", help="a sak's key (571424/2026-10-27/358-26), also before "
+                                                     "config.VEDLEGG_FRA; repeatable")
+
     publiser = sub.add_parser("publiser", help="put site/ online (config.PUBLISER_TIL: statichost or github)")
     publiser.add_argument("--placeholder", action="store_true", help="build the 'kommer snart' page first")
 
@@ -51,7 +56,7 @@ def main(argv: list[str] | None = None) -> int:
     kjorp = sub.add_parser("kjor", help="write, fact-check, classify and edit every decided sak with PDFs on disk")
     kjorp.add_argument("--utvalg", help="only this utvalgId")
     kjorp.add_argument("--dato", help="only this meeting date YYYY-MM-DD")
-    kjorp.add_argument("--steg", help="comma-separated subset of skriv,sjekk,klassifiser,rediger,artikkel,"
+    kjorp.add_argument("--steg", help="comma-separated subset of vedlegg,skriv,sjekk,klassifiser,rediger,artikkel,"
                                       "artikkelsjekk,artikkelrediger")
     kjorp.add_argument("--parallel", type=int, default=3)
     kjorp.add_argument("--fra", help="oldest meeting date YYYY-MM-DD (default: config.TILBAKE_DAGER back)")
@@ -160,6 +165,19 @@ def main(argv: list[str] | None = None) -> int:
         years = args.year or innhenter.years_to_fetch(date.today())
         try:
             innhenter.run(years, args.utvalg or list(config.TIER1))
+        except Blocked as e:
+            logging.error("giving up this run, server keeps refusing: %s", e)
+            return 2
+    elif args.cmd == "vedlegg":
+        from . import pipeline, vedlegg
+
+        saker = set(args.sak or [])
+        items = pipeline.saker(config.DATA_DIR, fra=None if saker else pipeline.fra_dato())
+        if saker - {pdf.key(i) for i in items}:
+            logging.error("fant ikke: %s", ", ".join(sorted(saker - {pdf.key(i) for i in items})))
+            return 1
+        try:
+            logging.info("vedlegg: %s", vedlegg.hent_lister(items, config.DATA_DIR, saker=saker or None))
         except Blocked as e:
             logging.error("giving up this run, server keeps refusing: %s", e)
             return 2

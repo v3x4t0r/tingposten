@@ -149,7 +149,7 @@ def sak(site_url: str, s: dict) -> Markup:
         "contentLocation": {"@type": "City", "name": "Bergen"},
         "author": {"@type": "Organization", "name": "Tingposten", "url": f"{site_url}om/"},
         "publisher": _avis(site_url),
-        "isBasedOn": list(s["pdf"].values()),
+        "isBasedOn": list(s["pdf"].values()) + [v["href"] for v in s.get("vedlegg", [])],
     }
     ledd = [("Forsiden", "bergen/")]
     if s.get("tema_side"):

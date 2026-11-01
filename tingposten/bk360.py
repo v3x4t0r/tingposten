@@ -50,6 +50,10 @@ class Client:
     def utvalg(self) -> list[dict]:
         return self.get_json("utvalgForPolitiskeSaker")
 
+    def agendapunktfiler(self, dokumentnummer: str) -> list[dict]:
+        """A sak's attachments (metadata only; robots.txt allows this, not fil/*)."""
+        return self.get_json("agendapunktfiler", dokumentnummer=dokumentnummer) or []
+
     def agendapunkter(self, utvalg_id: str, year: int) -> tuple[list[dict], bool]:
         """All agenda items for one organ and year, and whether we got all of them."""
         items, start, total = [], 0, None

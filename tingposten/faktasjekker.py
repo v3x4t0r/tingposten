@@ -23,7 +23,7 @@ from pathlib import Path
 from . import config, kildetekst, pdf
 from .llm import fence, obj, read_json, run_parallel, write_json
 
-PROMPT_VERSJON = "faktasjekker-2"  # 2: the ingress is checked too
+PROMPT_VERSJON = "faktasjekker-3"  # 3: attachment excerpts; 2: the ingress is checked too
 CHECKED = ("overskrift", "ingress", "hva_endres", "hvem_pavirkes", "hvorfor", "status", "nar_og_hvor")
 
 SCHEMA = obj(
@@ -49,6 +49,8 @@ documents ONLY. You never see the writer's reasoning, and you never edit the car
 The protokoll is the adopted vedtak plus the vote (Votering) and the case's earlier steps; the
 saksframlegg is the administration's/byrådet's case document (for interpellasjoner: the interpellation).
 The card's "kilder" list is the writer's claimed page references: a hint where to look, not evidence.
+Attachment excerpts (VEDLEGG_N, cited as dok "vedlegg-N") are sources too, but only the pages shown;
+a claim attributed to the kommune that comes from material by others is not supported.
 
 Method: split each non-empty field ("overskrift" counts as one sentence) into sentences. For each:
 - "stottet": true only if every factual claim in it is stated in the sources or follows directly from
@@ -90,10 +92,11 @@ def sjekk(item: dict, data_dir: Path = config.DATA_DIR, llm=None, force: bool = 
     if not kilder["protokoll"]:
         return "mangler kilde: protokoll"
     prompt = _prompt(card, kilder)
-    answer = llm.ask(prompt, SCHEMA)
+    schema = kildetekst.med_dokumenter(SCHEMA, kilder)
+    answer = llm.ask(prompt, schema)
     errors = [] if answer["blocked"].strip() else dekning(card, answer["setninger"])
     if errors:
-        answer = llm.ask(prompt + _feedback(errors), SCHEMA)
+        answer = llm.ask(prompt + _feedback(errors), schema)
         errors = [] if answer["blocked"].strip() else dekning(card, answer["setninger"])
         if errors:
             answer["blocked"] = "setningene dekker ikke kortet: " + "; ".join(errors)
@@ -138,7 +141,7 @@ def _cover(label: str, text: str, parts: list[str]) -> list[str]:
 
 # --- articles -------------------------------------------------------------------
 
-ARTIKKEL_PROMPT_VERSJON = "artikkelsjekk-2"  # 2: the body with roles; the anchor rule
+ARTIKKEL_PROMPT_VERSJON = "artikkelsjekk-3"  # 3: attachment excerpts; 2: the body with roles; the anchor rule
 ARTIKKEL_SCHEMA = obj(
     setninger={"type": "array", "items": obj(
         avsnitt={"type": "integer", "minimum": 1},
@@ -220,10 +223,11 @@ def sjekk_artikkel(item: dict, data_dir: Path = config.DATA_DIR, llm=None, force
     if not kilder["protokoll"]:
         return "mangler kilde: protokoll"
     prompt = _artikkel_prompt(card, article, kilder)
-    answer = llm.ask(prompt, ARTIKKEL_SCHEMA)
+    schema = kildetekst.med_dokumenter(ARTIKKEL_SCHEMA, kilder)
+    answer = llm.ask(prompt, schema)
     errors = [] if answer["blocked"].strip() else dekning_artikkel(paragraphs, answer["setninger"], answer["roller"])
     if errors:
-        answer = llm.ask(prompt + _feedback(errors), ARTIKKEL_SCHEMA)
+        answer = llm.ask(prompt + _feedback(errors), schema)
         errors = [] if answer["blocked"].strip() else dekning_artikkel(paragraphs, answer["setninger"], answer["roller"])
         if errors:
             answer["blocked"] = "setningene dekker ikke artikkelen: " + "; ".join(errors)
@@ -265,6 +269,7 @@ def _artikkel_prompt(card: dict, article: dict, kilder: dict) -> str:
         fence("ARTIKKEL", json.dumps(shown_article, ensure_ascii=False, indent=1)),
         fence("SAKSFRAMLEGG", kilder["saksframlegg"] or "(mangler)"),
         fence("PROTOKOLL", kilder["protokoll"]),
+        *kildetekst.vedlegg_blokker(kilder),
     ])
 
 
@@ -276,6 +281,7 @@ def _prompt(card: dict, kilder: dict) -> str:
         fence("KORT", json.dumps(shown, ensure_ascii=False, indent=1)),
         fence("SAKSFRAMLEGG", kilder["saksframlegg"] or "(mangler)"),
         fence("PROTOKOLL", kilder["protokoll"]),
+        *kildetekst.vedlegg_blokker(kilder),
     ])
 
 

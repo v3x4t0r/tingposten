@@ -69,7 +69,7 @@ def test_todo_follows_inputs_and_staleness(tmp_path):
 def test_kjor_runs_steps_in_order_with_given_backends(tmp_path, monkeypatch):
     store(tmp_path, [item("1/26")])
     calls = []
-    for mod, fn in (("skribent", "run"), ("faktasjekker", "run"), ("klassifiserer", "run"),
+    for mod, fn in (("vedlegg", "run"), ("skribent", "run"), ("faktasjekker", "run"), ("klassifiserer", "run"),
                     ("skribent", "run_artikkel"), ("faktasjekker", "run_artikkel")):
         monkeypatch.setattr(getattr(pipeline, mod), fn,
                             lambda items, data_dir, llm, force, parallel, n=f"{mod}.{fn}", **kw: calls.append((n, llm, force)) or {"ok": len(items)})
@@ -78,8 +78,8 @@ def test_kjor_runs_steps_in_order_with_given_backends(tmp_path, monkeypatch):
     monkeypatch.setattr(pipeline, "todo", lambda step, items, data_dir: items)
     monkeypatch.setattr(pipeline, "velg_artikler", lambda items, data_dir: items)
     monkeypatch.setattr(pipeline, "omskriv_kandidater", lambda items, data_dir, **kw: {})
-    pipeline.kjor(tmp_path, llms={"skriv": "W", "sjekk": "C", "klassifiser": "K"})
-    assert calls == [("skribent.run", "W", True), ("faktasjekker.run", "C", True), ("klassifiserer.run", "K", True),
+    pipeline.kjor(tmp_path, llms={"vedlegg": "V", "skriv": "W", "sjekk": "C", "klassifiser": "K"})
+    assert calls == [("vedlegg.run", "V", True), ("skribent.run", "W", True), ("faktasjekker.run", "C", True), ("klassifiserer.run", "K", True),
                      ("redaktor.run", None, None),
                      ("skribent.run_artikkel", "W", True), ("faktasjekker.run_artikkel", "C", True),
                      ("redaktor.run_artikler", None, None)]

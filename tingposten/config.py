@@ -160,6 +160,13 @@ MODELL_SKRIBENT = "opus"
 MODELL_KLASSIFISERER = "sonnet"
 MODELL_INNLEGG = "sonnet"  # the AI check of debattinnlegg from the form (debatt/innleggsjekk.py), effort low
 MODELL_FAKTASJEKKER = None  # None → the model set in ~/.codex/config.toml
+# The cheap reader of a sak's attachments (vedlegg.py): it picks the pages the writer
+# and the fact-checker then read, so the expensive models never read whole reports.
+MODELL_VEDLEGG = "haiku"
+VEDLEGG_EFFORT = "low"
+# Attachments are listed and read for meetings from this date (owner, 1.11.2026: old
+# cards stay frozen); a single older sak can be added with `tingposten vedlegg --sak`.
+VEDLEGG_FRA = "2026-11-01"
 # When Codex can't answer (not installed, out of quota), Claude with this model
 # fact-checks instead, for the rest of that run; the check records which model did
 # it. Owner, 30.10.2026: Codex out of tokens, Fable as the backup reviewer. None = no reserve.
