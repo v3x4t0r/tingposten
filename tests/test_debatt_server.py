@@ -160,14 +160,14 @@ def test_polling_a_waiting_comment_is_not_rate_limited(tmp_path, monkeypatch):
 
 def test_quiz_over_http(klient):
     sporsmal = klient.get("/api/quiz").json()["sporsmal"]
-    assert len(sporsmal) == 5 and "lov" not in sporsmal[0]
+    assert len(sporsmal) == 6 and "lov" not in sporsmal[0]
     h = logg_inn(klient, navn=None)
     assert klient.post("/api/meg", json={"navn": "Kari"}, headers=h).status_code == 200
     assert klient.get("/api/meg", headers=h).json()["quiz"] is False
     assert klient.post("/api/kommentar", json={"sak": SAK, "tekst": "Hei"}, headers=h).status_code == 403
     alle_lov = {q["id"]: True for q in sporsmal}
     r = klient.post("/api/quiz", json={"svar": alle_lov}, headers=h).json()
-    assert r["bestatt"] is False and len(r["svar"]) == 5
+    assert r["bestatt"] is False and len(r["svar"]) == 6
     assert klient.post("/api/quiz", json={"svar": alle_lov}).status_code == 401
 
 

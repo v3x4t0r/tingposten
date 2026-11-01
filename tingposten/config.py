@@ -122,6 +122,7 @@ DEBATT_GRENSER = {
     "trakassering": (0.90, 0.25),
     "privatperson": (0.90, 0.50),
     "beskyldning": (0.90, 0.60),
+    "salg": (0.80, 0.40),  # 1.11, not yet tuned on the test set: a little stricter than spam
     "spam": (0.90, 0.60),
 }
 DEBATT_GRENSE_OK = 0.40  # and "ok" itself at least this likely before a comment is published

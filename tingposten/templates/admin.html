@@ -421,7 +421,7 @@ $("sjekk").addEventListener("click", () => start("sjekk"));
 
 /* Debatt: the comments waiting for the editor and the reported ones. Reader text is set as text, never HTML. */
 const REGELNAVN = {ok: "innenfor", trussel: "trussel", hets: "hets", personangrep: "personangrep", privatperson: "privatperson",
-                   beskyldning: "udokumentert beskyldning", spam: "spam", utenfor: "utenfor saken"};
+                   beskyldning: "udokumentert beskyldning", salg: "kjøp og salg", spam: "spam", utenfor: "utenfor saken"};
 async function lastDebatt() {
   try {
     const r = await fetch("/debatt.json", {cache: "no-store"});

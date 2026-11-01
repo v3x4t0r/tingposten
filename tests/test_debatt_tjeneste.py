@@ -487,7 +487,7 @@ def test_new_rules_mean_a_new_quiz(t, monkeypatch):
 def test_quiz_examples_follow_the_rules():
     """The quiz teaches the editor's line: confronting a politician is lawful, contempt for a group is not."""
     etter_id = {q["id"]: q for q in QUIZ}
-    assert len(QUIZ) == 5 and etter_id["q2"]["lov"] is True and etter_id["q3"]["lov"] is False
+    assert len(QUIZ) == 6 and etter_id["q2"]["lov"] is True and etter_id["q3"]["lov"] is False
     assert sum(q["lov"] for q in QUIZ) == 2
 
 
