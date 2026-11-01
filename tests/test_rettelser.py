@@ -147,7 +147,7 @@ def test_overskrift(tmp_path, data_dir):
     rett(data_dir, {"dato": "2026-10-30", "merknad": "Overskriften var for bred.", "felt": "overskrift",
                     "tekst": "Ny modell for pengene til grunnskolene"})
     page = side(bygg_side(tmp_path, data_dir))
-    assert "<title>Ny modell for pengene til grunnskolene · Tingposten</title>" in page
+    assert "<title>Ny modell for pengene til grunnskolene · Bergen kommune · Tingposten</title>" in page
     assert ">Ny modell for pengene til grunnskolene</h1>" in page
 
 

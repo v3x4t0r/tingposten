@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "macros.html" import ikon, kildelinje, kildegrupper_html, figur_sak, rad, debatt_seksjon, del_lenker, meld_feil as meld_feil_lenker %}
-{% block title %}{{ s.overskrift }} · Tingposten{% endblock %}
+{% block title %}{{ s.overskrift }} · Bergen kommune · Tingposten{% endblock %}
+{% block jsonld %}{{ ld_sak(s) }}{% endblock %}
 {% block description %}{{ s.dek or s.tittel }}{% endblock %}
 {% block meta %}<meta property="article:published_time" content="{{ s.dato.isoformat() }}">
 {% endblock %}

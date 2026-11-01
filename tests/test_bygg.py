@@ -627,7 +627,8 @@ def test_hidden_from_search_until_launch(tmp_path, data_dir, monkeypatch):
     assert (tmp_path / "skjult" / "robots.txt").read_text() == "User-agent: *\nDisallow: /\n"
     monkeypatch.setattr(config, "SKJUL_FOR_SOK", False)
     bygg.build(tmp_path / "apen", data_dir, idag=date(2026, 10, 1))
-    assert not (tmp_path / "apen" / "robots.txt").exists()
+    robots = (tmp_path / "apen" / "robots.txt").read_text()
+    assert "Allow: /" in robots and "Disallow: /bergen/logg-inn/" in robots and "Sitemap: " in robots
     assert "noindex" not in (tmp_path / "apen" / "bergen" / "index.html").read_text()
 
 

@@ -97,7 +97,7 @@ def test_status_box_only_for_rare_telling_statuses():
 def test_rendered_front_page(site):
     site, _ = site
     forside = (site / "bergen/index.html").read_text()
-    assert "<title>Siste 14 dager · Bergen · Tingposten</title>" in forside
+    assert "<title>Hva Bergen kommune vedtar · Tingposten</title>" in forside
     # the bars link to the tema pages for the period, never to anchors on the page; Annet last
     bars = re.search(r'<ul class="stolper".*?</ul>', forside, re.S).group(0)
     hrefs = re.findall(r'href="([^"]+)"', bars)

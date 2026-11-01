@@ -74,9 +74,12 @@ STATICHOST_BUILDER = "https://builder.statichost.eu"
 # also reachable at https://<STATICHOST_SITE>.statichost.page/.
 SITE_URL = ("https://tingposten.no/" if PUBLISER_TIL.startswith("statichost")
             else "https://v3x4t0r.github.io/tingposten/")
-# Until launch the site is online but kept out of search engines: noindex on
-# every page and a robots.txt that disallows everything (user's choice, 2026-10-30).
-SKJUL_FOR_SOK = True
+# Until launch the site was online but kept out of search engines (2026-10-30). Opened
+# 1.11.2026 (owner: "as much traffic as possible"): robots.txt, sitemap, llms.txt and
+# structured data come from synlighet.py. True = noindex everywhere again.
+SKJUL_FOR_SOK = False
+# IndexNow (Bing, Yandex, Seznam …): public by design, it is served as /<key>.txt.
+INDEXNOW_NOKKEL = "1cbc9a497b4fcdf1a215bf05b9ace10a"
 # Visitor counts: GoatCounter (cookieless, no IP addresses stored). The count.js
 # in static/ is GoatCounter's own script (ISC), unmodified and served from this
 # site; only the count goes to this endpoint. None = no counting.

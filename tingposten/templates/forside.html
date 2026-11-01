@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "macros.html" import lead as lead_story, sek, rad, flis %}
-{% block title %}{{ periode }} · Bergen · Tingposten{% endblock %}
+{% block title %}{% if visning %}{{ periode }} · Bergen · Tingposten{% else %}Hva Bergen kommune vedtar · Tingposten{% endif %}{% endblock %}
+{% block jsonld %}{{ ld_nettsted() }}{% endblock %}
 {% block description %}Hva Bergen kommune har vedtatt, {{ periode|lower }}: de viktigste sakene først, hver med lenke til kommunens egne dokumenter.{% endblock %}
 {% block forhode %}
 <nav class="periodelinje ramme" aria-label="Periode">

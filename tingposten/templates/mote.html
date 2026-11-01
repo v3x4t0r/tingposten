@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "macros.html" import rad %}
-{% block title %}{{ mote.organ_kort }} {{ mote.dato_tekst }} · Tingposten{% endblock %}
+{% block title %}{{ mote.organ_kort }} {{ mote.dato_tekst }} · Bergen kommune · Tingposten{% endblock %}
 {% block description %}{% if mote.venter_protokoll %}Sakene som sto på sakslisten da {{ mote.organ_kort|lower }} møttes {{ mote.dato_tekst }}. Kommunen har ikke lagt ut protokollen ennå.{% else %}Alle sakene {{ mote.organ_kort|lower }} behandlet {{ mote.dato_tekst }}, i samme rekkefølge som i møtet.{% endif %}{% endblock %}
 {% block hovedklasse %}listeside moteside{% endblock %}
 {% block main %}
