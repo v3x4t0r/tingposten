@@ -195,8 +195,9 @@
     var self = this;
     var boks = el("div", { klasse: "debatt-inn debatt-quiz" }, [
       el("p", {}, [el("strong", { tekst: "Før du skriver første gang: " }),
-        document.createTextNode("fem eksempler på kommentarer. Er de lov på Tingposten? Alle må være riktige; du ser "
-          + "forklaringen etterpå og kan prøve igjen. "),
+        document.createTextNode("her er fem oppdiktede kommentarer. Ingen har skrevet dem; de viser bare hvor grensen går. "
+          + "Svar for hver av dem om den ville vært lov på Tingposten. Alle må være riktige; du ser forklaringen "
+          + "etterpå og kan prøve igjen. "),
         el("a", { href: this.regler, tekst: "Les debattreglene" }), document.createTextNode(".")]),
     ]);
     api(this.api, "GET", "/api/quiz").then(function (q) {
@@ -207,7 +208,7 @@
           var valgt = skjema.querySelector("input[name='" + s.id + "']:checked");
           if (valgt) svar[s.id] = valgt.value === "lov";
         });
-        if (Object.keys(svar).length < q.sporsmal.length) { self.si("Svar på alle fem.", true); return; }
+        if (Object.keys(svar).length < q.sporsmal.length) { self.si("Svar på alle eksemplene.", true); return; }
         api(self.api, "POST", "/api/quiz", { svar: svar }).then(function (r) {
           r.svar.forEach(function (x) {
             var f = skjema.querySelector("[data-forklaring='" + x.id + "']");
@@ -229,7 +230,10 @@
       q.sporsmal.forEach(function (s, i) {
         var navn = s.id;
         skjema.append(el("fieldset", { klasse: "debatt-sporsmal" }, [
-          el("legend", { tekst: (i + 1) + ". «" + s.tekst + "»" }),
+          el("legend", {}, [
+            el("span", { klasse: "debatt-eksempel-nr", tekst: "Eksempel " + (i + 1) + " av " + q.sporsmal.length + " · oppdiktet" }),
+            el("span", { klasse: "debatt-eksempel", tekst: "«" + s.tekst + "»" }),
+            el("span", { klasse: "debatt-eksempel-sporsmal", tekst: "Er denne lov?" })]),
           el("label", {}, [el("input", { type: "radio", name: navn, value: "lov" }), document.createTextNode(" Lov")]),
           el("label", {}, [el("input", { type: "radio", name: navn, value: "ikke" }), document.createTextNode(" Ikke lov")]),
           el("p", { "data-forklaring": navn, klasse: "debatt-forklaring", "aria-live": "polite" }),
