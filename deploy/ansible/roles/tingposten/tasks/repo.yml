@@ -1,0 +1,38 @@
+- name: The repository (cloned when missing; deploy.yml updates it)
+  ansible.builtin.git:
+    repo: "{{ tingposten_repo }}"
+    dest: "{{ tingposten_dir }}"
+    version: "{{ tingposten_versjon }}"
+    update: false
+
+- name: Pushes go through the deploy key
+  ansible.builtin.command: git -C {{ tingposten_dir | quote }} remote get-url --push origin  # noqa: command-instead-of-module
+  register: tingposten_push
+  changed_when: false
+  check_mode: false
+
+- name: Set the push URL
+  ansible.builtin.command: >-  # noqa: command-instead-of-module (the git module has no push URL)
+    git -C {{ tingposten_dir | quote }} remote set-url --push origin {{ tingposten_push_url | quote }}
+  when: tingposten_push.stdout != tingposten_push_url
+  changed_when: true
+
+- name: Is uv installed?
+  ansible.builtin.stat:
+    path: "/home/{{ tingposten_bruker }}/.local/bin/uv"
+  register: tingposten_uv
+
+- name: Install uv (Astral's installer, into ~/.local/bin)
+  ansible.builtin.shell: set -o pipefail && curl -LsSf https://astral.sh/uv/install.sh | sh
+  args:
+    executable: /bin/bash
+    creates: "/home/{{ tingposten_bruker }}/.local/bin/uv"
+  when: not tingposten_uv.stat.exists
+
+# Only that they exist: the Pi's umask decides the mode (0775 today), and git keeps the
+# scripts' execute bit.
+- name: Folders for logs and the comment server's data
+  ansible.builtin.file:  # noqa: risky-file-permissions
+    path: "{{ tingposten_dir }}/{{ item }}"
+    state: directory
+  loop: [data/logs, data/debatt]

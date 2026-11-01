@@ -1,0 +1,6 @@
+# What is particular to this Pi. Defaults: roles/tingposten/defaults/main.yml.
+tingposten_bruker: hemep
+tingposten_dir: /home/hemep/tingposten
+# The daily run in cron (deploy/run-daily.sh). Off: the owner starts runs from the control
+# panel (1.11.2026); the PUBLISER file decides whether a daily run also publishes.
+tingposten_daglig_kjoring: false

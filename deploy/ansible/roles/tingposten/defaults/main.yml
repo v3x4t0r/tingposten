@@ -1,0 +1,24 @@
+# Tingposten on a Pi (deploy/ansible). host_vars/<host>.yml overrides these.
+tingposten_bruker: "{{ ansible_user }}"
+tingposten_dir: "/home/{{ tingposten_bruker }}/tingposten"
+tingposten_repo: https://github.com/v3x4t0r/tingposten.git
+tingposten_push_url: git@github-tingposten:v3x4t0r/tingposten.git   # the deploy key (setup-pi.sh, ~/.ssh/config)
+tingposten_versjon: main
+# Extras for the Python environment on top of the default groups (uv sync --frozen). Empty
+# matches the Pi today: the comment server runs in its own container with the debatt extra.
+tingposten_uv_ekstra: []
+# The control panel (a user service). Off on a machine that only builds.
+tingposten_kontrollpanel: true
+tingposten_admin_port: 8787
+# The comment server (deploy/debatt): Docker Compose with Tailscale Funnel, and its firewall.
+tingposten_debatt: true
+# The daily run (deploy/run-daily.sh) in the user's crontab; time in the Pi's zone (Europe/Oslo).
+tingposten_daglig_kjoring: false
+tingposten_daglig_minutt: "0"
+tingposten_daglig_time: "6"
+# The secret files stay on the Pi, written by hand (deploy/README.md, deploy/debatt/README.md).
+# The role checks they exist and are 0600; it never reads or prints them.
+tingposten_hemmeligheter:
+  - .env
+  - deploy/debatt/debatt.env
+  - deploy/debatt/tailscale.env
