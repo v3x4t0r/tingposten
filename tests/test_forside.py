@@ -125,7 +125,7 @@ def test_front_page_css(site):
     for sel in (".periode-merk", ".flis-tom", ".tomt", ".kommer"):
         rule = re.search(r"(?m)^" + re.escape(sel) + r" \{[^}]*\}", css).group(0)
         assert "italic" not in rule or "var(--didone)" in rule, rule
-    assert "--sterk: #c8c5bc" in css                        # softer strong rules in dark mode
+    assert "--sterk: #cbc3b1" in css                        # softer strong rules in dark mode
     assert ".lead .nokkeltall { margin-top: auto; }" not in css  # white space falls below the lead
     assert ".sek .fakta { align-content: flex-start; }" in css
 

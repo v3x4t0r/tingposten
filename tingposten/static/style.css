@@ -7,26 +7,26 @@
 
 :root {
   color-scheme: light dark;
-  --papir: #f7f6f1;
-  --boks: #eeebe3;
-  --boks-kant: #ddd9ce;
+  --papir: #f3efe4;   /* warm newsprint (design D, 1.11) */
+  --boks: #e9e3d3;
+  --boks-kant: #d6cfbd;
   --blekk: #141413;
   --blekk-2: #33322e;
   --dempet: #5a5852;
-  --linje: #d8d4ca;
-  --linje-2: #b9b4a8;
+  --linje: #d6cfbd;
+  --linje-2: #b5ad99;
   --sterk: #141413;
   --lenke: #164a7a;
   --fokus: #a35c00;
   --stolpe: #3a3935;
-  --stolpe-spor: #e4e1d8;
-  --merket: #e9e4d6;
+  --stolpe-spor: #ddd6c4;
+  --merket: #e6dcc3;
 
   /* Read by the SVG figures (grafikk.py). Ink, never party colours. */
   --tp-for: #3a3935;
   --tp-falt: #8a877f;
-  --tp-spor: #d6d2c7;
-  --tp-kart: #d9d5cb;
+  --tp-spor: #d3cbb8;
+  --tp-kart: #d8d0bd;
   --tp-flate: var(--papir);
   --tp-fg: var(--blekk);
   --tp-muted: #55534d;
@@ -47,26 +47,26 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --papir: #121211;
-    --boks: #1c1c1a;
-    --boks-kant: #2e2d2a;
-    --blekk: #ecebe5;
-    --blekk-2: #d0cec6;
-    --dempet: #a9a69d;
-    --linje: #34332f;
-    --linje-2: #504e48;
-    --sterk: #c8c5bc;  /* softer than the text: 3 px rules glare in full white */
+    --papir: #16140f;   /* warm, like the paper by lamplight */
+    --boks: #201d17;
+    --boks-kant: #343027;
+    --blekk: #ece6d8;
+    --blekk-2: #d2cbbb;
+    --dempet: #aba393;
+    --linje: #37332a;
+    --linje-2: #555044;
+    --sterk: #cbc3b1;  /* softer than the text: 3 px rules glare in full white */
     --lenke: #9cc3ec;
     --fokus: #f0b85a;
-    --stolpe: #cfccc3;
-    --stolpe-spor: #2c2b28;
-    --merket: #2a2925;
+    --stolpe: #d0c9b8;
+    --stolpe-spor: #2f2b23;
+    --merket: #2d2920;
 
-    --tp-for: #d3d0c6;
-    --tp-falt: #7f7c74;
-    --tp-spor: #3b3a36;
-    --tp-kart: #3a3935;
-    --tp-muted: #b9b6ad;
+    --tp-for: #d5cebd;
+    --tp-falt: #827b6d;
+    --tp-spor: #3e392f;
+    --tp-kart: #3c372d;
+    --tp-muted: #bbb3a2;
   }
 }
 
@@ -113,48 +113,31 @@ a:hover { text-decoration-thickness: 2px; }
 .lead-tittel, .sek-tittel, .rad-tittel, .sak-tittel, .seksjon-hode h2, .temaer-hode h2,
 .flis-hode h3, .relaterte-hode h2, .andre-lenke, .nokkeltall dd { word-spacing: 0.07em; }
 
-/* ---------- Masthead ---------- */
-.masthode { padding-top: 22px; }
-.masthode-topp { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center; }
-.navnetrekk { margin: 0; font: 400 clamp(3.4rem, 2.2rem + 5.6vw, 6.25rem)/1 var(--navn); letter-spacing: 0; }
+/* ---------- Masthead (design D): the same on every page ---------- */
+/* The nameplate in a double frame (a border and an outline 3px outside it), an ear on each side. */
+.masthode { padding-top: 18px; }
+.masthode-ramme { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center;
+  margin: 4px; padding: 12px 12px 10px; border: 1px solid var(--sterk); outline: 1px solid var(--sterk); outline-offset: 3px; }
+.navnefelt { min-width: 0; }
+.navnetrekk { margin: 0; font: 400 clamp(2.6rem, 1.9rem + 3.4vw, 5.5rem)/1 var(--navn); letter-spacing: 0; }
 .navnetrekk a { color: inherit; text-decoration: none; }
-.ore { margin: 0; font: 500 0.75rem/1.5 var(--sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--dempet); }
-.ore strong { color: var(--blekk); font-weight: 700; letter-spacing: 0.1em; }
-.ore-v { order: 3; margin-top: 10px; }
-.ore-h { order: 2; margin-top: 4px; font: italic 400 1rem/1.3 var(--didone); letter-spacing: 0; text-transform: none; color: var(--blekk-2); }
-.ore-h br { display: none; }
-.folio { margin-top: 14px; border-top: 1px solid var(--sterk); border-bottom: 3px double var(--sterk); }
-.meny { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 30px; padding: 8px 0 7px; font: 600 0.8125rem/1.3 var(--sans); letter-spacing: 0.08em; text-transform: uppercase; }
-.meny a { color: var(--blekk); text-decoration: none; padding: 4px 0; }
+.slagord { margin: 2px 0 0; font: 400 0.75rem/1.4 var(--didone); letter-spacing: 0.2em; text-transform: uppercase; color: var(--blekk); }
+.ore { display: none; margin: 0; }
+.ore-topp { display: block; font: italic 400 0.9375rem/1.35 var(--didone); color: var(--blekk); }
+.ore-bunn { display: block; margin-top: 2px; font: 500 0.6875rem/1.4 var(--sans); letter-spacing: 0.1em; text-transform: uppercase; color: var(--dempet); }
+@media (min-width: 820px) {
+  .masthode { padding-top: 24px; }
+  .masthode-ramme { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; column-gap: 24px; padding: 16px 20px 13px; }
+  .slagord { font-size: 0.9375rem; letter-spacing: 0.24em; }
+  .ore { display: block; max-width: 210px; padding: 4px 0; }
+  .ore-v { justify-self: start; padding-right: 18px; border-right: 1px solid var(--sterk); }
+  .ore-h { justify-self: end; padding-left: 18px; border-left: 1px solid var(--sterk); }
+}
+.meny { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 30px; margin-top: 6px; padding: 7px 0 6px; border-bottom: 1px solid var(--sterk);
+  font: 400 1.0625rem/1.3 var(--didone); font-variant: small-caps; letter-spacing: 0.06em; }
+.meny a { color: var(--blekk); text-decoration: none; padding: 6px 2px; }
 .meny a:hover { text-decoration: underline; }
-.meny a[aria-current="page"] { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 0.45em; }
-@media (min-width: 820px) {
-  .masthode-topp { grid-template-columns: 1fr auto 1fr; align-items: end; gap: 32px; }
-  .ore-v, .ore-h { order: 0; margin: 0 0 12px; }
-  .ore-v { justify-self: start; text-align: left; }
-  .ore-h { justify-self: end; text-align: right; font-size: 1.125rem; }
-  .ore-h br { display: inline; }
-  .ore-v .smal { display: none; }
-}
-@media (max-width: 819px) { .ore-v .bred { display: none; } }
-
-/* Slim masthead on sak pages: same nameplate, smaller */
-.masthode-smal { padding-top: 12px; }
-.masthode-smal .masthode-topp { row-gap: 2px; }
-.masthode-smal .navnetrekk { font-size: clamp(2.25rem, 1.8rem + 1.6vw, 2.9rem); }
-.masthode-smal .folio { margin-top: 8px; border-top: 0; border-bottom: 3px double var(--sterk); }
-.masthode-smal .meny { display: none; }
-.masthode-smal .meny-smal { display: flex; justify-content: center; gap: 22px; font: 600 0.75rem/1.3 var(--sans); letter-spacing: 0.08em; text-transform: uppercase; }
-.meny-smal a { color: var(--blekk); text-decoration: none; padding: 4px 0; }
-.meny-smal a:hover { text-decoration: underline; }
-.masthode-smal .ore-h { display: none; }
-@media (min-width: 820px) {
-  .masthode-smal .masthode-topp { align-items: center; }
-  .masthode-smal .meny-smal { justify-self: start; order: 0; margin: 0; }
-  .masthode-smal .ore-h { display: block; margin: 0; font-size: 1rem; }
-  .masthode-smal .ore-h br { display: none; }
-}
-@media (max-width: 819px) { .masthode-smal .meny-smal { order: 4; padding-top: 2px; } }
+.meny a[aria-current="page"] { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.3em; }
 
 /* Period tabs */
 .periodelinje { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 24px; padding-top: 12px; }
@@ -243,7 +226,10 @@ a:hover { text-decoration-thickness: 2px; }
 .stolpe { display: block; height: 100%; width: var(--andel); background: var(--stolpe); }
 .stolpe-tall { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--blekk); }
 
-/* The row of four */
+/* The row of four, under a centred label between a thick and a thin rule (design A) */
+.fire-tittel { grid-column: 1 / -1; margin: 0; padding: 9px 0 6px; border-top: 3px solid var(--sterk); box-shadow: inset 0 -1px 0 var(--sterk);
+  font: 700 0.75rem/1.3 var(--sans); letter-spacing: 0.12em; text-transform: uppercase; text-align: center; }
+.fire-tittel + .sek { border-top: 0; }
 .fire { display: grid; grid-template-columns: minmax(0, 1fr); border-bottom: 1px solid var(--linje); }
 .sek { padding: 22px 0 24px; border-top: 1px solid var(--linje); display: flex; flex-direction: column; }
 .sek:first-of-type { border-top: 0; }
@@ -401,8 +387,8 @@ a:hover { text-decoration-thickness: 2px; }
 /* Source page links: each a 24×24px target (WCAG 2.5.8) that still reads as
    "s. 5, 6, 7". The right padding lies under the ", " that follows (pulled
    back by the negative margin), so the comma sits tight and targets never overlap. */
-.kilde a, .fotnoter li > span a { display: inline-block; min-width: 24px; padding: 4px 5px 4px 12px; margin-right: -5px; font-weight: 500; }
-.kilde-etikett + a, .kilde-skille + a, .fotnoter li > span > a:first-child { margin-left: -11px; }
+.kilde a, .randnote a { display: inline-block; min-width: 24px; padding: 4px 5px 4px 12px; margin-right: -5px; font-weight: 500; }
+.kilde-etikett + a, .randnote-etikett + a, .kilde-skille + a { margin-left: -11px; }
 .kilde-skille { margin: 0 0.45em; color: var(--linje-2); }
 
 /* Rail: figures with neat captions (C), documents */
@@ -459,17 +445,16 @@ a:hover { text-decoration-thickness: 2px; }
   .brodtekst p.forste::first-letter { initial-letter: 3; -webkit-initial-letter: 3; font-family: var(--didone); font-weight: 700; margin-right: 0.14em; color: var(--blekk); }
 }
 .brodtekst p:target { background: var(--merket); box-shadow: 0 0 0 8px var(--merket); }
-.fn { font: 600 0.68em/0 var(--sans); vertical-align: 0.55em; margin-left: 0.12em; }
-.fn a { text-decoration: none; padding: 6px; margin: 0 -4px; }
-.fn a:hover { text-decoration: underline; }
-.fotnoter { max-width: 37em; margin: 18px 0 0; padding: 14px 0 0; border-top: 1px solid var(--linje); font-family: var(--sans); }
-.fotnoter h3 { margin: 0; font: 600 0.875rem/1.3 var(--sans); }
-.fotnoter > p { margin: 3px 0 10px; font: 400 0.8125rem/1.45 var(--sans); color: var(--dempet); }
-.fotnoter ol { list-style: none; margin: 0; padding: 0; }
-.fotnoter li { display: grid; grid-template-columns: 1.8em minmax(0, 1fr) auto; gap: 8px; padding: 5px 0; font: 400 0.8125rem/1.45 var(--sans); color: var(--dempet); scroll-margin-top: 12px; }
-.fotnoter li:target { background: var(--merket); box-shadow: 0 0 0 6px var(--merket); }
-.fotnoter .nr { font-weight: 700; color: var(--blekk); font-variant-numeric: tabular-nums; }
-.fotnoter .tilbake { text-decoration: none; padding: 2px 8px; }
+/* Sources in the margin: under each paragraph on narrow screens, in the label column beside it on wide ones */
+.avsnitt { position: relative; }
+.brodtekst .randnote { margin: -0.55em 0 1.3em; font: 400 0.8125rem/1.45 var(--sans); color: var(--dempet); scroll-margin-top: 12px; }
+.randnote-etikett { margin-right: 0.3em; font-weight: 600; color: var(--blekk-2); }
+.randnote:target { background: var(--merket); box-shadow: 0 0 0 6px var(--merket); }
+@media (min-width: 900px) {
+  .brodtekst .randnote { position: absolute; top: 0.4em; right: calc(100% + var(--spalt)); width: var(--etikett); margin: 0;
+    padding-top: 5px; border-top: 1px solid var(--linje-2); }
+  .randnote-etikett { display: block; font-size: 0.6875rem; letter-spacing: 0.09em; text-transform: uppercase; }
+}
 
 /* More from the same meeting */
 .relaterte { margin-top: 44px; padding-top: 24px; border-top: 3px double var(--sterk); }
@@ -624,7 +609,8 @@ body > header, body > footer, body > nav { width: 100%; }
 
 /* Footer: the double rule inside the frame, like the masthead's */
 .bunn { border-top: 0; padding: 0 var(--gutter) 48px; }
-.bunn-innhold { border-top: 3px double var(--sterk); padding-top: 26px; }
+.bunn-innhold { margin-top: 5px; border-top: 1px solid var(--sterk); box-shadow: 0 -4px 0 0 var(--papir), 0 -5px 0 0 var(--sterk); padding-top: 26px; text-align: center; }
+.bunn-innhold p { margin-left: auto; margin-right: auto; }
 
 /* Navigation in ink with a light underline; blue is for links in running text and sources */
 .bunn-lenker a, .andre a, .flis-fot a, .stolper-mer a, .moteliste .moteliste-mer a, .ogsa a,
@@ -635,8 +621,7 @@ body > header, body > footer, body > nav { width: 100%; }
 .ogsa a:hover, .andre-temaer a:hover, .intro-lenke a:hover, .ikkefunnet-lenker a:hover, .moterader a:hover {
   text-decoration-color: currentColor;
 }
-.meny a[aria-current="true"] { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 0.45em; }
-.meny-smal a[aria-current] { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 0.4em; }
+.meny a[aria-current="true"] { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.3em; }
 
 /* A sak without a card shows the kommune's own title: a plain line, not a headline */
 .lead-tittel.raatittel, .sek-tittel.raatittel, .rad-tittel.raatittel, .flis-tittel.raatittel, .valg-tittel.raatittel {
@@ -671,6 +656,7 @@ body > header, body > footer, body > nav { width: 100%; }
 .flere { display: block; }
 .flere .seksjon-hode { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 24px; margin: 0 0 18px; }
 .flere .seksjon-hode p { margin: 0; }
+.flere .seksjon-hode h2 { font-style: italic; font-weight: 500; }
 @media (min-width: 700px) {
   .forside .rad, .listeside .rad { display: flex; grid-row: auto; }
   .forside .rad .fakta, .listeside .rad .fakta { align-self: auto; }
@@ -791,15 +777,14 @@ main > .sidehode:first-child { padding-top: 38px; }
           --linje: #bbb; --linje-2: #888; --sterk: #000; --lenke: #000; --merket: #eee; --stolpe: #333; --stolpe-spor: #ddd;
           --tp-for: #333; --tp-falt: #888; --tp-spor: #ddd; --tp-kart: #ddd; --tp-flate: #fff; --tp-fg: #000; --tp-muted: #444; }
   body { display: block; min-height: 0; font-size: 11pt; }
-  .meny, .meny-smal, .hopp, .paa-siden, .relaterte, .periodelinje, .brodsmule, .bunn-lenker, .andre, .stolper-mer,
+  .meny, .hopp, .paa-siden, .relaterte, .periodelinje, .brodsmule, .bunn-lenker, .andre, .stolper-mer,
   .andre-temaer, .ikkefunnet-lenker, .debatt { display: none !important; }
-  .masthode-smal .ore-h { display: block; }
   h1, h2, h3, .artikkel-etikett, .mellomtittel, .kort-hode, .figur-tittel, .seksjon-hode, .flis-hode { break-after: avoid; }
-  .felt, .figur, .fotnoter li, .rad, .indeksrad, .flis > ul > li, .valgliste li, .sek, .lead { break-inside: avoid; }
+  .felt, .figur, .avsnitt, .rad, .indeksrad, .flis > ul > li, .valgliste li, .sek, .lead { break-inside: avoid; }
   .bunn { padding: 0; }
   .bunn-innhold { border-top: 1px solid #000; padding-top: 8pt; }
   a { text-decoration: none; }
-  .kilde a, .fn a { text-decoration: underline; }
+  .kilde a, .randnote a { text-decoration: underline; }
 }
 
 /* === Om og bunn: utgiver, redaktør, erklæring (30.10) === */

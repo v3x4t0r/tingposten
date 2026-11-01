@@ -58,20 +58,15 @@
       <h2 class="etikett etikett-strek artikkel-etikett" id="artikkel-tittel">Saken</h2>
       <div>
         <p class="byline">{% if bygger %}<span>Bygger på {{ bygger }}</span>{% endif %}<span class="nb">Ca. {{ s.lesetid }} {{ "minutt" if s.lesetid == 1 else "minutter" }} å lese</span></p>
+        {# Each paragraph's sources in the margin beside it (wide screens), or on a small line under it. #}
         <div class="brodtekst">
           {% for a in s.artikkel %}
           {% if a.mellomtittel %}<h3 class="mellomtittel">{{ a.mellomtittel }}</h3>{% endif %}
-          <p id="avsnitt-{{ loop.index }}"{% if loop.first %} class="forste"{% endif %}>{{ a.tekst|typo }}{% if a.kilder %}<sup class="fn"><a href="#kilde-{{ loop.index }}" aria-label="Kilder til avsnitt {{ loop.index }}">{{ loop.index }}</a></sup>{% endif %}{% if a.rettet %} <a class="rettet-merke" href="#rettelser">Rettet</a>{% endif %}</p>
+          <div class="avsnitt">
+            <p id="avsnitt-{{ loop.index }}"{% if loop.first %} class="forste"{% endif %}>{{ a.tekst|typo }}{% if a.rettet %} <a class="rettet-merke" href="#rettelser">Rettet</a>{% endif %}</p>
+            {% if a.kilder %}<p class="randnote" id="kilde-{{ loop.index }}"><span class="randnote-etikett">Kilde</span> {{ kildegrupper_html(a.kilder) }}</p>{% endif %}
+          </div>
           {% endfor %}
-        </div>
-        <div class="fotnoter">
-          <h3>Kilder til teksten</h3>
-          <p>Tallet etter hvert avsnitt viser til sidene i kommunens dokumenter som avsnittet bygger på.</p>
-          <ol>
-            {% for a in s.artikkel %}{% if a.kilder %}
-            <li id="kilde-{{ loop.index }}"><span class="nr">{{ loop.index }}</span><span>{{ kildegrupper_html(a.kilder) }}</span><a class="tilbake" href="#avsnitt-{{ loop.index }}" aria-label="Tilbake til avsnitt {{ loop.index }}">↑</a></li>
-            {% endif %}{% endfor %}
-          </ol>
         </div>
         <p class="meld-feil">Ser du en feil? {{ meld_feil_lenker(s) }}</p>
       </div>

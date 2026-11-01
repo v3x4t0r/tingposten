@@ -37,27 +37,19 @@
 {% set meny %}
 <a href="{{ root }}bergen/"{% if side == "forside" %} aria-current="page"{% endif %}>Forside</a><a href="{{ root }}bergen/moter/"{% if side == "moter" %} aria-current="page"{% elif side == "mote" %} aria-current="true"{% endif %}>Møter</a><a href="{{ root }}om/"{% if side == "om" %} aria-current="page"{% endif %}>Om</a>
 {% endset %}
-{% if side in ("forside", "landing") %}
+{# One masthead on every page, as in a printed paper: the nameplate in a double frame between two ears.
+   Narrow screens hide the ears and set the name smaller, so the headline is on the first screen. #}
 <header class="masthode ramme">
-  <div class="masthode-topp">
-    <p class="ore ore-v"><strong>Bergen</strong>{% if idag_tekst is defined %}<span class="bred"><br></span><span class="smal"> · </span>{{ idag_tekst }}{% endif %}</p>
-    <p class="navnetrekk"><a href="{{ root }}bergen/">Tingposten</a></p>
-    <p class="ore ore-h">Hva kommunen<br> faktisk vedtar</p>
+  <div class="masthode-ramme">
+    <p class="ore ore-v"><span class="ore-topp">Bergen-utgaven</span><span class="ore-bunn">Vedtak i Bergen kommune</span></p>
+    <div class="navnefelt">
+      <p class="navnetrekk"><a href="{{ root }}bergen/">Tingposten</a></p>
+      <p class="slagord">Hva kommunen faktisk vedtar</p>
+    </div>
+    <p class="ore ore-h">{% if idag_tekst is defined %}<span class="ore-topp">{{ idag_tekst }}</span><span class="ore-bunn">Det viktigste først</span>{% else %}<span class="ore-topp">Med kilde til alt</span><span class="ore-bunn">Kommunens dokumenter</span>{% endif %}</p>
   </div>
-  <div class="folio">
-    <nav class="meny" aria-label="Hovedmeny">{{ meny }}</nav>
-  </div>
+  <nav class="meny" aria-label="Hovedmeny">{{ meny }}</nav>
 </header>
-{% else %}
-<header class="masthode masthode-smal ramme">
-  <div class="masthode-topp">
-    <nav class="meny-smal" aria-label="Hovedmeny">{{ meny }}</nav>
-    <p class="navnetrekk"><a href="{{ root }}bergen/">Tingposten</a></p>
-    <p class="ore ore-h">Hva kommunen faktisk vedtar</p>
-  </div>
-  <div class="folio"></div>
-</header>
-{% endif %}
 {% block forhode %}{% endblock %}
 <main id="innhold" class="ramme {% block hovedklasse %}vanlig{% endblock %}">
 {% block main %}{% endblock %}
