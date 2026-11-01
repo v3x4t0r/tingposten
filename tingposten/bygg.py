@@ -37,7 +37,7 @@ from urllib.parse import quote, urlencode, urlsplit
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 from markupsafe import Markup, escape
 
-from . import config, grafikk, innlegg as innlegg_mod, pdf, rettelser as rettelser_mod, score
+from . import config, grafikk, innlegg as innlegg_mod, pdf, rettelser as rettelser_mod, score, synlighet
 from .klassifiserer import TEMA
 from .saksframlegg import saksbydeler
 from . import status as status_mod
@@ -157,8 +157,9 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
 
     env = _env()
     pages = 0
+    i_sitemap: list[tuple[str, date | None]] = []   # (path, last changed) of the pages search engines should find
 
-    def write(rel: str, template: str, **ctx) -> None:
+    def write(rel: str, template: str, endret: date | None = None, **ctx) -> None:
         nonlocal pages
         path = tmp / rel
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -168,6 +169,8 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
         ctx.setdefault("sti", rel.removesuffix("index.html"))
         path.write_text(env.get_template(template).render(**ctx))
         pages += 1
+        if ctx["sti"] and not ctx.get("noindex"):
+            i_sitemap.append((ctx["sti"], endret))
 
     moter = _meetings(saker)
     by_meeting = {m["slug"]: m for m in moter}
@@ -177,7 +180,7 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
         window = _window(saker, idag, days)
         front = front_page(window)
         write(f"bergen/{slug}index.html", "forside.html", side="forside", visning=slug, periode=label,
-              idag_tekst=idag_tekst, **front)
+              idag_tekst=idag_tekst, endret=idag, **front)
         # The year's lists are long: month subheads and headlines only.
         aar = days is None
         write(f"bergen/{slug}alle/index.html", "alle.html", side="alle", visning=slug, periode=label,
@@ -197,15 +200,16 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
         write(f"bergen/mote/{m['slug']}/index.html", "mote.html", side="mote", mote=m)
     for s_ in saker:
         meeting = by_meeting[s_["mote"]]
+        # A sak with only the kommune's title and links stays out of search until it has a summary.
         write(s_["side"] + "index.html", "sak.html", side="sak", s=s_, mote=meeting,
-              relaterte=related(s_, meeting))
+              relaterte=related(s_, meeting), noindex=not s_["har_sammendrag"], endret=s_["endret"])
     write("om/index.html", "om.html", side="om", signaler=_weights(), terskel=_terskel())
     # Debatt: the editor's published debattinnlegg (data/bergen/innlegg) and the page that lists them.
     innlegg = innlegg_mod.last(data_dir)
     sak_etter_key = {s_["key"]: s_ for s_ in saker}
     for i in innlegg:
         write(i["side"] + "index.html", "innlegg.html", side="innlegg", i=i, sak=sak_etter_key.get(i["sak"]),
-              andre=[x for x in innlegg if x is not i][:4])
+              andre=[x for x in innlegg if x is not i][:4], endret=i["dato"])
     write("bergen/debatt/index.html", "debatt.html", side="debatt", innlegg=innlegg, maks_tegn=innlegg_mod.MAKS_TEGN)
     if env.globals["debatt"]:
         from .debatt.regler import REGLER, STRENGE
@@ -242,6 +246,16 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
         (tmp / "_redirects").write_text("\n".join(regler) + "\n")
     if getattr(config, "SKJUL_FOR_SOK", False):
         (tmp / "robots.txt").write_text("User-agent: *\nDisallow: /\n")
+    else:
+        # Being found (synlighet.py): robots.txt, the sitemap, llms.txt and the IndexNow key.
+        (tmp / "robots.txt").write_text(synlighet.robots(_site_url()))
+        (tmp / "sitemap.xml").write_text(synlighet.sitemap(_site_url(), i_sitemap))
+        nyeste = sorted((s_ for s_ in _window(saker, idag, 60) if s_["har_sammendrag"]),
+                        key=lambda x: (x["dato"], x["score"]), reverse=True)[:100]
+        (tmp / "llms.txt").write_text(synlighet.llms_txt(_site_url(), nyeste, bool(env.globals["debatt"])))
+        if getattr(config, "INDEXNOW_NOKKEL", None):
+            navn, innhold = synlighet.nokkelfil(config.INDEXNOW_NOKKEL)
+            (tmp / navn).write_text(innhold)
     if config.CNAME:
         (tmp / "CNAME").write_text(config.CNAME + "\n")
 
@@ -484,6 +498,10 @@ def _sak(item: dict, ranked: dict, data_dir: Path, parsers: "_Parsers | None" = 
         "rettet": sorted({n["felt"] for n in notes if n["brukt"]}),
     }
     sak["har_artikkel"] = bool(sak["artikkel"])
+    # When the page last changed, for the sitemap and dateModified: the card, the article, a correction.
+    filer = [p for p in (card_path, data_dir / "artikler-redigert" / f"{pdf.key(item)}.json") if p.exists()]
+    sak["endret"] = max([dato] + [date.fromtimestamp(p.stat().st_mtime) for p in filer]
+                        + [n["dato"] for n in notes if isinstance(n.get("dato"), date)])
     sak["lesetid"] = lesetid(sak["artikkel"])
     sak["fremhevet"] = sak["score"] >= _terskel()
     sak["meld_feil"] = meld_feil(sak["nr"], sak["tittel"], _site_url() + sak["lenke"])
@@ -1064,6 +1082,9 @@ def _env() -> Environment:
     env.globals["status_boks"] = status_boks
     env.tests["status_boks"] = status_boks
     env.globals["site_url"] = _site_url()
+    env.globals["ld_nettsted"] = lambda: synlighet.nettsted(_site_url())
+    env.globals["ld_sak"] = lambda s: synlighet.sak(_site_url(), s)
+    env.globals["ld_innlegg"] = lambda i: synlighet.innlegg(_site_url(), i)
     env.globals["redaktor"] = getattr(config, "ANSVARLIG_REDAKTOR", None)
     env.globals["utgiver"] = getattr(config, "UTGIVER", None)
     env.globals["utgiver_orgnr"] = getattr(config, "UTGIVER_ORGNR", None)

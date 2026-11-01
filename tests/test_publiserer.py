@@ -188,6 +188,8 @@ def test_publiser_git_triggers_a_build_but_not_when_stopped(monkeypatch):
     monkeypatch.setattr(config, "PUBLISER_TIL", "statichost-git")
     monkeypatch.setattr(publiserer, "trigger_build", lambda: calls.append("bygg"))
     monkeypatch.setattr(publiserer, "publish", lambda message, statichost: statichost)
-    assert publiserer.publiser() is True and calls == ["bygg"]
+    from tingposten import synlighet
+    monkeypatch.setattr(synlighet, "varsle_indexnow", lambda site_dir: calls.append("indexnow"))
+    assert publiserer.publiser() is True and calls == ["bygg", "indexnow"]
     monkeypatch.setattr(publiserer, "publish", lambda message, statichost: False)
-    assert publiserer.publiser() is False and calls == ["bygg"]
+    assert publiserer.publiser() is False and calls == ["bygg", "indexnow"]

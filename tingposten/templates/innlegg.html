@@ -5,6 +5,7 @@
 {% block description %}Debattinnlegg av {{ i.forfatter }}: {{ i.avsnitt[0]|truncate(150) }}{% endblock %}
 {% block meta %}<meta property="article:published_time" content="{{ i.dato.isoformat() }}">
 {% endblock %}
+{% block jsonld %}{{ ld_innlegg(i) }}{% endblock %}
 {% block hovedklasse %}innleggside{% endblock %}
 {% block main %}
 <nav class="brodsmule" aria-label="Brødsmuler"><ol>

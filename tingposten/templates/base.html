@@ -20,7 +20,7 @@
 {% block meta %}{% endblock %}
 <meta property="og:site_name" content="Tingposten">
 <meta property="og:locale" content="nb_NO">
-<link rel="icon" href="{{ root }}favicon.ico" sizes="32x32">
+{% block jsonld %}{% endblock %}<link rel="icon" href="{{ root }}favicon.ico" sizes="32x32">
 <link rel="icon" href="{{ root }}static/favicon.svg" type="image/svg+xml">
 {% if fonter %}{% if side in ("forside", "landing") %}<link rel="preload" href="{{ root }}static/fonts/unifrakturmaguntia-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
 {% endif %}<link rel="stylesheet" href="{{ root }}static/fonts.css">

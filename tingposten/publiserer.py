@@ -81,6 +81,9 @@ def publiser(message: str = "Publiser") -> bool:
         return False
     if statichost:
         trigger_build()
+    from .synlighet import varsle_indexnow
+
+    varsle_indexnow(config.SITE_DIR)   # best effort: tell Bing and the others what changed
     return True
 
 
