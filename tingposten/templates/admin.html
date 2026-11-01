@@ -65,6 +65,10 @@ button:disabled { opacity: .45; cursor: default; }
 .plan, .melding, .smaa { font: 14px/1.45 var(--sans); color: var(--dempet); margin: 6px 0; }
 .melding { color: var(--blekk); min-height: 1.45em; }
 .melding.feil { color: var(--feil); }
+.resultat { margin: 12px 0 4px; }
+.resultat ul { margin: 4px 0 0; padding-left: 20px; font: 15px/1.5 var(--sans); }
+.resultat ul.advarsler { list-style: none; padding: 0; }
+.resultat ul.advarsler li { margin-top: 6px; padding: 8px 10px; border-left: 3px solid var(--feil); background: var(--boks); }
 .debatt-ko { list-style: none; margin: 8px 0 0; padding: 0; }
 .debatt-ko li { border-top: 1px solid var(--linje, #ccc); padding: 12px 0; }
 .debatt-ko .hvem { font: 13px/1.4 var(--sans); color: var(--dempet); margin: 0; }
@@ -142,6 +146,11 @@ footer { padding: 0 var(--gutter) 30px; font: 13px/1.4 var(--sans); color: var(-
       </div>
       <p class="melding" id="melding" aria-live="polite"></p>
       <ol class="steg" id="steg" hidden></ol>
+      <div class="resultat" id="resultat" hidden>
+        <p class="etikett">Dette gjorde kjøringen</p>
+        <ul id="punkter"></ul>
+        <ul class="advarsler" id="advarsler"></ul>
+      </div>
       <details id="loggboks">
         <summary>Logg fra siste kjøring</summary>
         <pre class="logg" id="logg">Ingen kjøring ennå.</pre>
@@ -276,7 +285,16 @@ function tegn() {
   if (nye) hent.push(`laster ned ${nye} nye PDF-er`);
   if (g.pdf_pa_nytt) hent.push(`henter ${g.pdf_pa_nytt} protokoller på nytt (de vi har, dekker ikke møtet ennå)`);
   plan += hent.length ? `${hent.join(" og ")}, ca. ${g.pdf_minutter} min med én fil om gangen, ` : "ser etter nye PDF-er, ";
-  plan += "skriver og faktasjekker sakene som mangler kort, bygger siden og publiserer den. Skriving og faktasjekk tar ofte 10–60 minutter.";
+  // What waits to be written with the PDFs already here (admin.arbeid); new PDFs can add to it.
+  const skriv = [];
+  if (g.kort) skriv.push(`skriver ${antall(g.kort, "nytt kort", "nye kort")}`);
+  if (g.omskriv) skriv.push(`skriver om ${antall(g.omskriv, "avvist kort", "avviste kort")}`);
+  if (g.artikler) skriv.push(`skriver ${antall(g.artikler, "bakgrunnsartikkel", "bakgrunnsartikler")}`);
+  if (skriv.length) plan += `${skriv.join(", ")} og faktasjekker dem, bygger siden og publiserer den. Skriving og faktasjekk tar ofte 10–60 minutter.`;
+  else if (g.kort === 0) plan += hent.length
+    ? "skriver og faktasjekker det som kommer i de nye PDF-ene (ellers venter ingenting), bygger siden og publiserer den."
+    : "har ingenting nytt å skrive akkurat nå, og bygger og publiserer bare siden på nytt.";
+  else plan += "skriver og faktasjekker sakene som mangler kort, bygger siden og publiserer den. Skriving og faktasjekk tar ofte 10–60 minutter.";
   $("plan").textContent = plan;
   $("stopp").hidden = !d.side.stopp;
 
@@ -321,6 +339,13 @@ function tegn() {
     if (nederst) pre.scrollTop = pre.scrollHeight;
     if (k.pagar) $("loggboks").open = true;
   }
+  // What the last run did, in words (admin.oppsummer)
+  const o = s && s.oppsummering, res = $("resultat");
+  if (o && !k.pagar && (o.punkter.length || o.advarsler.length)) {
+    $("punkter").replaceChildren(...o.punkter.map(t => el("li", {}, t)));
+    $("advarsler").replaceChildren(...o.advarsler.map(t => el("li", {}, t)));
+    res.hidden = false;
+  } else res.hidden = true;
 
   // Meetings: everything still open, the latest finished ones, the rest folded away.
   const rad = m => {
@@ -363,6 +388,9 @@ function tegn() {
   fakta("gjenstar", [
     ["PDF-er å laste ned", g.pdf ? `${g.pdf}${g.pdf_pa_nytt ? ` (${g.pdf_pa_nytt} på nytt)` : ""}` : "Ingen"],
     ["Saker uten kort", String(g.uten_kort)],
+    g.kort !== null ? ["Å skrive nå", [g.kort ? antall(g.kort, "kort", "kort") : null,
+      g.omskriv ? `${g.omskriv} omskrivinger` : null,
+      g.artikler ? antall(g.artikler, "artikkel", "artikler") : null].filter(Boolean).join(", ") || "Ingenting"] : null,
     ["Agendaen sist hentet", tid(d.sist_hentet)],
   ]);
   const m = d.maskin;
