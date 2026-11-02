@@ -26,7 +26,10 @@ def dokumenttekst(path: Path) -> str:
 def kilder_for(item: dict, data_dir: Path = config.DATA_DIR) -> dict[str, str]:
     """{"saksframlegg": text, "protokoll": text}; "" for a missing PDF. Plus
     "vedlegg-N": the pages the attachment reader picked, under a short header, for
-    each attachment it read."""
+    each attachment it read. A Stortinget sak gets its own documents (stortinget/dokumenter.py)."""
+    if er_stortinget(item):
+        from .stortinget import dokumenter
+        return dokumenter.kilder_for(item, data_dir)
     out = {}
     for kind, _, _ in pdf.KINDS:
         path = data_dir / "pdf" / pdf.filename(item, kind)
@@ -43,6 +46,30 @@ def kilder_for(item: dict, data_dir: Path = config.DATA_DIR) -> dict[str, str]:
     return out
 
 
+def er_stortinget(item: dict) -> bool:
+    return item.get("kilde") == "stortinget"
+
+
+def _stortinget(kilder: dict) -> bool:
+    return "protokoll" not in kilder and "vedtak" in kilder
+
+
+def hovedkilde(kilder: dict[str, str]) -> str:
+    """The document a card can't be written without: Bergen's protokoll, Stortinget's vedtak."""
+    return "vedtak" if _stortinget(kilder) else "protokoll"
+
+
+def blokker(kilder: dict[str, str]) -> list[str]:
+    """The sak's documents as fenced prompt blocks, in the order the prompts give them."""
+    from .llm import fence
+
+    if _stortinget(kilder):
+        from .stortinget import regler
+        return regler.blokker(kilder)
+    return [fence("SAKSFRAMLEGG", kilder["saksframlegg"] or "(mangler)"), fence("PROTOKOLL", kilder["protokoll"]),
+            *vedlegg_blokker(kilder)]
+
+
 def vedlegg_blokker(kilder: dict[str, str]) -> list[str]:
     """The attachment excerpts as fenced prompt blocks (VEDLEGG_1 …), in order."""
     from .llm import fence
@@ -53,8 +80,12 @@ def vedlegg_blokker(kilder: dict[str, str]) -> list[str]:
 
 def med_dokumenter(schema: dict, kilder: dict[str, str]) -> dict:
     """The schema with every citation's "dok" enum widened to this sak's attachments."""
-    doks = [k for k, _, _ in pdf.KINDS] + sorted((k for k in kilder if pdf.VEDLEGG_DOK.fullmatch(k)),
-                                                key=lambda k: int(k.split("-")[1]))
+    if _stortinget(kilder):
+        from .stortinget import regler
+        doks = list(regler.DOKUMENTER)
+    else:
+        doks = [k for k, _, _ in pdf.KINDS] + sorted((k for k in kilder if pdf.VEDLEGG_DOK.fullmatch(k)),
+                                                    key=lambda k: int(k.split("-")[1]))
     ut = copy.deepcopy(schema)
 
     def gaa(node):

@@ -1,0 +1,307 @@
+{
+ "respons_dato_tid": "/Date(1793601970872+0100)/",
+ "versjon": "1.6",
+ "sak_id": 200236,
+ "sak_votering_liste": [
+  {
+   "respons_dato_tid": "/Date(1793601970872+0100)/",
+   "versjon": "1.6",
+   "alternativ_votering_id": -1,
+   "antall_for": 10,
+   "antall_ikke_tilstede": 68,
+   "antall_mot": 91,
+   "behandlingsrekkefoelge": 1,
+   "dagsorden_sak_nummer": 8,
+   "fri_votering": false,
+   "kommentar": null,
+   "mote_kart_nummer": 90,
+   "personlig_votering": true,
+   "president": {
+    "parti": {
+     "respons_dato_tid": "/Date(1793577618818+0100)/",
+     "versjon": "1.6",
+     "id": "FrP",
+     "navn": "Fremskrittspartiet",
+     "representert_parti": true
+    }
+   },
+   "sak_id": 200236,
+   "vedtatt": false,
+   "votering_id": 28284,
+   "votering_resultat_type": 0,
+   "votering_resultat_type_tekst": null,
+   "votering_tema": "Forslag nr. 2 på vegne av SV.",
+   "votering_tid": "/Date(1781183647493+0200)/"
+  },
+  {
+   "respons_dato_tid": "/Date(1793601970872+0100)/",
+   "versjon": "1.6",
+   "alternativ_votering_id": -1,
+   "antall_for": 21,
+   "antall_ikke_tilstede": 69,
+   "antall_mot": 79,
+   "behandlingsrekkefoelge": 1,
+   "dagsorden_sak_nummer": 8,
+   "fri_votering": false,
+   "kommentar": null,
+   "mote_kart_nummer": 90,
+   "personlig_votering": true,
+   "president": {
+    "parti": {
+     "respons_dato_tid": "/Date(1793577618818+0100)/",
+     "versjon": "1.6",
+     "id": "A",
+     "navn": "Arbeiderpartiet",
+     "representert_parti": true
+    }
+   },
+   "sak_id": 200236,
+   "vedtatt": false,
+   "votering_id": 28285,
+   "votering_resultat_type": 0,
+   "votering_resultat_type_tekst": null,
+   "votering_tema": "Forslag nr. 4 på vegne av MDG, KrF og V.",
+   "votering_tid": "/Date(1781183678530+0200)/"
+  },
+  {
+   "respons_dato_tid": "/Date(1793601970872+0100)/",
+   "versjon": "1.6",
+   "alternativ_votering_id": -1,
+   "antall_for": 6,
+   "antall_ikke_tilstede": 68,
+   "antall_mot": 95,
+   "behandlingsrekkefoelge": 1,
+   "dagsorden_sak_nummer": 8,
+   "fri_votering": false,
+   "kommentar": null,
+   "mote_kart_nummer": 90,
+   "personlig_votering": true,
+   "president": {
+    "parti": {
+     "respons_dato_tid": "/Date(1793577618818+0100)/",
+     "versjon": "1.6",
+     "id": "A",
+     "navn": "Arbeiderpartiet",
+     "representert_parti": true
+    }
+   },
+   "sak_id": 200236,
+   "vedtatt": false,
+   "votering_id": 28286,
+   "votering_resultat_type": 0,
+   "votering_resultat_type_tekst": null,
+   "votering_tema": "Forslag nr. 3 på vegne av KrF.",
+   "votering_tid": "/Date(1781183692323+0200)/"
+  },
+  {
+   "respons_dato_tid": "/Date(1793601970872+0100)/",
+   "versjon": "1.6",
+   "alternativ_votering_id": -1,
+   "antall_for": 26,
+   "antall_ikke_tilstede": 68,
+   "antall_mot": 75,
+   "behandlingsrekkefoelge": 1,
+   "dagsorden_sak_nummer": 8,
+   "fri_votering": false,
+   "kommentar": null,
+   "mote_kart_nummer": 90,
+   "personlig_votering": true,
+   "president": {
+    "parti": {
+     "respons_dato_tid": "/Date(1793577618818+0100)/",
+     "versjon": "1.6",
+     "id": "A",
+     "navn": "Arbeiderpartiet",
+     "representert_parti": true
+    }
+   },
+   "sak_id": 200236,
+   "vedtatt": false,
+   "votering_id": 28287,
+   "votering_resultat_type": 0,
+   "votering_resultat_type_tekst": null,
+   "votering_tema": "Forslag nr. 5 på vegne av Sp.",
+   "votering_tid": "/Date(1781183711283+0200)/"
+  },
+  {
+   "respons_dato_tid": "/Date(1793601970872+0100)/",
+   "versjon": "1.6",
+   "alternativ_votering_id": -1,
+   "antall_for": 22,
+   "antall_ikke_tilstede": 68,
+   "antall_mot": 79,
+   "behandlingsrekkefoelge": 1,
+   "dagsorden_sak_nummer": 8,
+   "fri_votering": false,
+   "kommentar": null,
+   "mote_kart_nummer": 90,
+   "personlig_votering": true,
+   "president": {
+    "parti": {
+     "respons_dato_tid": "/Date(1793577618818+0100)/",
+     "versjon": "1.6",
+     "id": "A",
+     "navn": "Arbeiderpartiet",
+     "representert_parti": true
+    }
+   },
+   "sak_id": 200236,
+   "vedtatt": false,
+   "votering_id": 28288,
+   "votering_resultat_type": 0,
+   "votering_resultat_type_tekst": null,
+   "votering_tema": "Forslag nr. 6 på vegne av Sp.",
+   "votering_tid": "/Date(1781183730053+0200)/"
+  },
+  {
+   "respons_dato_tid": "/Date(1793601970872+0100)/",
+   "versjon": "1.6",
+   "alternativ_votering_id": -1,
+   "antall_for": 54,
+   "antall_ikke_tilstede": 68,
+   "antall_mot": 47,
+   "behandlingsrekkefoelge": 1,
+   "dagsorden_sak_nummer": 8,
+   "fri_votering": false,
+   "kommentar": null,
+   "mote_kart_nummer": 90,
+   "personlig_votering": true,
+   "president": {
+    "parti": {
+     "respons_dato_tid": "/Date(1793577618818+0100)/",
+     "versjon": "1.6",
+     "id": "A",
+     "navn": "Arbeiderpartiet",
+     "representert_parti": true
+    }
+   },
+   "sak_id": 200236,
+   "vedtatt": true,
+   "votering_id": 28289,
+   "votering_resultat_type": 0,
+   "votering_resultat_type_tekst": null,
+   "votering_tema": "Forslag nr. 1 på vegne av FrP og H.",
+   "votering_tid": "/Date(1781183749540+0200)/"
+  },
+  {
+   "respons_dato_tid": "/Date(1793601970872+0100)/",
+   "versjon": "1.6",
+   "alternativ_votering_id": -1,
+   "antall_for": 82,
+   "antall_ikke_tilstede": 70,
+   "antall_mot": 17,
+   "behandlingsrekkefoelge": 1,
+   "dagsorden_sak_nummer": 8,
+   "fri_votering": false,
+   "kommentar": null,
+   "mote_kart_nummer": 90,
+   "personlig_votering": true,
+   "president": {
+    "parti": {
+     "respons_dato_tid": "/Date(1793577618818+0100)/",
+     "versjon": "1.6",
+     "id": "A",
+     "navn": "Arbeiderpartiet",
+     "representert_parti": true
+    }
+   },
+   "sak_id": 200236,
+   "vedtatt": true,
+   "votering_id": 28290,
+   "votering_resultat_type": 0,
+   "votering_resultat_type_tekst": null,
+   "votering_tema": "Romertall I § 6-2 tredje ledd",
+   "votering_tid": "/Date(1781183775980+0200)/"
+  },
+  {
+   "respons_dato_tid": "/Date(1793601970872+0100)/",
+   "versjon": "1.6",
+   "alternativ_votering_id": -1,
+   "antall_for": 80,
+   "antall_ikke_tilstede": 68,
+   "antall_mot": 21,
+   "behandlingsrekkefoelge": 1,
+   "dagsorden_sak_nummer": 8,
+   "fri_votering": false,
+   "kommentar": null,
+   "mote_kart_nummer": 90,
+   "personlig_votering": true,
+   "president": {
+    "parti": {
+     "respons_dato_tid": "/Date(1793577618818+0100)/",
+     "versjon": "1.6",
+     "id": "A",
+     "navn": "Arbeiderpartiet",
+     "representert_parti": true
+    }
+   },
+   "sak_id": 200236,
+   "vedtatt": true,
+   "votering_id": 28291,
+   "votering_resultat_type": 0,
+   "votering_resultat_type_tekst": null,
+   "votering_tema": "Romertall II pkt. 2",
+   "votering_tid": "/Date(1781183795347+0200)/"
+  },
+  {
+   "respons_dato_tid": "/Date(1793601970872+0100)/",
+   "versjon": "1.6",
+   "alternativ_votering_id": -1,
+   "antall_for": 90,
+   "antall_ikke_tilstede": 69,
+   "antall_mot": 10,
+   "behandlingsrekkefoelge": 1,
+   "dagsorden_sak_nummer": 8,
+   "fri_votering": false,
+   "kommentar": null,
+   "mote_kart_nummer": 90,
+   "personlig_votering": true,
+   "president": {
+    "parti": {
+     "respons_dato_tid": "/Date(1793577618818+0100)/",
+     "versjon": "1.6",
+     "id": "A",
+     "navn": "Arbeiderpartiet",
+     "representert_parti": true
+    }
+   },
+   "sak_id": 200236,
+   "vedtatt": true,
+   "votering_id": 28292,
+   "votering_resultat_type": 0,
+   "votering_resultat_type_tekst": null,
+   "votering_tema": "Resten av romertall I og resten av romertall II",
+   "votering_tid": "/Date(1781183814887+0200)/"
+  },
+  {
+   "respons_dato_tid": "/Date(1793601970872+0100)/",
+   "versjon": "1.6",
+   "alternativ_votering_id": -1,
+   "antall_for": 89,
+   "antall_ikke_tilstede": 70,
+   "antall_mot": 10,
+   "behandlingsrekkefoelge": 1,
+   "dagsorden_sak_nummer": 8,
+   "fri_votering": false,
+   "kommentar": null,
+   "mote_kart_nummer": 90,
+   "personlig_votering": true,
+   "president": {
+    "parti": {
+     "respons_dato_tid": "/Date(1793577618818+0100)/",
+     "versjon": "1.6",
+     "id": "A",
+     "navn": "Arbeiderpartiet",
+     "representert_parti": true
+    }
+   },
+   "sak_id": 200236,
+   "vedtatt": true,
+   "votering_id": 28293,
+   "votering_resultat_type": 0,
+   "votering_resultat_type_tekst": null,
+   "votering_tema": "Lovens overskrift og loven i sin helhet.",
+   "votering_tid": "/Date(1781183837057+0200)/"
+  }
+ ]
+}

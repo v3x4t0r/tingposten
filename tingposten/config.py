@@ -184,3 +184,18 @@ TIER1 = {
     "900101": "Byrådet – saker med innstilling til bystyret",
     "900102": "Byrådet – saker avgjort av byrådet",
 }
+
+# Stortinget (issue #25, 2.11.2026). data.stortinget.no is open data (NLOD: name
+# Stortinget as the source; 100 calls a minute) and robots.txt on both hosts allows
+# us, www.stortinget.no with Crawl-delay 5. Fetched openly with USER_AGENT, slower
+# than the limits. Nothing about Stortinget is built or published on the public site
+# until the owner has tested a separate copy (owner, 2.11): STORTINGET_PUBLISERT stays
+# False until then, and only `bygg --til … --med-stortinget` makes the private copy.
+STORTINGET_DATA_DIR = ROOT / "data" / "stortinget"
+STORTINGET_API = "https://data.stortinget.no/eksport"
+STORTINGET_WWW = "https://www.stortinget.no"
+STORTINGET_DELAY_S = {"data.stortinget.no": 3.0, "www.stortinget.no": 5.0}
+STORTINGET_PUBLISERT = False
+# Cards are written for saker decided in this session and later, plus the test saker
+# named in data/stortinget/utvalg.json (owner, 2.11: the current session + 15 test saker).
+STORTINGET_FRA_SESJON = "2026-2027"

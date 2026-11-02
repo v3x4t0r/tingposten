@@ -56,7 +56,10 @@ def tag(item: dict) -> str:
 
 def key(item: dict) -> str:
     """'<utvalgId>/<moteDato>/<tag>': where a sak's files live under each step's
-    directory (pdf/, kort/, sjekk/, …). Case numbers are only unique per organ."""
+    directory (pdf/, kort/, sjekk/, …). Case numbers are only unique per organ.
+    A Stortinget sak: '<sesjon>/<sakid>' (under its own data dir)."""
+    if item.get("kilde") == "stortinget":
+        return f"{item['sesjon']}/{item['sakid']}"
     return f"{item.get('utvalgId', 'ukjent')}/{item.get('moteDato', 'udatert')}/{tag(item)}"
 
 

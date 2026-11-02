@@ -1,0 +1,337 @@
+{
+ "respons_dato_tid": "/Date(1793600396622+0100)/",
+ "versjon": "1.6",
+ "dokumentgruppe": 1,
+ "emne_liste": [
+  {
+   "respons_dato_tid": "/Date(1793599325187+0100)/",
+   "versjon": "1.6",
+   "er_hovedemne": false,
+   "hovedemne_id": 40,
+   "id": 41,
+   "navn": "Barn",
+   "underemne_liste": []
+  },
+  {
+   "respons_dato_tid": "/Date(1793599325187+0100)/",
+   "versjon": "1.6",
+   "er_hovedemne": false,
+   "hovedemne_id": 40,
+   "id": 43,
+   "navn": "Barnevern",
+   "underemne_liste": []
+  },
+  {
+   "respons_dato_tid": "/Date(1793599325187+0100)/",
+   "versjon": "1.6",
+   "er_hovedemne": false,
+   "hovedemne_id": 6,
+   "id": 125,
+   "navn": "Ungdommer",
+   "underemne_liste": []
+  }
+ ],
+ "ferdigbehandlet": true,
+ "henvisning": "Prop. 86 L (2025-2026), Innst. 362 L (2025-2026), Lovvedtak 86 (2025-2026)",
+ "id": 200236,
+ "innstillingstekst": "Innstilling fra familie- og kulturkomiteen om Endringer i barnevernsloven (bedre beskyttelse av barn på institusjon)",
+ "komite": {
+  "respons_dato_tid": "/Date(1793599243311+0100)/",
+  "versjon": "1.6",
+  "id": "FAMKULT",
+  "navn": "Familie- og kulturkomiteen"
+ },
+ "korttittel": "Endringer i barnevernsloven (bedre beskyttelse av barn på institusjon)",
+ "kortvedtak": "Stortinget har vedtatt regjeringens foreslåtte endringer i barnevernsloven som skal sette barnevernsinstitusjonene i bedre stand til å gi forsvarlig omsorg og beskyttelse til barn som utsetter sin utvikling for alvorlig fare. Bl.a. er det vedtatt at barn kan ha lengre tvangsopphold på institusjon. I tillegg fattet Stortinget et anmodniningsvedtak om å be regjeringen innen første halvår 2027 å følge opp Stene-utvalget, gjennom å legge frem for Stortinget forslag til nødvendige lovendringer og organisatoriske endringer.",
+ "parentestekst": null,
+ "publikasjon_referanse_liste": [
+  {
+   "respons_dato_tid": "/Date(1793600396826+0100)/",
+   "versjon": "1.6",
+   "eksport_id": null,
+   "lenke_tekst": "Prop. 86 L (2025-2026)",
+   "lenke_url": "http://www.regjeringen.no/id/PRP202520260086000DDDEPIS",
+   "type": 1,
+   "undertype": "proposisjon"
+  },
+  {
+   "respons_dato_tid": "/Date(1793600396826+0100)/",
+   "versjon": "1.6",
+   "eksport_id": "refs-202526-04-09",
+   "lenke_tekst": "Stortingsreferat 09.04.2026",
+   "lenke_url": "//www.stortinget.no/no/Saker-og-publikasjoner/Publikasjoner/Referater/Stortinget/2025-2026/refs-202526-04-09/referatsaker/",
+   "type": 10,
+   "undertype": "storting"
+  },
+  {
+   "respons_dato_tid": "/Date(1793600396826+0100)/",
+   "versjon": "1.6",
+   "eksport_id": "inns-202526-362l",
+   "lenke_tekst": "Innst. 362 L (2025-2026)",
+   "lenke_url": "//www.stortinget.no/no/Saker-og-publikasjoner/Publikasjoner/Innstillinger/Stortinget/2025-2026/inns-202526-362l/",
+   "type": 6,
+   "undertype": "storting"
+  },
+  {
+   "respons_dato_tid": "/Date(1793600396826+0100)/",
+   "versjon": "1.6",
+   "eksport_id": "refs-202526-06-11",
+   "lenke_tekst": "Stortingsreferat 11.06.2026",
+   "lenke_url": "//www.stortinget.no/no/Saker-og-publikasjoner/Publikasjoner/Referater/Stortinget/2025-2026/refs-202526-06-11/8",
+   "type": 10,
+   "undertype": "storting"
+  },
+  {
+   "respons_dato_tid": "/Date(1793600396826+0100)/",
+   "versjon": "1.6",
+   "eksport_id": "vedtak-202526-086",
+   "lenke_tekst": "Lovvedtak 86 (2025-2026)",
+   "lenke_url": "//www.stortinget.no/no/Saker-og-publikasjoner/Vedtak/Beslutninger/Lovvedtak/2025-2026/vedtak-202526-086/",
+   "type": 8,
+   "undertype": null
+  },
+  {
+   "respons_dato_tid": "/Date(1793600396826+0100)/",
+   "versjon": "1.6",
+   "eksport_id": "refs-202526-06-11",
+   "lenke_tekst": "Stortingsreferat 11.06.2026",
+   "lenke_url": "//www.stortinget.no/no/Saker-og-publikasjoner/Publikasjoner/Referater/Stortinget/2025-2026/refs-202526-06-11/voteringer#110626-8",
+   "type": 10,
+   "undertype": "storting"
+  },
+  {
+   "respons_dato_tid": "/Date(1793600396826+0100)/",
+   "versjon": "1.6",
+   "eksport_id": "refs-202526-06-15",
+   "lenke_tekst": "Stortingsreferat 15.06.2026",
+   "lenke_url": "//www.stortinget.no/no/Saker-og-publikasjoner/Publikasjoner/Referater/Stortinget/2025-2026/refs-202526-06-15/10",
+   "type": 10,
+   "undertype": "storting"
+  }
+ ],
+ "sak_nummer": 86,
+ "sak_opphav": {
+  "respons_dato_tid": "/Date(1793600396622+0100)/",
+  "versjon": "1.6",
+  "forslagstiller_liste": []
+ },
+ "sak_relasjon_liste": [],
+ "sak_sesjon": "2025-2026",
+ "saksgang": {
+  "respons_dato_tid": "/Date(1793600396826+0100)/",
+  "versjon": "1.6",
+  "id": "KPRPLOV",
+  "navn": "KLovforslag fra Regjeringen",
+  "saksgang_steg_liste": [
+   {
+    "respons_dato_tid": "/Date(1793600396826+0100)/",
+    "versjon": "1.6",
+    "id": "SAK",
+    "navn": "Lovforslag",
+    "saksgang_hendelse_liste": [
+     {
+      "respons_dato_tid": "/Date(1793600396826+0100)/",
+      "versjon": "1.6",
+      "dato": "01.01.0001 00:00:00",
+      "id": "FRADEP",
+      "publikasjonsReferanse": null,
+      "sorterings_nummer": 10000,
+      "stegnummer": "1"
+     },
+     {
+      "respons_dato_tid": "/Date(1793600396826+0100)/",
+      "versjon": "1.6",
+      "dato": "01.01.0001 00:00:00",
+      "id": "SAK",
+      "publikasjonsReferanse": null,
+      "sorterings_nummer": 20000,
+      "stegnummer": "1"
+     },
+     {
+      "respons_dato_tid": "/Date(1793600396826+0100)/",
+      "versjon": "1.6",
+      "dato": "27.03.2026 00:00:00",
+      "id": "FREMMET",
+      "publikasjonsReferanse": null,
+      "sorterings_nummer": 30000,
+      "stegnummer": "1"
+     },
+     {
+      "respons_dato_tid": "/Date(1793600396826+0100)/",
+      "versjon": "1.6",
+      "dato": "09.04.2026 00:00:00",
+      "id": "REFS",
+      "publikasjonsReferanse": "http://www.stortinget.no/stid/2025/si260409.html",
+      "sorterings_nummer": 40010,
+      "stegnummer": "1"
+     }
+    ],
+    "steg_nummer": 1,
+    "uaktuell": false
+   },
+   {
+    "respons_dato_tid": "/Date(1793600396826+0100)/",
+    "versjon": "1.6",
+    "id": "KOMBEH",
+    "navn": "Komitebehandling",
+    "saksgang_hendelse_liste": [
+     {
+      "respons_dato_tid": "/Date(1793600396826+0100)/",
+      "versjon": "1.6",
+      "dato": "09.04.2026 00:00:00",
+      "id": "SENDT",
+      "publikasjonsReferanse": null,
+      "sorterings_nummer": 50000,
+      "stegnummer": "2"
+     },
+     {
+      "respons_dato_tid": "/Date(1793600396826+0100)/",
+      "versjon": "1.6",
+      "dato": "01.01.0001 00:00:00",
+      "id": "KOMITE",
+      "publikasjonsReferanse": null,
+      "sorterings_nummer": 60000,
+      "stegnummer": "2"
+     },
+     {
+      "respons_dato_tid": "/Date(1793600396826+0100)/",
+      "versjon": "1.6",
+      "dato": "20.04.2026 00:00:00",
+      "id": "HOERFRIST",
+      "publikasjonsReferanse": "http://epos.stortinget.no/HenvPrMail.aspx?HenvGrup",
+      "sorterings_nummer": 80000,
+      "stegnummer": "2"
+     },
+     {
+      "respons_dato_tid": "/Date(1793600396826+0100)/",
+      "versjon": "1.6",
+      "dato": "27.04.2026 00:00:00",
+      "id": "HOER",
+      "publikasjonsReferanse": "http://epos.stortinget.no/HoeringsProgram.aspx?Hoe",
+      "sorterings_nummer": 81043,
+      "stegnummer": "2"
+     },
+     {
+      "respons_dato_tid": "/Date(1793600396826+0100)/",
+      "versjon": "1.6",
+      "dato": "01.01.0001 00:00:00",
+      "id": "ORDFORER",
+      "publikasjonsReferanse": null,
+      "sorterings_nummer": 90000,
+      "stegnummer": "2"
+     },
+     {
+      "respons_dato_tid": "/Date(1793600396826+0100)/",
+      "versjon": "1.6",
+      "dato": "26.05.2026 00:00:00",
+      "id": "AVGITT",
+      "publikasjonsReferanse": "http://www.stortinget.no/inns/2025/inns-202526-362.html",
+      "sorterings_nummer": 110000,
+      "stegnummer": "2"
+     }
+    ],
+    "steg_nummer": 2,
+    "uaktuell": false
+   },
+   {
+    "respons_dato_tid": "/Date(1793600396826+0100)/",
+    "versjon": "1.6",
+    "id": "DEBATT",
+    "navn": "Første behandling",
+    "saksgang_hendelse_liste": [
+     {
+      "respons_dato_tid": "/Date(1793600396826+0100)/",
+      "versjon": "1.6",
+      "dato": "01.01.0001 00:00:00",
+      "id": "LOSEFORS",
+      "publikasjonsReferanse": null,
+      "sorterings_nummer": 126000,
+      "stegnummer": "3"
+     },
+     {
+      "respons_dato_tid": "/Date(1793600396826+0100)/",
+      "versjon": "1.6",
+      "dato": "11.06.2026 00:00:00",
+      "id": "BEH1LOV",
+      "publikasjonsReferanse": "http://www.stortinget.no/otid/2025/oi260611-08.html",
+      "sorterings_nummer": 130000,
+      "stegnummer": "3"
+     },
+     {
+      "respons_dato_tid": "/Date(1793600396826+0100)/",
+      "versjon": "1.6",
+      "dato": "01.01.0001 00:00:00",
+      "id": "LOVLENKE1",
+      "publikasjonsReferanse": "http://www.stortinget.no/bess/bess-202526-086.html",
+      "sorterings_nummer": 135086,
+      "stegnummer": "3"
+     },
+     {
+      "respons_dato_tid": "/Date(1793600396826+0100)/",
+      "versjon": "1.6",
+      "dato": "11.06.2026 00:00:00",
+      "id": "VOTLOV1",
+      "publikasjonsReferanse": null,
+      "sorterings_nummer": 135500,
+      "stegnummer": "3"
+     },
+     {
+      "respons_dato_tid": "/Date(1793600396826+0100)/",
+      "versjon": "1.6",
+      "dato": "01.01.0001 00:00:00",
+      "id": "VEDTAK",
+      "publikasjonsReferanse": null,
+      "sorterings_nummer": 135600,
+      "stegnummer": "3"
+     }
+    ],
+    "steg_nummer": 3,
+    "uaktuell": false
+   },
+   {
+    "respons_dato_tid": "/Date(1793600396826+0100)/",
+    "versjon": "1.6",
+    "id": "VEDTAK",
+    "navn": "Andre behandling",
+    "saksgang_hendelse_liste": [
+     {
+      "respons_dato_tid": "/Date(1793600396826+0100)/",
+      "versjon": "1.6",
+      "dato": "15.06.2026 00:00:00",
+      "id": "BEH2LOV",
+      "publikasjonsReferanse": "http://www.stortinget.no/ltid/2025/li260615-10.html",
+      "sorterings_nummer": 136010,
+      "stegnummer": "4"
+     }
+    ],
+    "steg_nummer": 4,
+    "uaktuell": false
+   },
+   {
+    "respons_dato_tid": "/Date(1793600396826+0100)/",
+    "versjon": "1.6",
+    "id": "LOV",
+    "navn": "Lov",
+    "saksgang_hendelse_liste": [
+     {
+      "respons_dato_tid": "/Date(1793600396826+0100)/",
+      "versjon": "1.6",
+      "dato": "19.06.2026 00:00:00",
+      "id": "LOVVEDT",
+      "publikasjonsReferanse": "http://www.stortinget.no/bess/bess-202526-086.html",
+      "sorterings_nummer": 150086,
+      "stegnummer": "5"
+     }
+    ],
+    "steg_nummer": 5,
+    "uaktuell": false
+   }
+  ]
+ },
+ "saksordfoerer_liste": [],
+ "status": 1,
+ "stikkord_liste": [],
+ "tittel": "Endringer i barnevernsloven (bedre beskyttelse av barn på institusjon)",
+ "type": 3,
+ "vedtakstekst": "Vedtak i samsvar med innstillingen med avvik/tillegg"
+}

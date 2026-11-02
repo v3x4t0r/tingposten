@@ -77,7 +77,8 @@ VIKTIGHETSORD = [
     r"\bavgjørende\b",
     r"\bstor betydning\b",
 ]
-_SUBJECT = r"(?:byrådet|administrasjonen|fagetaten|sekretariatet|kontrollutvalget)"
+_SUBJECT = (r"(?:byrådet|administrasjonen|fagetaten|sekretariatet|kontrollutvalget"
+            r"|regjeringen|departementet|komiteen)")  # the last three: Stortinget
 _GROUPS = r"(?:flertallet|mindretallet|forslagsstillerne)"
 _PARTIES = r"(?:Ap|H|FrP|SV|Sp|KrF|V|MDG|R|INP|BL|PP)"
 _SAYS = r"(?:mener|mente|skriver|skrev|begrunner|begrunnet|viser\b.*?\btil|viste\b.*?\btil|peker\b.*?\bpå|pekte\b.*?\bpå)"

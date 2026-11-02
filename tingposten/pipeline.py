@@ -105,7 +105,9 @@ def eldre_regler(path: Path) -> bool:
     written = read_json(path) or {}
     if "overskrift" not in written and "avsnitt" not in written:
         return False  # nothing written yet (or not a card/article)
-    return (written.get("meta") or {}).get("prompt_versjon") != skribent.PROMPT_VERSJON
+    from .stortinget import regler as stortinget_regler
+    return (written.get("meta") or {}).get("prompt_versjon") not in (skribent.PROMPT_VERSJON,
+                                                                       stortinget_regler.SKRIBENT_VERSJON)
 
 
 def todo(step: str, items: list[dict], data_dir: Path) -> list[dict]:

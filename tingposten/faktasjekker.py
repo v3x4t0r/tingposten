@@ -89,8 +89,8 @@ def sjekk(item: dict, data_dir: Path = config.DATA_DIR, llm=None, force: bool = 
     if card is None:
         return "mangler kort"
     kilder = kildetekst.kilder_for(item, data_dir)
-    if not kilder["protokoll"]:
-        return "mangler kilde: protokoll"
+    if not kilder[hoved := kildetekst.hovedkilde(kilder)]:
+        return f"mangler kilde: {hoved}"
     prompt = _prompt(card, kilder)
     schema = kildetekst.med_dokumenter(SCHEMA, kilder)
     answer = llm.ask(prompt, schema)
@@ -100,7 +100,7 @@ def sjekk(item: dict, data_dir: Path = config.DATA_DIR, llm=None, force: bool = 
         errors = [] if answer["blocked"].strip() else dekning(card, answer["setninger"])
         if errors:
             answer["blocked"] = "setningene dekker ikke kortet: " + "; ".join(errors)
-    write_json(out, {"nr": card["nr"], **answer, "meta": _meta(llm)})
+    write_json(out, {"nr": card["nr"], **answer, "meta": _meta(llm, _versjon(kilder, PROMPT_VERSJON))})
     if answer["blocked"].strip():
         return f"blocked: {answer['blocked'].strip()}"
     bad = sum(1 for s in answer["setninger"] if s["stottet"] is False)
@@ -220,8 +220,8 @@ def sjekk_artikkel(item: dict, data_dir: Path = config.DATA_DIR, llm=None, force
                          "meta": {**_meta(llm, ARTIKKEL_PROMPT_VERSJON), "tom": True}})
         return "tom artikkel"
     kilder = kildetekst.kilder_for(item, data_dir)
-    if not kilder["protokoll"]:
-        return "mangler kilde: protokoll"
+    if not kilder[hoved := kildetekst.hovedkilde(kilder)]:
+        return f"mangler kilde: {hoved}"
     prompt = _artikkel_prompt(card, article, kilder)
     schema = kildetekst.med_dokumenter(ARTIKKEL_SCHEMA, kilder)
     answer = llm.ask(prompt, schema)
@@ -231,7 +231,7 @@ def sjekk_artikkel(item: dict, data_dir: Path = config.DATA_DIR, llm=None, force
         errors = [] if answer["blocked"].strip() else dekning_artikkel(paragraphs, answer["setninger"], answer["roller"])
         if errors:
             answer["blocked"] = "setningene dekker ikke artikkelen: " + "; ".join(errors)
-    write_json(out, {"nr": article.get("nr", ""), **answer, "meta": _meta(llm, ARTIKKEL_PROMPT_VERSJON)})
+    write_json(out, {"nr": article.get("nr", ""), **answer, "meta": _meta(llm, _versjon(kilder, ARTIKKEL_PROMPT_VERSJON))})
     if answer["blocked"].strip():
         return f"blocked: {answer['blocked'].strip()}"
     bad = sum(1 for s in answer["setninger"] if s["stottet"] is False)
@@ -263,26 +263,38 @@ def _artikkel_prompt(card: dict, article: dict, kilder: dict) -> str:
     shown_card = {"overskrift": card.get("overskrift", ""), **(card.get("felt") or {})}
     shown_article = [{"avsnitt": n, "rolle": a.get("rolle", ""), "tekst": a.get("tekst", ""), "kilder": a.get("kilder", [])}
                      for n, a in enumerate(article.get("avsnitt", []), start=1)]
+    st = _stortinget(kilder)
     return "\n\n".join([
-        ARTIKKEL_RULES,
+        st.ARTIKKELSJEKK_RULES if st else ARTIKKEL_RULES,
         fence("KORT", json.dumps(shown_card, ensure_ascii=False, indent=1)),
         fence("ARTIKKEL", json.dumps(shown_article, ensure_ascii=False, indent=1)),
-        fence("SAKSFRAMLEGG", kilder["saksframlegg"] or "(mangler)"),
-        fence("PROTOKOLL", kilder["protokoll"]),
-        *kildetekst.vedlegg_blokker(kilder),
+        *kildetekst.blokker(kilder),
     ])
 
 
 def _prompt(card: dict, kilder: dict) -> str:
     # The writer's merknad stays out: the checker must not see its reasoning.
     shown = {k: card.get(k, "") for k in CHECKED} | {"kilder": card.get("kilder", [])}
+    st = _stortinget(kilder)
     return "\n\n".join([
-        RULES,
+        st.SJEKK_RULES if st else RULES,
         fence("KORT", json.dumps(shown, ensure_ascii=False, indent=1)),
-        fence("SAKSFRAMLEGG", kilder["saksframlegg"] or "(mangler)"),
-        fence("PROTOKOLL", kilder["protokoll"]),
-        *kildetekst.vedlegg_blokker(kilder),
+        *kildetekst.blokker(kilder),
     ])
+
+
+def _stortinget(kilder: dict):
+    """Stortinget's rules for a Stortinget sak's documents, else None."""
+    if kildetekst.hovedkilde(kilder) == "vedtak":
+        from .stortinget import regler
+        return regler
+    return None
+
+
+def _versjon(kilder: dict, bergen: str) -> str:
+    if st := _stortinget(kilder):
+        return st.ARTIKKELSJEKK_VERSJON if bergen == ARTIKKEL_PROMPT_VERSJON else st.FAKTASJEKKER_VERSJON
+    return bergen
 
 
 def _feedback(errors: list[str]) -> str:

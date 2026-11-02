@@ -24,7 +24,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import config, kildetekst, pdf, redaktor
-from .llm import fence, obj, read_json, run_parallel, write_json
+from .llm import obj, read_json, run_parallel, write_json
 
 PROMPT_VERSJON = "skribent-4"  # -4: attachment excerpts; -3: written ingress, word caps, plain-language status, body with roles
 EKSEMPLER = Path(__file__).parent / "eksempler" / "kort"
@@ -203,8 +203,8 @@ def skriv(item: dict, data_dir: Path = config.DATA_DIR, llm=None, force: bool = 
     if out.exists() and not force:
         return "finnes"
     kilder = kildetekst.kilder_for(item, data_dir)
-    if not kilder["protokoll"]:
-        return "mangler kilde: protokoll"
+    if not kilder[hoved := kildetekst.hovedkilde(kilder)]:
+        return f"mangler kilde: {hoved}"
     prompt = _card_prompt(item, kilder)
     schema = kildetekst.med_dokumenter(CARD_SCHEMA, kilder)
     meta_extra = {}
@@ -215,13 +215,14 @@ def skriv(item: dict, data_dir: Path = config.DATA_DIR, llm=None, force: bool = 
     card = llm.ask(prompt, schema)
     if card["blocked"].strip():
         return f"blocked: {card['blocked'].strip()}"
-    if problems := grenser(card):
+    start = _organ_start(item)
+    if problems := grenser(card, start):
         card = llm.ask(prompt + _feedback(problems), schema)
         if card["blocked"].strip():
             return f"blocked: {card['blocked'].strip()}"
     card.pop("blocked")
-    write_json(out, {"nr": _nr(item), **card, "meta": {**_meta(llm), **meta_extra}})
-    return ("omskrevet" if feedback else "skrevet") + (" (over grensen)" if grenser(card) else "")
+    write_json(out, {"nr": _nr(item), **card, "meta": {**_meta(llm, item), **meta_extra}})
+    return ("omskrevet" if feedback else "skrevet") + (" (over grensen)" if grenser(card, start) else "")
 
 
 def skriv_artikkel(item: dict, card: dict, data_dir: Path = config.DATA_DIR, llm=None, force: bool = False,
@@ -232,17 +233,16 @@ def skriv_artikkel(item: dict, card: dict, data_dir: Path = config.DATA_DIR, llm
     if out.exists() and not force:
         return "finnes"
     kilder = kildetekst.kilder_for(item, data_dir)
-    if not kilder["protokoll"]:
-        return "mangler kilde: protokoll"
+    if not kilder[hoved := kildetekst.hovedkilde(kilder)]:
+        return f"mangler kilde: {hoved}"
     shown = {k: card.get(k, "") for k in ("overskrift", *FIELDS)}
+    st = _stortinget(item)
     prompt = "\n\n".join([
-        ARTICLE_RULES,
-        _sak_meta(item),
+        st.ARTICLE_RULES if st else ARTICLE_RULES,
+        st.sak_meta(item) if st else _sak_meta(item),
         "THE CARD AS PUBLISHED (headline, ingress and the fact box; only a paragraph's first sentence may\n"
         "restate a fact from it):\n" + json.dumps(shown, ensure_ascii=False, indent=1),
-        fence("SAKSFRAMLEGG", kilder["saksframlegg"] or "(mangler)"),
-        fence("PROTOKOLL", kilder["protokoll"]),
-        *kildetekst.vedlegg_blokker(kilder),
+        *kildetekst.blokker(kilder),
     ])
     schema = kildetekst.med_dokumenter(ARTICLE_SCHEMA, kilder)
     meta_extra = {}
@@ -257,7 +257,7 @@ def skriv_artikkel(item: dict, card: dict, data_dir: Path = config.DATA_DIR, llm
         answer = llm.ask(prompt + _feedback(problems), schema)
         if answer["blocked"].strip():
             return f"blocked: {answer['blocked'].strip()}"
-    write_json(out, {"nr": _nr(item), "avsnitt": answer["avsnitt"], "meta": {**_meta(llm), **meta_extra}})
+    write_json(out, {"nr": _nr(item), "avsnitt": answer["avsnitt"], "meta": {**_meta(llm, item), **meta_extra}})
     return ("omskrevet" if feedback else "skrevet") + (" (over grensen)" if artikkel_grenser(answer) else "")
 
 
@@ -289,12 +289,15 @@ def redigert_kort(item: dict, data_dir: Path = config.DATA_DIR) -> dict | None:
     return {"nr": r.get("nr", ""), "overskrift": r.get("overskrift", ""), **{f: (r.get("felt") or {}).get(f, "") for f in FIELDS}}
 
 
-def grenser(card: dict) -> list[str]:
+ORGAN_START = r"\s*(bystyret|byrådet)\b"
+
+
+def grenser(card: dict, organ_start: str = ORGAN_START) -> list[str]:
     """The plan's hard limits, as messages the writer can act on."""
     problems = []
     if len(card.get("overskrift", "")) > MAX_OVERSKRIFT:
         problems.append(f"overskrift har {len(card['overskrift'])} tegn (maks {MAX_OVERSKRIFT})")
-    if re.match(r"\s*(bystyret|byrådet)\b", card.get("overskrift", ""), re.IGNORECASE):
+    if re.match(organ_start, card.get("overskrift", ""), re.IGNORECASE):
         problems.append("overskriften begynner med organet; begynn med hva som endres, for hvem eller hvor")
     cited = {k["felt"] for k in card.get("kilder", [])}
     for field, limit in MAX_SETNINGER.items():
@@ -371,18 +374,36 @@ def setninger(text: str) -> list[str]:
 
 
 def _card_prompt(item: dict, kilder: dict) -> str:
+    if st := _stortinget(item):
+        return "\n\n".join([
+            st.CARD_RULES,
+            "EXAMPLE CARDS (follow their length and tone; " + st.EKSEMPLER_MERKNAD + "):\n" + _examples(st.EKSEMPLER),
+            st.sak_meta(item),
+            *kildetekst.blokker(kilder),
+        ])
     return "\n\n".join([
         CARD_RULES,
         "EXAMPLE CARDS (follow their length and tone):\n" + _examples(),
         _sak_meta(item),
-        fence("SAKSFRAMLEGG", kilder["saksframlegg"] or "(mangler)"),
-        fence("PROTOKOLL", kilder["protokoll"]),
-        *kildetekst.vedlegg_blokker(kilder),
+        *kildetekst.blokker(kilder),
     ])
 
 
-def _examples() -> str:
-    cards = [json.loads(p.read_text()) for p in sorted(EKSEMPLER.glob("*.json"))]
+def _stortinget(item: dict):
+    """Stortinget's rules (stortinget/regler.py) for a Stortinget sak, else None."""
+    if kildetekst.er_stortinget(item):
+        from .stortinget import regler
+        return regler
+    return None
+
+
+def _organ_start(item: dict) -> str:
+    st = _stortinget(item)
+    return st.ORGAN_START if st else ORGAN_START
+
+
+def _examples(mappe: Path = EKSEMPLER) -> str:
+    cards = [json.loads(p.read_text()) for p in sorted(mappe.glob("*.json"))]
     return "\n".join(json.dumps(c, ensure_ascii=False) for c in cards)
 
 
@@ -410,8 +431,9 @@ def _nr(item: dict) -> str:
     return item.get("referansenr") or pdf.tag(item)
 
 
-def _meta(llm) -> dict:
-    return {"modell": llm.name, "prompt_versjon": PROMPT_VERSJON,
+def _meta(llm, item: dict | None = None) -> dict:
+    st = _stortinget(item or {})
+    return {"modell": llm.name, "prompt_versjon": st.SKRIBENT_VERSJON if st else PROMPT_VERSJON,
             "tid": datetime.now(timezone.utc).isoformat(timespec="seconds")}
 
 

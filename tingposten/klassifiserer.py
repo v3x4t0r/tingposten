@@ -99,11 +99,11 @@ def klassifiser(item: dict, data_dir: Path = config.DATA_DIR, llm=None, force: b
     card = read_json(data_dir / "kort" / f"{pdf.key(item)}.json")
     if card is None:
         return "mangler kort"
-    answer = llm.ask(_prompt(item, card), SCHEMA)
+    answer = llm.ask(_prompt(item, card), _schema(item))
     if answer["blocked"].strip():
         return f"blocked: {answer['blocked'].strip()}"
     write_json(out, {"angar": answer["angar"], "konkret": answer["konkret"], "tema": answer["tema"],
-                     "tema_begrunnelse": answer["tema_begrunnelse"], "meta": _meta(llm)})
+                     "tema_begrunnelse": answer["tema_begrunnelse"], "meta": _meta(llm, item)})
     return "klassifisert"
 
 
@@ -112,7 +112,7 @@ def mangler_tema(item: dict, data_dir: Path = config.DATA_DIR) -> bool:
     if not (data_dir / "kort" / f"{pdf.key(item)}.json").exists():
         return False
     signaler = read_json(data_dir / "signaler" / f"{pdf.key(item)}.json") or {}
-    return signaler.get("tema") not in TEMA
+    return signaler.get("tema") not in tema_for(item)
 
 
 def klassifiser_tema(item: dict, data_dir: Path = config.DATA_DIR, llm=None) -> str:
@@ -147,7 +147,32 @@ def run(items: list[dict], data_dir: Path = config.DATA_DIR, llm=None, force: bo
     return run_parallel(lambda item: klassifiser(item, data_dir, llm, force), items, parallel)
 
 
+def _stortinget(item: dict):
+    if item.get("kilde") == "stortinget":
+        from .stortinget import regler
+        return regler
+    return None
+
+
+def tema_for(item: dict) -> dict[str, str]:
+    """The sections a sak can be sorted into: Bergen's, or Stortinget's."""
+    st = _stortinget(item)
+    return st.TEMA if st else TEMA
+
+
+def _schema(item: dict) -> dict:
+    st = _stortinget(item)
+    if not st:
+        return SCHEMA
+    return obj(angar=_SIGNAL, konkret=_SIGNAL, tema={"type": "string", "enum": list(st.TEMA)},
+               tema_begrunnelse={"type": "string"}, blocked={"type": "string"})
+
+
 def _prompt(item: dict, card: dict, rules: str | None = None) -> str:
+    if st := _stortinget(item):
+        sak = {**st.klassifiser_sak(item), **{k: card.get(k, "") for k in CARD_FIELDS}}
+        rules = rules if rules is not None else st.KLASSIFISER_RULES + "\n" + st.TEMA_RULES
+        return "\n\n".join([rules, fence("SAK", json.dumps(sak, ensure_ascii=False, indent=1))])
     sak = {
         "organ": config.TIER1.get(item.get("utvalgId"), item.get("utvalgsNavn", "")),
         "møtedato": item.get("moteDato"),
@@ -159,6 +184,7 @@ def _prompt(item: dict, card: dict, rules: str | None = None) -> str:
     return "\n\n".join([rules, fence("SAK", json.dumps(sak, ensure_ascii=False, indent=1))])
 
 
-def _meta(llm) -> dict:
-    return {"modell": llm.name, "prompt_versjon": PROMPT_VERSJON,
+def _meta(llm, item: dict | None = None) -> dict:
+    st = _stortinget(item or {})
+    return {"modell": llm.name, "prompt_versjon": st.KLASSIFISERER_VERSJON if st else PROMPT_VERSJON,
             "tid": datetime.now(timezone.utc).isoformat(timespec="seconds")}

@@ -1,0 +1,21 @@
+{
+ "respons_dato_tid": "/Date(1793602129362+0100)/",
+ "versjon": "1.6",
+ "sesjon_id": "2025-2026",
+ "stortingsvedtak_liste": [
+  {
+   "id": 40036865,
+   "sak_id": 200236,
+   "sak_lenke_url": "//www.stortinget.no/no/Saker-og-publikasjoner/Saker/Sak/?p=200236",
+   "stortingsvedtak_dato_tid": "/Date(1781128800000+0200)/",
+   "stortingsvedtak_lenke_url": "//www.stortinget.no/no/Saker-og-publikasjoner/Vedtak/Vedtak/Sak/?did=40036865&p=200236",
+   "stortingsvedtak_nummer": 960,
+   "stortingsvedtak_tekst": "<div class='strtngt_forslag' data-strtngt-forslag-nr='1'>\r\n  <p class='strtngt_a type_innrykk'>\r\n    Stortinget ber regjeringen innen første halvår 2027 følge opp Stene-utvalget, jf. rapporten Rapport fra ekspertutvalget om organisering og styring av statlig barnevern av 1. oktober 2025, gjennom å legge frem for Stortinget forslag til de nødvendige lovendringer og organisatoriske endringer.\r\n  </p>\r\n</div>",
+   "stortingsvedtak_tittel": "Endringer i barnevernsloven (bedre beskyttelse av barn på institusjon)",
+   "stortingsvedtak_type": {
+    "id": "ANMOD",
+    "navn": "Anmodninger"
+   }
+  }
+ ]
+}

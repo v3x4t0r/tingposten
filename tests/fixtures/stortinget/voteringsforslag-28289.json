@@ -1,0 +1,35 @@
+{
+ "respons_dato_tid": "/Date(1793601988125+0100)/",
+ "versjon": "1.6",
+ "votering_id": 28289,
+ "voteringsforslag_liste": [
+  {
+   "respons_dato_tid": "/Date(1793601988125+0100)/",
+   "versjon": "1.6",
+   "forslag_betegnelse": "Forslag nr. 1 fra Fremskrittspartiet, Høyre",
+   "forslag_betegnelse_kort": "nr. 1 fra FrP, H",
+   "forslag_id": 40087129,
+   "forslag_levert_av_parti_liste": [
+    {
+     "respons_dato_tid": "/Date(1793577618818+0100)/",
+     "versjon": "1.6",
+     "id": "FrP",
+     "navn": "Fremskrittspartiet",
+     "representert_parti": true
+    },
+    {
+     "respons_dato_tid": "/Date(1793577618818+0100)/",
+     "versjon": "1.6",
+     "id": "H",
+     "navn": "Høyre",
+     "representert_parti": true
+    }
+   ],
+   "forslag_levert_av_representant": null,
+   "forslag_paa_vegne_av_tekst": "Fremskrittspartiet, Høyre",
+   "forslag_sorteringsnummer": 0,
+   "forslag_tekst": "<div class='strtngt_forslag' data-strtngt-forslag-nr='1'>\r\n  <p class='strtngt_a type_innrykk'>\r\n    Stortinget ber regjeringen innen første halvår 2027 følge opp Stene-utvalget, jf. rapporten Rapport fra ekspertutvalget om organisering og styring av statlig barnevern av 1. oktober 2025, gjennom å legge frem for Stortinget forslag til de nødvendige lovendringer og organisatoriske endringer.\r\n  </p>\r\n</div>",
+   "forslag_type": 2
+  }
+ ]
+}
