@@ -108,7 +108,7 @@
     <li class="blokk"><h4 class="flis-tittel{% if not s.har_sammendrag %} raatittel{% endif %}"><a class="blokklenke" href="{{ root }}{{ s.side }}">{{ s.overskrift|tittel }}</a></h4>{{ flis_meta(s, standard) }}</li>
     {% endfor %}
   </ul>
-  {% if t.antall > t.saker|length %}<p class="flis-fot"><a class="pil" href="{{ root }}{{ t.get("sti", "bergen/") }}{{ visning }}tema/{{ t.tema }}/">Alle {{ t.antall }} vedtak<span class="vh"> om {{ t.navn|lower }}</span></a></p>{% endif %}
+  {% if t.antall > t.saker|length %}<p class="flis-fot"><a class="pil" href="{{ root }}{% if t.href is defined %}{{ t.href }}{% else %}{{ t.get("sti", "bergen/") }}{{ visning }}tema/{{ t.tema }}/{% endif %}">Alle {{ t.antall }} vedtak<span class="vh"> om {{ t.navn|lower }}</span></a></p>{% endif %}
 </section>
 {% endmacro %}
 

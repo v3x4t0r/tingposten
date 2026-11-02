@@ -182,3 +182,87 @@ def bygg_sider(write, env, idag: date, data_dir: Path | None = None) -> dict:
     rss_xml = env.get_template("rss.xml").render(saker=rss, site_url=bygg._site_url(), bygget=bygg._rfc822(idag), k=k)
     return {"saker": len(saker), "moter": len(moter), "rss": rss_xml,
             "fremhevet": sum(s_["fremhevet"] for s_ in saker)}
+
+
+# --- a mixed front page: Bergen and Stortinget (prototype, test copy only) ----------------------
+
+BLANDET = "blandet/"
+
+
+def _fortelling(saker: list[dict]) -> list[dict]:
+    """A source's candidates for the stories, as bygg.front_page picks them: highlighted saker
+    with a summary first, then the next best with a summary."""
+    ordered = sorted(saker, key=lambda s: (-s["score"], -s["dato"].toordinal(), s["seq"]))
+    first = [s for s in ordered if s["fremhevet"] and s["har_sammendrag"]]
+    return first + [s for s in ordered if s["score"] > 0 and s["har_sammendrag"] and s not in first]
+
+
+def blandet_front(bergen: list[dict], stortinget: list[dict]) -> dict:
+    """The front page with half the stories from each source (the owner's plan, issue #25):
+    the best sak of the two leads, then the sources take turns, and a source that runs out
+    leaves its places to the other. Each source then gets a tile with its next saker."""
+    kilder = {"bergen": _fortelling(bergen), "stortinget": _fortelling(stortinget)}
+    antall = 1 + bygg.SECONDARY + bygg.LISTE
+    stories: list[dict] = []
+    tur = max(kilder, key=lambda k: kilder[k][0]["score"] if kilder[k] else -1)
+    while len(stories) < antall and any(kilder.values()):
+        if not kilder[tur]:
+            tur = "stortinget" if tur == "bergen" else "bergen"
+        stories.append(kilder[tur].pop(0))
+        tur = "stortinget" if tur == "bergen" else "bergen"
+    shown = {id(s) for s in stories}
+    window = bergen + stortinget
+    moter = bygg._meetings(window)
+    for m in moter:
+        m["sti"] = STI if m["saker"][0].get("kilde") == "stortinget" else "bergen/"
+    fliser = []
+    for navn, sti, saker in (("Mer fra Bergen kommune", "bergen/", bergen), ("Mer fra Stortinget", STI, stortinget)):
+        rest = sorted((s for s in saker if id(s) not in shown), key=lambda s: (not s["har_sammendrag"], -s["score"]))
+        if rest:
+            fliser.append({"tema": sti.strip("/"), "navn": navn, "antall": len(saker), "saker": rest[:bygg.FLIS],
+                           "href": f"{sti}alle/"})
+    temaer = [{"tema": "bergen", "navn": "Bergen kommune", "antall": len(bergen), "href": "bergen/"},
+              {"tema": "stortinget", "navn": "Stortinget", "antall": len(stortinget), "href": STI}]
+    return {
+        "lead": stories[0] if stories else None,
+        "sekundaer": stories[1:1 + bygg.SECONDARY],
+        "liste": stories[1 + bygg.SECONDARY:],
+        "fliser": fliser,
+        "ogsa": [],
+        "temaer": [t for t in temaer if t["antall"]],
+        "panel_temaer": [t for t in temaer if t["antall"]],
+        "standard": bygg.standard_mote(stories, moter),
+        "moter": moter,
+        "panel_moter": bygg.panel_moter(moter),
+        "andre": len(window) - len(stories) - sum(len(f["saker"]) for f in fliser),
+        "antall": len(window),
+    }
+
+
+def bygg_blandet(write, idag: date, bergen: list[dict], data_dir: Path | None = None) -> int:
+    """/blandet/: the front page as it could look when a reader has chosen Bergen, with
+    Stortinget mixed in. Only in the private test copy, for the owner to judge."""
+    stortinget = load(data_dir or config.STORTINGET_DATA_DIR)
+    k = bygg.KILDE_BLANDET
+    idag_tekst = bygg.nb_weekday_date(idag)
+    sider = 0
+    for slug, (days, label) in bygg.VIEWS.items():
+        b = bygg._window(bergen, idag, days)
+        s = bygg._window(stortinget, idag, days)
+        reserve = ""
+        if not s and days is not None and stortinget:
+            s = sorted(stortinget, key=lambda x: (x["dato"], x["score"]), reverse=True)[:SISTE]
+            reserve = (f"Stortinget har ikke gjort vedtak de siste {days} dagene, så sakene fra Stortinget er de "
+                       f"siste, fra {bygg.nb_date(min(x['dato'] for x in s))}.")
+        front = blandet_front(b, s)
+        write(f"{BLANDET}{slug}index.html", "forside.html", side="forside", visning=slug, periode=label,
+              idag_tekst=idag_tekst, endret=idag, reserve=reserve, k=k, debatt=None, **front)
+        moter = front["moter"]
+        write(f"{BLANDET}{slug}alle/index.html", "alle.html", side="alle", visning=slug, periode=label,
+              moter=moter, antall=len(b) + len(s), aar=days is None, k=k, debatt=None)
+        sider += 2
+    alle = bygg._meetings(bergen + stortinget)
+    for m in alle:
+        m["sti"] = STI if m["saker"][0].get("kilde") == "stortinget" else "bergen/"
+    write(f"{BLANDET}moter/index.html", "moter.html", side="moter", moter=alle, k=k, debatt=None)
+    return sider + 1

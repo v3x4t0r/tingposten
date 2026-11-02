@@ -120,6 +120,16 @@ KILDE_STORTINGET = {
     "moter_beskrivelse": "Alle møtedager i Stortinget med vedtak, nyeste først, hver med alle sakene fra dagen.",
     "moter_ingress": "Alle dager Stortinget har stemt over saker, nyeste først.",
 }
+# The mixed front page (a prototype in the test copy: Bergen with Stortinget mixed in).
+KILDE_BLANDET = {
+    **KILDE_STORTINGET, "sti": "blandet/", "navn": "Bergen kommune og Stortinget", "kort": "Bergen og Stortinget",
+    "utgave": "Bergen og Stortinget", "slagord": "Hva kommunen og Stortinget faktisk vedtar", "rss": "bergen/rss.xml",
+    "bunntekst": "Tingposten viser hva Bergen kommune og Stortinget vedtar. Hver setning bygger på deres egne "
+                 "dokumenter, og hver sak lenker til dem.",
+    "egne_dok": "kommunens og Stortingets egne dokumenter", "egennavn": True,
+    "moter_beskrivelse": "Møtene i bystyret og byrådet i Bergen og Stortingets møtedager, nyeste først.",
+    "moter_ingress": "Møtene i bystyret og byrådet og Stortingets møtedager med vedtak, nyeste først.",
+}
 
 
 def dok_navn(dok: str, bestemt: bool = False) -> str:
@@ -284,6 +294,8 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
     if med_stortinget:
         from .stortinget import side as st_side
         st = st_side.bygg_sider(write, env, idag)
+        if testkopi:
+            st["blandet"] = st_side.bygg_blandet(write, idag, saker)
         (tmp / "stortinget").mkdir(parents=True, exist_ok=True)
         (tmp / "stortinget" / "rss.xml").write_text(st.pop("rss"))
     rss = [s_ for s_ in _window(saker, idag, 30)]

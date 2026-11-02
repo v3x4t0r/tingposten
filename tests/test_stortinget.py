@@ -424,3 +424,19 @@ def test_checker_asks_if_each_sentence_belongs_and_editor_deletes_strays(sak, st
 
 def test_bergen_check_schema_is_unchanged():
     assert faktasjekker._card_schema({"saksframlegg": "", "protokoll": "x"}) is faktasjekker.SCHEMA
+
+
+def test_mixed_front_takes_turns_and_leads_with_the_best():
+    from tingposten.stortinget import side
+
+    def s(kilde, score, n):
+        return {"kilde": kilde, "score": score, "dato": date(2026, 10, 1 + n), "seq": n, "fremhevet": True,
+                "har_sammendrag": True, "mote": f"{kilde}-{n}", "organ": kilde, "organ_kort": kilde,
+                "dato_tekst": "", "venter_protokoll": False}
+    bergen = [s("bergen", 90 - i, i) for i in range(12)]
+    stortinget = [s("stortinget", 95 - i, i) for i in range(3)]
+    front = side.blandet_front(bergen, stortinget)
+    rekke = [x["kilde"] for x in [front["lead"], *front["sekundaer"], *front["liste"]]]
+    assert rekke[:6] == ["stortinget", "bergen", "stortinget", "bergen", "stortinget", "bergen"]
+    assert len(rekke) == 15 and rekke[6:] == ["bergen"] * 9  # Stortinget ran out: Bergen fills
+    assert [f["navn"] for f in front["fliser"]] == ["Mer fra Bergen kommune"]

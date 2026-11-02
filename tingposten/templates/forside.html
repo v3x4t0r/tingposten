@@ -25,7 +25,7 @@
   <div class="periode-moter">
     <h3 class="etikett-liten" id="periode-moter">Møter</h3>
     <ul class="moteliste" aria-labelledby="periode-moter">
-      {% for m in panel_moter %}<li><a href="{{ root }}{{ k.sti }}mote/{{ m.slug }}/">{{ m.organ_kort }} {{ m.dato|kort_dato(short=False) }}</a><span>{{ m.saker|length }}<span class="vh"> vedtak</span></span></li>{% endfor %}
+      {% for m in panel_moter %}<li><a href="{{ root }}{{ m.get("sti", k.sti) }}mote/{{ m.slug }}/">{{ m.organ_kort }} {{ m.dato|kort_dato(short=False) }}</a><span>{{ m.saker|length }}<span class="vh"> vedtak</span></span></li>{% endfor %}
       {% set flere_moter = moter|length - panel_moter|length %}
       {% if flere_moter %}<li class="moteliste-mer"><a class="pil" href="{{ root }}{{ k.sti }}moter/">og {{ flere_moter }} {{ "møte" if flere_moter == 1 else "møter" }} til</a></li>{% endif %}
     </ul>
@@ -34,7 +34,7 @@
     <h3 class="etikett-liten" id="periode-temaer">Vedtak per tema</h3>
     {% set maks = (temaer|map(attribute="antall")|max) or 1 %}
     <ul class="stolper" aria-labelledby="periode-temaer">
-      {% for t in panel_temaer %}<li><a href="{{ root }}{{ k.sti }}{{ visning }}tema/{{ t.tema }}/"><span class="stolpe-navn">{{ t.navn }}</span><span class="stolpe-spor" aria-hidden="true"><span class="stolpe" style="--andel:{{ '%.1f'|format(100 * t.antall / maks) }}%"></span></span><span class="stolpe-tall">{{ t.antall }}<span class="vh"> vedtak</span></span></a></li>{% endfor %}
+      {% for t in panel_temaer %}<li><a href="{{ root }}{% if t.href is defined %}{{ t.href }}{% else %}{{ k.sti }}{{ visning }}tema/{{ t.tema }}/{% endif %}"><span class="stolpe-navn">{{ t.navn }}</span><span class="stolpe-spor" aria-hidden="true"><span class="stolpe" style="--andel:{{ '%.1f'|format(100 * t.antall / maks) }}%"></span></span><span class="stolpe-tall">{{ t.antall }}<span class="vh"> vedtak</span></span></a></li>{% endfor %}
     </ul>
     {% set flere_temaer = temaer|length - panel_temaer|length %}
     {% if flere_temaer %}<p class="stolper-mer"><a class="pil" href="#temaer">og {{ flere_temaer }} temaer til</a></p>{% endif %}

@@ -17,7 +17,7 @@
 <section class="maned" aria-labelledby="mnd-{{ maned.grouper }}">
   <h2 id="mnd-{{ maned.grouper }}">{{ maned.list[0].maned }}</h2>
   <ul class="moterader">
-    {% for m in maned.list %}<li{% if m.bystyret %} class="bystyret"{% endif %}><a href="{{ root }}{{ k.sti }}mote/{{ m.slug }}/">{{ m.organ_kort }} <span class="nb">{{ m.dato|ukedag }} {{ m.dato|kort_dato(short=False) }}</span></a><span class="moterad-tall">{{ m.saker|length }} {{ "sak" if m.saker|length == 1 else "saker" }}{% if m.venter_protokoll %} · venter på protokoll{% endif %}</span></li>{% endfor %}
+    {% for m in maned.list %}<li{% if m.bystyret %} class="bystyret"{% endif %}><a href="{{ root }}{{ m.get("sti", k.sti) }}mote/{{ m.slug }}/">{{ m.organ_kort }} <span class="nb">{{ m.dato|ukedag }} {{ m.dato|kort_dato(short=False) }}</span></a><span class="moterad-tall">{{ m.saker|length }} {{ "sak" if m.saker|length == 1 else "saker" }}{% if m.venter_protokoll %} · venter på protokoll{% endif %}</span></li>{% endfor %}
   </ul>
 </section>
 {% else %}
