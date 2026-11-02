@@ -196,6 +196,20 @@ footer { padding: 0 var(--gutter) 30px; font: 13px/1.4 var(--sans); color: var(-
         </form>
       </details>
     </section>
+    <section class="blokk" aria-labelledby="stortinget-tittel" id="stortinget" hidden>
+      <h2 id="stortinget-tittel">Stortinget (test)</h2>
+      <p class="plan" id="stortinget-plan"></p>
+      <p class="smaa">Skrives og sjekkes hver dag, men publiseres ikke: alt havner i den private testkopien.</p>
+      <div class="knapper">
+        <button type="button" class="liten" id="stortinget-kjor">Kjør nå</button>
+        <a class="liten" id="stortinget-lenke" href="#" hidden>Åpne testkopien</a>
+      </div>
+      <p class="melding" id="stortinget-melding" aria-live="polite"></p>
+      <details id="stortinget-loggboks">
+        <summary>Logg fra siste kjøring</summary>
+        <pre class="logg" id="stortinget-logg">Ingen kjøring ennå.</pre>
+      </details>
+    </section>
     <section class="blokk" aria-labelledby="testpanel-tittel" id="testpanel" hidden>
       <h2 id="testpanel-tittel">Testpanel</h2>
       <p class="plan" id="testpanel-plan"></p>
@@ -703,6 +717,43 @@ $("testpanel-ny").addEventListener("submit", e => {
 $("testpanel-lagre-moter").addEventListener("click", () => testpanelHandling({handling: "moter",
   moter: [...document.querySelectorAll("#testpanel-moter input:checked")].map(i => i.value)}));
 $("testpanel-nyeste").addEventListener("click", () => testpanelHandling({handling: "moter", moter: []}));
+/* Stortinget (issue #25): the daily run into the private test copy, and the front page queue */
+async function lastStortinget() {
+  try {
+    const r = await fetch("/stortinget.json", {cache: "no-store"});
+    if (r.ok) tegnStortinget(await r.json());
+  } catch (e) { /* the next poll tries again */ }
+}
+function tegnStortinget(d) {
+  $("stortinget").hidden = !d.aktiv;
+  if (!d.aktiv) return;
+  const s = d.siste;
+  const kjoring = d.pagar ? `Kjører nå${s && s.steg ? " (" + s.steg + ")" : ""}.`
+    : s ? `Siste kjøring ${tid(s.startet)}${s.ferdig ? "" : ", stoppet før slutten"}.` : "Ingen kjøring ennå.";
+  const vedtak = d.siste_vedtak ? ` Siste vedtak er fra ${new Date(d.siste_vedtak).getDate()}. ${MND[new Date(d.siste_vedtak).getMonth()]}.` : "";
+  $("stortinget-plan").textContent = `${kjoring} ${antall(d.saker, "sak", "saker")}, ${d.klar} med ferdig kort` +
+    (d.uten_kort ? `, ${d.uten_kort} uten.` : ".") + vedtak +
+    ` Forsiden: ${antall(d.i_dag, "sak", "saker")} i dag, ${d.i_ko} venter i køen (høyst 3 om dagen).`;
+  $("stortinget-kjor").disabled = d.pagar;
+  const lenke = $("stortinget-lenke");
+  lenke.hidden = !d.testkopi;
+  if (d.testkopi) lenke.href = d.testkopi + "blandet/";
+  $("stortinget-logg").textContent = s && s.logg ? s.logg.join("\n") : "Ingen kjøring ennå.";
+}
+$("stortinget-kjor").addEventListener("click", async () => {
+  const m = $("stortinget-melding");
+  $("stortinget-kjor").disabled = true;
+  try {
+    const r = await fetch("/stortinget", {method: "POST", headers: {"Content-Type": "application/json", "X-Tingposten": "admin"},
+      body: "{}"});
+    m.textContent = (await r.json()).melding;
+  } catch (e) {
+    m.textContent = "Fikk ikke kontakt med panelet.";
+  }
+  lastStortinget();
+});
+lastStortinget();
+setInterval(lastStortinget, 30000);
 lastTestpanel();
 setInterval(lastTestpanel, 60000);
 lastInnlegg();

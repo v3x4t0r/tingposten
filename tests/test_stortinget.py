@@ -469,3 +469,23 @@ def test_queue_gives_three_a_day_best_first_and_lets_old_ones_go():
     assert len(side.forsidedatoer(mange, juni + timedelta(days=200))) == 3 * (side.KO_DAGER + 1)
     # Without a card or with score 0: never on the front page.
     assert side.forsidedatoer([{**s(1, 0, juni)}, {**s(2, 50, juni), "har_sammendrag": False}], juni) == {}
+
+
+def test_panel_status_and_runner(store, tmp_path):
+    from tingposten import admin
+
+    (tmp_path / "deploy").mkdir()
+    (tmp_path / "deploy" / "run-stortinget.sh").write_text("")
+    logs = tmp_path / "data" / "logs" / "stortinget"
+    logs.mkdir(parents=True)
+    (logs / "2026-11-02.log").write_text("2026-11-02T07:30:00+01:00 start (stortinget)\n"
+                                         "2026-11-02T07:30:01+01:00 == hent\n2026-11-02T07:40:00+01:00 done\n")
+    skribent.skriv(dokumenter.saker(store)[0], store, FakeLLM([dict(KORT)]))
+    kalt = []
+    kjorer = admin.StortingetKjorer(tmp_path, store, kommando=lambda modus: kalt.append(modus) or ["true"])
+    assert kjorer.lock == tmp_path / "data" / "run-stortinget.lock"
+    st = admin.stortinget_status(kjorer, idag=date(2026, 11, 2))
+    assert st["aktiv"] and st["saker"] == 1 and st["siste"]["ferdig"] and "oppsummering" not in st["siste"]
+    assert st["siste_vedtak"] == "2026-06-11"
+    code, _ = kjorer.start("stortinget")
+    assert code == 202 and kalt == ["stortinget"]

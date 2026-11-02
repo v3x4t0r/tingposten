@@ -199,3 +199,5 @@ STORTINGET_PUBLISERT = False
 # Cards are written for saker decided in this session and later, plus the test saker
 # named in data/stortinget/utvalg.json (owner, 2.11: the current session + 15 test saker).
 STORTINGET_FRA_SESJON = "2026-2027"
+# The private test copy on the Pi (tailnet only; deploy/run-stortinget.sh builds it), for the panel's link.
+STORTINGET_TESTKOPI_URL = os.environ.get("STORTINGET_TESTKOPI_URL", "https://hemep.tailab9cf1.ts.net:8443/")

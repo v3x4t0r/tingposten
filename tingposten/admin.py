@@ -516,6 +516,48 @@ class Kjorer:
             return 202, "Startet."
 
 
+class StortingetKjorer(Kjorer):
+    """Starts deploy/run-stortinget.sh: fetch, write and build the private test copy (issue #25).
+    Its own lock, so it doesn't wait for a Bergen run."""
+
+    def __init__(self, root: Path = config.ROOT, data_dir: Path = config.STORTINGET_DATA_DIR, kommando=None):
+        super().__init__(root, data_dir, kommando or (lambda modus: ["bash", str(root / "deploy" / "run-stortinget.sh")]))
+
+    @property
+    def lock(self) -> Path:
+        return self.root / "data" / "run-stortinget.lock"
+
+
+def stortinget_status(kjorer: StortingetKjorer, idag: date | None = None) -> dict:
+    """The panel's Stortinget box: the last run, how many saker have a card, the front page queue."""
+    from .stortinget import side as st_side
+
+    idag = idag or date.today()
+    siste = siste_kjoring(kjorer.root / "data" / "logs" / "stortinget")
+    if siste:
+        siste.pop("oppsummering", None)  # Bergen's summary reads Bergen's log lines
+    try:
+        saker = st_side.load(kjorer.data_dir) if (kjorer.data_dir / "sak").exists() else []
+    except Exception:
+        log.exception("admin: could not read the Stortinget saker")
+        saker = []
+    vist = st_side.forsidedatoer(saker, idag)
+    kandidat = [s for s in saker if s["har_sammendrag"] and s["score"] > 0]
+    siste_vedtak = max((s["dato"] for s in saker), default=None)
+    return {
+        "aktiv": (kjorer.root / "deploy" / "run-stortinget.sh").exists(),
+        "pagar": kjorer.pagar(),
+        "siste": siste,
+        "saker": len(saker),
+        "klar": len(kandidat),
+        "uten_kort": sum(1 for s in saker if not s["har_sammendrag"]),
+        "i_dag": sum(1 for d in vist.values() if d == idag),
+        "i_ko": sum(1 for s in kandidat if s["key"] not in vist and (idag - s["dato"]).days <= st_side.KO_DAGER),
+        "siste_vedtak": siste_vedtak.isoformat() if siste_vedtak else None,
+        "testkopi": config.STORTINGET_TESTKOPI_URL,
+    }
+
+
 _ARBEID: dict = {"tid": None, "verdi": None, "data_dir": None, "regner": False}
 _ARBEID_LAAS = threading.Lock()
 ARBEID_CACHE = timedelta(minutes=2)
@@ -892,13 +934,15 @@ class TestpanelKo:
 def make_server(vert: str = "127.0.0.1", port: int = 8787, passord: str | None = None,
                 kjorer: Kjorer | None = None, site_dir: Path = config.SITE_DIR,
                 idag: date | None = None, debatt: DebattKo | None = None,
-                innlegg: InnleggKo | None = None, testpanel: TestpanelKo | None = None) -> ThreadingHTTPServer:
+                innlegg: InnleggKo | None = None, testpanel: TestpanelKo | None = None,
+                stortinget: StortingetKjorer | None = None) -> ThreadingHTTPServer:
     if not passord and not _loopback(vert):
         raise ValueError(f"set {PASSORD_ENV} in .env before the panel listens on {vert}")
     kjorer = kjorer or Kjorer()
     debatt = debatt or DebattKo()
     innlegg = innlegg or InnleggKo(debatt, kjorer)
     testpanel = testpanel or TestpanelKo(debatt)
+    stortinget = stortinget or StortingetKjorer(kjorer.root)
     page = SIDE.read_bytes()
     expected = passord.encode() if passord else b""
 
@@ -919,6 +963,8 @@ def make_server(vert: str = "127.0.0.1", port: int = 8787, passord: str | None =
                 self._json(200, testpanel.status())
             elif path == "/testpanel-resultater.json":
                 self._json(200, testpanel.resultater())
+            elif path == "/stortinget.json":
+                self._json(200, stortinget_status(stortinget, idag))
             elif path.startswith("/static/"):
                 self._static(path.removeprefix("/static/"))
             else:
@@ -932,7 +978,7 @@ def make_server(vert: str = "127.0.0.1", port: int = 8787, passord: str | None =
                     origin and urlsplit(origin).netloc != self.headers.get("Host")):
                 return self._json(403, {"melding": "Avvist."})
             sti = urlsplit(self.path).path
-            if sti not in ("/start", "/debatt", "/innlegg", "/testpanel"):
+            if sti not in ("/start", "/debatt", "/innlegg", "/testpanel", "/stortinget"):
                 return self._json(404, {"melding": "Finnes ikke."})
             try:
                 length = int(self.headers.get("Content-Length") or 0)
@@ -950,6 +996,9 @@ def make_server(vert: str = "127.0.0.1", port: int = 8787, passord: str | None =
             if sti == "/testpanel":
                 code, svar = testpanel.handle(body)
                 return self._json(code, svar)
+            if sti == "/stortinget":
+                code, melding = stortinget.start("stortinget")
+                return self._json(code, {"melding": melding})
             modus = body.get("modus")
             if modus not in MODUSER:
                 return self._json(400, {"melding": "Ukjent kjøring."})
