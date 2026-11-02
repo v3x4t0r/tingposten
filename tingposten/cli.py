@@ -71,6 +71,8 @@ def main(argv: list[str] | None = None) -> int:
     stkjor.add_argument("--sak", type=int, action="append", help="only these sakids; repeatable")
     stkjor.add_argument("--parallel", type=int, default=3)
     stsub.add_parser("saker", help="list the Stortinget saker on disk with score and card status")
+    stko = stsub.add_parser("ko", help="the mixed front page's queue: which Stortinget saker join it when")
+    stko.add_argument("--idag", type=date.fromisoformat, help="as on this day (default: today)")
 
     byggp = sub.add_parser("bygg", help="build the static site into site/")
     byggp.add_argument("--idag", type=date.fromisoformat, help="pretend today is YYYY-MM-DD (for previews)")
@@ -302,6 +304,23 @@ def _stortinget(args, parser) -> int:
             parser.error(f"unknown steg: {', '.join(sorted(unknown))}")
         logging.info("stortinget kjor: %s", st_pipeline.kjor(data_dir, steg=steg, parallel=args.parallel,
                                                              saker_=args.sak))
+    elif args.st_cmd == "ko":
+        from .stortinget import side as st_side
+
+        idag = args.idag or date.today()
+        saker = st_side.load(data_dir)
+        vist = st_side.forsidedatoer(saker, idag)
+        for s in sorted(saker, key=lambda x: (vist.get(x["key"], date.max), -x["score"])):
+            naar = vist.get(s["key"])
+            if naar:
+                hvor = f"på forsiden {naar.isoformat()}"
+            elif not s["har_sammendrag"] or s["score"] <= 0:
+                hvor = "uten kort, ikke i køen"
+            elif (idag - s["dato"]).days > st_side.KO_DAGER:
+                hvor = "gikk ut av køen"
+            else:
+                hvor = "venter i køen"
+            print(f"{s['score']:3d}  vedtatt {s['dato'].isoformat()}  {hvor:26s}  {s['overskrift'][:60]}")
     elif args.st_cmd == "saker":
         items = st_pipeline.saker(data_dir)
         by_key = {dokumenter.key(i): i for i in items}

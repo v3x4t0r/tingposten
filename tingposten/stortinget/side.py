@@ -8,7 +8,7 @@ tested the copy (config.STORTINGET_PUBLISERT).
 """
 
 import logging
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 from .. import bygg, config
@@ -187,6 +187,40 @@ def bygg_sider(write, env, idag: date, data_dir: Path | None = None) -> dict:
 # --- a mixed front page: Bergen and Stortinget (prototype, test copy only) ----------------------
 
 BLANDET = "blandet/"
+PER_DAG = 3     # Stortinget saker that join the mixed front page each day (owner, 2.11)
+KO_DAGER = 60   # a sak that hasn't had its turn this many days after the decision leaves the queue
+
+
+def forsidedatoer(saker: list[dict], idag: date) -> dict[str, date]:
+    """When each Stortinget sak joins the mixed front page: key → day.
+
+    Stortinget decides unevenly (some 50 saker a week in June, none from July to September).
+    Every sak is published at once on /stortinget/; the front page takes at most PER_DAG a day,
+    the highest score first, and the rest wait their turn, so the quiet weeks get saker too and
+    the kommune's news is never drowned out. Worked out again from the first decision at every
+    build: the same day always gives the same answer, with no state to keep."""
+    kandidater = [s_ for s_ in saker if s_["har_sammendrag"] and s_["score"] > 0]
+    if not kandidater:
+        return {}
+    vist: dict[str, date] = {}
+    dag = min(s_["dato"] for s_ in kandidater)
+    while dag <= idag:
+        ko = [s_ for s_ in kandidater if s_["dato"] <= dag and s_["key"] not in vist
+              and (dag - s_["dato"]).days <= KO_DAGER]
+        for s_ in sorted(ko, key=lambda x: (-x["score"], -x["dato"].toordinal(), x["seq"]))[:PER_DAG]:
+            vist[s_["key"]] = dag
+        dag += timedelta(days=1)
+    return vist
+
+
+def _forside_vindu(saker: list[dict], vist: dict[str, date], idag: date, days: int | None) -> list[dict]:
+    """The Stortinget saker on the mixed front page for a period: by the day they joined it."""
+    def med(s_):
+        d = vist.get(s_["key"])
+        if d is None:
+            return False
+        return d.year == idag.year and d <= idag if days is None else idag - timedelta(days=days) <= d <= idag
+    return [s_ for s_ in saker if med(s_)]
 
 
 def _fortelling(saker: list[dict]) -> list[dict]:
@@ -250,17 +284,18 @@ def bygg_blandet(write, idag: date, bergen: list[dict], data_dir: Path | None = 
     Stortinget mixed in. Only in the private test copy, for the owner to judge."""
     stortinget = load(data_dir or config.STORTINGET_DATA_DIR)
     bergen = med_sted(bergen)
+    vist = forsidedatoer(stortinget, idag)
     k = bygg.KILDE_BLANDET
     idag_tekst = bygg.nb_weekday_date(idag)
     sider = 0
     for slug, (days, label) in bygg.VIEWS.items():
         b = bygg._window(bergen, idag, days)
-        s = bygg._window(stortinget, idag, days)
+        s = _forside_vindu(stortinget, vist, idag, days)
         reserve = ""
         if not s and days is not None and stortinget:
             s = sorted(stortinget, key=lambda x: (x["dato"], x["score"]), reverse=True)[:SISTE]
-            reserve = (f"Stortinget har ikke gjort vedtak de siste {days} dagene, så sakene fra Stortinget er de "
-                       f"siste, fra {bygg.nb_date(min(x['dato'] for x in s))}.")
+            reserve = (f"Ingen saker fra Stortinget har vært på forsiden de siste {days} dagene, så sakene fra "
+                       f"Stortinget er de siste vedtakene, fra {bygg.nb_date(min(x['dato'] for x in s))}.")
         front = blandet_front(b, s)
         write(f"{BLANDET}{slug}index.html", "forside.html", side="forside", visning=slug, periode=label,
               idag_tekst=idag_tekst, endret=idag, reserve=reserve, k=k, debatt=None, **front)

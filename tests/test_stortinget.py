@@ -448,3 +448,24 @@ def test_mixed_page_names_bergen():
     s = {"organ_kort": "Bystyret", "tittel": "x"}
     assert side.med_sted([s])[0]["organ_kort"] == "Bystyret i Bergen"
     assert s["organ_kort"] == "Bystyret"  # Bergen's own pages keep theirs
+
+
+def test_queue_gives_three_a_day_best_first_and_lets_old_ones_go():
+    from datetime import timedelta
+
+    from tingposten.stortinget import side
+
+    def s(n, score, dato):
+        return {"key": f"k{n}", "score": score, "dato": dato, "seq": n, "har_sammendrag": True}
+    juni = date(2026, 6, 15)
+    saker = [s(n, 90 - n, juni) for n in range(8)] + [s(99, 99, juni + timedelta(days=1))]
+    vist = side.forsidedatoer(saker, juni + timedelta(days=5))
+    assert [k for k, d in vist.items() if d == juni] == ["k0", "k1", "k2"]
+    # The next day a better, newer sak goes first; the rest keep their order.
+    assert sorted(k for k, d in vist.items() if d == juni + timedelta(days=1)) == ["k3", "k4", "k99"]
+    assert sorted(k for k, d in vist.items() if d == juni + timedelta(days=2)) == ["k5", "k6", "k7"]
+    # A queue that waits longer than KO_DAGER lets the sak go.
+    mange = [s(n, 50, juni) for n in range(3 * side.KO_DAGER + 10)]
+    assert len(side.forsidedatoer(mange, juni + timedelta(days=200))) == 3 * (side.KO_DAGER + 1)
+    # Without a card or with score 0: never on the front page.
+    assert side.forsidedatoer([{**s(1, 0, juni)}, {**s(2, 50, juni), "har_sammendrag": False}], juni) == {}
