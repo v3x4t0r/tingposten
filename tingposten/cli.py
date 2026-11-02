@@ -287,7 +287,10 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _stortinget(args, parser) -> int:
-    from .stortinget import dokumenter, innhenter as st_innhenter, pipeline as st_pipeline, score as st_score
+    from .stortinget import dokumenter
+    from .stortinget import innhenter as st_innhenter
+    from .stortinget import pipeline as st_pipeline
+    from .stortinget import score as st_score
 
     data_dir = config.STORTINGET_DATA_DIR
     if args.st_cmd == "hent":
