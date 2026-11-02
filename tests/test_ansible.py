@@ -24,3 +24,13 @@ def test_secrets_are_checked_never_copied():
     # never a copy/template of a secret file, never its contents in a variable
     assert "lookup('file'" not in tekst and "slurp" not in tekst
     assert "ANTHROPIC_API_KEY" in tekst
+
+
+def test_daily_runs_are_timers_that_never_download_bergens_pdfs_or_publish_stortinget():
+    rolle = ANSIBLE / "roles" / "tingposten"
+    timere = (rolle / "vars" / "main.yml").read_text()
+    # Bergen's daily run without a mode: never --manuell (the PDF download is a person's button press)
+    assert "skript: deploy/run-daily.sh\n" in timere and "--manuell" not in timere
+    assert "skript: deploy/run-stortinget.sh\n" in timere
+    assert "ansible.builtin.cron" in (rolle / "tasks" / "daglig.yml").read_text()  # only to remove the old entries
+    assert "state: absent" in (rolle / "tasks" / "daglig.yml").read_text()

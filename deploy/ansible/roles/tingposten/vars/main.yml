@@ -1,0 +1,14 @@
+# The daily runs (tasks/daglig.yml), from the switches in defaults/main.yml and host_vars.
+tingposten_timere:
+  - navn: tingposten-daglig
+    beskrivelse: "Tingposten: Bergen hver morgen (hent, skriv, bygg; publiserer bare med PUBLISER)"
+    mappe: "{{ tingposten_dir }}"
+    skript: deploy/run-daily.sh
+    tid: "{{ tingposten_daglig_tid }}"
+    aktiv: "{{ tingposten_daglig_kjoring | bool }}"
+  - navn: tingposten-stortinget
+    beskrivelse: "Tingposten: Stortinget hver morgen, inn i den private testkopien"
+    mappe: "{{ tingposten_stortinget_dir }}"
+    skript: deploy/run-stortinget.sh
+    tid: "{{ tingposten_stortinget_tid }}"
+    aktiv: "{{ tingposten_stortinget_kjoring | bool }}"

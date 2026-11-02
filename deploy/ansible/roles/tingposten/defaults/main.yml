@@ -12,10 +12,18 @@ tingposten_kontrollpanel: true
 tingposten_admin_port: 8787
 # The comment server (deploy/debatt): Docker Compose with Tailscale Funnel, and its firewall.
 tingposten_debatt: true
-# The daily run (deploy/run-daily.sh) in the user's crontab; time in the Pi's zone (Europe/Oslo).
+# The daily runs as systemd user timers; times in the Pi's zone (Europe/Oslo). Off by default.
+# Bergen (deploy/run-daily.sh, no mode): fetch the agenda, write and check what has its PDFs,
+# build. It never downloads Bergen's PDFs (robots.txt: that stays the panel's button) and
+# publishes only if the PUBLISER file exists.
 tingposten_daglig_kjoring: false
-tingposten_daglig_minutt: "0"
-tingposten_daglig_time: "6"
+tingposten_daglig_tid: "06:00"
+# Stortinget (deploy/run-stortinget.sh, issue #25): fetch, write and check, build the private
+# test copy. Never publishes.
+tingposten_stortinget_kjoring: false
+tingposten_stortinget_tid: "07:30"
+# Where the Stortinget run starts: the repo, or a worktree while the branch isn't merged.
+tingposten_stortinget_dir: "{{ tingposten_dir }}"
 # The secret files stay on the Pi, written by hand (deploy/README.md, deploy/debatt/README.md).
 # The role checks they exist and are 0600; it never reads or prints them.
 tingposten_hemmeligheter:

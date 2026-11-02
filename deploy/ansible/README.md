@@ -36,7 +36,11 @@ Playbooken dekker:
 - kontrollpanelet som brukertjeneste
 - kommentarserveren (Docker Compose)
 - brannmuren (`/usr/local/sbin`, systemd)
-- den daglige kjøringen i cron, som er av (`tingposten_daglig_kjoring` i `host_vars/pi.yml`)
+- de daglige kjøringene som systemd-timere for brukeren, hver med sin bryter i `host_vars/pi.yml`:
+  Bergen kl. 06:00 (`tingposten_daglig_kjoring`: henter agendaen, skriver og sjekker det som har
+  PDF-er, bygger; laster aldri ned Bergens PDF-er og publiserer bare med `PUBLISER`) og Stortinget
+  kl. 07:30 (`tingposten_stortinget_kjoring`: bygger bare den private testkopien). Se dem med
+  `systemctl --user list-timers`.
 
 Den kan trygt kjøres flere ganger. På en Pi som er som beskrevet, endrer den ingenting.
 
