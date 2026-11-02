@@ -101,6 +101,15 @@ def trigger_build(site: str | None = None, apikey: str | None = None, session=No
     log.info("asked statichost to deploy %s: %s", site, response.text.strip()[:200])
 
 
+def ikke_testkopi(site_dir: Path) -> None:
+    """Refuse a private test copy (bygg --testkopi), and Stortinget's pages before the owner
+    has approved them (config.STORTINGET_PUBLISERT; issue #25)."""
+    if (site_dir / "TESTKOPI").exists():
+        raise RuntimeError(f"{site_dir} er en privat testkopi og skal ikke publiseres")
+    if (site_dir / "stortinget").exists() and not getattr(config, "STORTINGET_PUBLISERT", False):
+        raise RuntimeError(f"{site_dir} har Stortinget-sider, men Stortinget er ikke godkjent for publisering ennå")
+
+
 def publish_statichost(
     site_dir: Path = config.SITE_DIR,
     repo_dir: Path = config.ROOT,
@@ -109,6 +118,7 @@ def publish_statichost(
     session=None,
 ) -> bool:
     """Upload site_dir to statichost.eu. Raises RuntimeError if the upload fails."""
+    ikke_testkopi(site_dir)
     if (repo_dir / "STOP").exists():
         log.warning("STOP file present in %s, skipping publish", repo_dir)
         return False
@@ -149,6 +159,7 @@ def publish(
     statichost: bool = False,
 ) -> bool:
     """Commit site_dir to `branch` and push it. False if the kill switch stopped it."""
+    ikke_testkopi(site_dir)
     if (repo_dir / "STOP").exists():
         log.warning("STOP file present in %s, skipping publish", repo_dir)
         return False

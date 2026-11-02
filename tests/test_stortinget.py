@@ -281,3 +281,34 @@ def test_score_reads_votes_and_signals(store, sak):
     assert r["signaler"]["type"] == "lovsak"
     assert 0 < r["score"] <= 100
     assert "lovendring" in r["grunner"]
+
+
+def test_testkopi_builds_stortinget_privately_and_cannot_be_published(store, tmp_path, monkeypatch):
+    from tingposten import bygg, config, publiserer
+
+    monkeypatch.setattr(config, "STORTINGET_DATA_DIR", store)
+    monkeypatch.setattr(config, "DEBATT", None)
+    skribent.skriv(dokumenter.saker(store)[0], store, FakeLLM([dict(KORT)]))
+    site = tmp_path / "site-test"
+    stats = bygg.build(site, data_dir=tmp_path / "bergen", idag=datetime(2026, 6, 20).date(),
+                       med_stortinget=True, testkopi=True)
+    assert stats["stortinget"]["saker"] == 1
+    side = (site / "stortinget" / "sak" / "2025-2026" / "200236" / "index.html").read_text()
+    assert "Stortingets egne dokumenter" in side and 'name="robots" content="noindex' in side
+    assert "Bergen kommune" not in side.split("<footer")[0].split("<main")[1]
+    assert (site / "robots.txt").read_text() == "User-agent: *\nDisallow: /\n"
+    assert (site / "TESTKOPI").exists() and not (site / "sitemap.xml").exists()
+    with pytest.raises(RuntimeError, match="testkopi"):
+        publiserer.publish(site, repo_dir=tmp_path)
+    (site / "TESTKOPI").unlink()
+    with pytest.raises(RuntimeError, match="Stortinget"):
+        publiserer.publish_statichost(site, repo_dir=tmp_path, apikey="x")
+
+
+def test_normal_build_has_no_stortinget(store, tmp_path, monkeypatch):
+    from tingposten import bygg, config
+
+    monkeypatch.setattr(config, "STORTINGET_DATA_DIR", store)
+    monkeypatch.setattr(config, "DEBATT", None)
+    bygg.build(tmp_path / "site", data_dir=tmp_path / "bergen", idag=datetime(2026, 6, 20).date())
+    assert not (tmp_path / "site" / "stortinget").exists()

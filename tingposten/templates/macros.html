@@ -108,7 +108,7 @@
     <li class="blokk"><h4 class="flis-tittel{% if not s.har_sammendrag %} raatittel{% endif %}"><a class="blokklenke" href="{{ root }}{{ s.side }}">{{ s.overskrift|tittel }}</a></h4>{{ flis_meta(s, standard) }}</li>
     {% endfor %}
   </ul>
-  {% if t.antall > t.saker|length %}<p class="flis-fot"><a class="pil" href="{{ root }}bergen/{{ visning }}tema/{{ t.tema }}/">Alle {{ t.antall }} vedtak<span class="vh"> om {{ t.navn|lower }}</span></a></p>{% endif %}
+  {% if t.antall > t.saker|length %}<p class="flis-fot"><a class="pil" href="{{ root }}{{ t.get("sti", "bergen/") }}{{ visning }}tema/{{ t.tema }}/">Alle {{ t.antall }} vedtak<span class="vh"> om {{ t.navn|lower }}</span></a></p>{% endif %}
 </section>
 {% endmacro %}
 
@@ -128,7 +128,7 @@
 
 {% macro motegruppe(m, root, niva=2, tema=True, kompakt=False, om="") %}
 <section class="seksjon" aria-labelledby="m-{{ m.slug }}">
-  <div class="seksjon-hode"><h{{ niva }} id="m-{{ m.slug }}"><a href="{{ root }}bergen/mote/{{ m.slug }}/">{{ m.organ_kort }} <span class="nb">{{ m.dato_tekst }}</span></a></h{{ niva }}><p>{{ m.saker|length }} {{ "sak" if m.saker|length == 1 else "saker" }}{{ om }}</p></div>
+  <div class="seksjon-hode"><h{{ niva }} id="m-{{ m.slug }}"><a href="{{ root }}{{ m.get("sti", "bergen/") }}mote/{{ m.slug }}/">{{ m.organ_kort }} <span class="nb">{{ m.dato_tekst }}</span></a></h{{ niva }}><p>{{ m.saker|length }} {{ "sak" if m.saker|length == 1 else "saker" }}{{ om }}</p></div>
   {% if kompakt %}
   <ol class="indeks">
     {% for s in m.saker %}{{ indeksrad(s, root, niva=niva + 1, tema=tema) }}{% endfor %}

@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 {% from "macros.html" import rad %}
-{% block title %}{{ mote.organ_kort }} {{ mote.dato_tekst }} · Bergen kommune · Tingposten{% endblock %}
-{% block description %}{% if mote.venter_protokoll %}Sakene som sto på sakslisten da {{ mote.organ_kort|lower }} møttes {{ mote.dato_tekst }}. Kommunen har ikke lagt ut protokollen ennå.{% else %}Alle sakene {{ mote.organ_kort|lower }} behandlet {{ mote.dato_tekst }}, i samme rekkefølge som i møtet.{% endif %}{% endblock %}
+{% block title %}{{ mote.organ_kort }} {{ mote.dato_tekst }} · {{ k.navn }} · Tingposten{% endblock %}
+{% block description %}{% if mote.venter_protokoll %}Sakene som sto på sakslisten da {{ mote.organ_kort|lower }} møttes {{ mote.dato_tekst }}. Kommunen har ikke lagt ut protokollen ennå.{% else %}Alle sakene {{ mote.organ_kort if k.egennavn else mote.organ_kort|lower }} behandlet {{ mote.dato_tekst }}, i samme rekkefølge som i møtet.{% endif %}{% endblock %}
 {% block hovedklasse %}listeside moteside{% endblock %}
 {% block main %}
 {# Agenda order; valg and fritak grouped compactly at the end. #}
 {% set ns = namespace(saker=[], valg=[]) %}
 {% for s in mote.saker %}{% if er_valg(s) %}{% set ns.valg = ns.valg + [s] %}{% else %}{% set ns.saker = ns.saker + [s] %}{% endif %}{% endfor %}
 <nav class="brodsmule" aria-label="Brødsmuler"><ol>
-  <li><a href="{{ root }}bergen/">Forsiden</a></li>
-  <li><a href="{{ root }}bergen/moter/">Møter</a></li>
+  <li><a href="{{ root }}{{ k.sti }}">Forsiden</a></li>
+  <li><a href="{{ root }}{{ k.sti }}moter/">Møter</a></li>
   <li>{{ mote.organ_kort }} {{ mote.dato_tekst }}</li>
 </ol></nav>
 <header class="sidehode">

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 {% if skjult or noindex|default(false) %}<meta name="robots" content="noindex, nofollow">
 {% endif %}<title>{% block title %}Tingposten{% endblock %}</title>
-<meta name="description" content="{% block description %}Hva Bergen kommune faktisk vedtar – hver sak i samme format, med lenke til kilden.{% endblock %}">
+<meta name="description" content="{% block description %}Hva {{ k.navn }} faktisk vedtar – hver sak i samme format, med lenke til kilden.{% endblock %}">
 {% if sti is not none %}<link rel="canonical" href="{{ site_url }}{{ sti }}">
 <meta property="og:url" content="{{ site_url }}{{ sti }}">
 {% endif %}
@@ -15,7 +15,7 @@
 <meta property="og:image" content="{{ site_url }}static/deling.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Tingposten: hva Bergen kommune faktisk vedtar">
+<meta property="og:image:alt" content="Tingposten: hva {{ k.navn }} faktisk vedtar">
 <meta name="twitter:card" content="summary_large_image">
 {% block meta %}{% endblock %}
 <meta property="og:site_name" content="Tingposten">
@@ -26,7 +26,7 @@
 {% endif %}<link rel="stylesheet" href="{{ root }}static/fonts.css">
 {% endif %}
 <link rel="stylesheet" href="{{ root }}static/style.css">
-<link rel="alternate" type="application/rss+xml" title="Tingposten Bergen" href="{{ root }}bergen/rss.xml">
+<link rel="alternate" type="application/rss+xml" title="Tingposten {{ k.kort }}" href="{{ root }}{{ k.rss }}">
 {% if goatcounter %}<script>window.goatcounter = {no_onload: navigator.doNotTrack === "1" || navigator.globalPrivacyControl === true}</script>
 <script data-goatcounter="{% if teller_via_siden %}{{ root }}count{% else %}{{ goatcounter }}{% endif %}" async src="{{ root }}static/count.js"></script>
 {% endif %}</head>
@@ -41,18 +41,18 @@
 <a class="hopp" href="#innhold">Hopp til innholdet</a>
 {# "page" on the page itself; "true" on a page inside the section (one meeting under Møter). #}
 {% set meny %}
-<a href="{{ root }}bergen/"{% if side == "forside" %} aria-current="page"{% endif %}>Forside</a><a href="{{ root }}bergen/debatt/"{% if side == "debatt" %} aria-current="page"{% elif side == "innlegg" %} aria-current="true"{% endif %}>Debatt</a><a href="{{ root }}bergen/moter/"{% if side == "moter" %} aria-current="page"{% elif side == "mote" %} aria-current="true"{% endif %}>Møter</a><a href="{{ root }}om/"{% if side == "om" %} aria-current="page"{% endif %}>Om</a>
+<a href="{{ root }}{{ k.sti }}"{% if side == "forside" %} aria-current="page"{% endif %}>Forside</a><a href="{{ root }}bergen/debatt/"{% if side == "debatt" %} aria-current="page"{% elif side == "innlegg" %} aria-current="true"{% endif %}>Debatt</a><a href="{{ root }}{{ k.sti }}moter/"{% if side == "moter" %} aria-current="page"{% elif side == "mote" %} aria-current="true"{% endif %}>Møter</a><a href="{{ root }}om/"{% if side == "om" %} aria-current="page"{% endif %}>Om</a>
 {% endset %}
 {# One masthead on every page, as in a printed paper: the nameplate in a double frame between two ears.
    Narrow screens hide the ears and set the name smaller, so the headline is on the first screen. #}
 <header class="masthode ramme">
   <div class="masthode-ramme">
-    <p class="ore ore-v"><span class="ore-topp">Bergen-utgaven</span><span class="ore-bunn">Vedtak i Bergen kommune</span></p>
+    <p class="ore ore-v"><span class="ore-topp">{{ k.utgave }}</span><span class="ore-bunn">Vedtak i {{ k.navn }}</span></p>
     <div class="navnefelt">
-      <p class="navnetrekk"><a href="{{ root }}bergen/">Tingposten</a></p>
-      <p class="slagord">Hva kommunen faktisk vedtar</p>
+      <p class="navnetrekk"><a href="{{ root }}{{ k.sti }}">Tingposten</a></p>
+      <p class="slagord">{{ k.slagord }}</p>
     </div>
-    <p class="ore ore-h">{% if idag_tekst is defined %}<span class="ore-topp">{{ idag_tekst }}</span><span class="ore-bunn">Det viktigste først</span>{% else %}<span class="ore-topp">Med kilde til alt</span><span class="ore-bunn">Kommunens dokumenter</span>{% endif %}</p>
+    <p class="ore ore-h">{% if idag_tekst is defined %}<span class="ore-topp">{{ idag_tekst }}</span><span class="ore-bunn">Det viktigste først</span>{% else %}<span class="ore-topp">Med kilde til alt</span><span class="ore-bunn">{{ k.ore_dok }}</span>{% endif %}</p>
   </div>
   <nav class="meny" aria-label="Hovedmeny">{{ meny }}</nav>
   {% if debatt %}<p class="konto-lenke"><a href="{{ root }}bergen/debatt/#konto" data-konto-lenke>Logg inn</a></p>{% endif %}
@@ -64,9 +64,9 @@
 <footer class="bunn ramme">
   <div class="bunn-innhold">
     <p class="bunn-navn">Tingposten</p>
-    <p>Tingposten viser hva Bergen kommune vedtar. Hver setning bygger på kommunens egne dokumenter, og hver sak lenker til dem.</p>
+    <p>{{ k.bunntekst }}</p>
     {% if utgiver or redaktor %}<p class="bunn-utgiver">{% if utgiver %}Utgitt av {{ utgiver }}{% endif %}{% if utgiver and redaktor %} · {% endif %}{% if redaktor %}Ansvarlig redaktør: {{ redaktor }}{% endif %}</p>{% endif %}
-    <p class="bunn-lenker"><a href="{{ root }}om/">Om Tingposten og rangeringen</a> · <a href="{{ root }}bergen/rss.xml">RSS</a> · <a href="https://github.com/{{ repo }}">Åpen kildekode</a></p>
+    <p class="bunn-lenker"><a href="{{ root }}om/">Om Tingposten og rangeringen</a> · <a href="{{ root }}{{ k.rss }}">RSS</a> · <a href="https://github.com/{{ repo }}">Åpen kildekode</a></p>
   </div>
 </footer>
 {% if side in ("sak", "innlegg") %}<script src="{{ root }}static/del.js" defer></script>

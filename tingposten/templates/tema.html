@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% from "macros.html" import motegrupper %}
-{% block title %}{{ navn }} · {{ periode }} · Bergen · Tingposten{% endblock %}
-{% block description %}Vedtak i Bergen kommune om {{ navn|lower }}, {{ periode|lower }}.{% endblock %}
+{% block title %}{{ navn }} · {{ periode }} · {{ k.kort }} · Tingposten{% endblock %}
+{% block description %}Vedtak i {{ k.navn }} om {{ navn|lower }}, {{ periode|lower }}.{% endblock %}
 {% block hovedklasse %}listeside{% endblock %}
 {% block main %}
 <nav class="brodsmule" aria-label="Brødsmuler"><ol>
-  <li><a href="{{ root }}bergen/{{ visning }}">Forsiden, {{ periode|lower }}</a></li>
+  <li><a href="{{ root }}{{ k.sti }}{{ visning }}">Forsiden, {{ periode|lower }}</a></li>
   <li>{{ navn }}</li>
 </ol></nav>
 <header class="sidehode">
@@ -17,7 +17,7 @@
 <nav class="andre-temaer" aria-labelledby="andre-temaer">
   <h2 class="etikett etikett-strek" id="andre-temaer">Andre temaer</h2>
   <ul>
-    {% for t in temaer %}<li><a href="{{ root }}bergen/{{ visning }}tema/{{ t.tema }}/">{{ t.navn }}</a> <span class="antall">{{ t.antall }}</span></li>{% endfor %}
+    {% for t in temaer %}<li><a href="{{ root }}{{ k.sti }}{{ visning }}tema/{{ t.tema }}/">{{ t.navn }}</a> <span class="antall">{{ t.antall }}</span></li>{% endfor %}
   </ul>
 </nav>
 {% endif %}

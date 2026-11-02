@@ -75,6 +75,9 @@ def main(argv: list[str] | None = None) -> int:
     byggp = sub.add_parser("bygg", help="build the static site into site/")
     byggp.add_argument("--idag", type=date.fromisoformat, help="pretend today is YYYY-MM-DD (for previews)")
     byggp.add_argument("--til", type=Path, help="build into this directory instead of site/")
+    byggp.add_argument("--med-stortinget", action="store_true", help="also build /stortinget/ (issue #25)")
+    byggp.add_argument("--testkopi", action="store_true",
+                       help="a private copy for testing: noindex, robots shut, never publishable (needs --til)")
 
     innp = sub.add_parser(
         "innlegg", help="publiser et debattinnlegg fra en leser (bygg og publiser etterpå)",
@@ -274,7 +277,10 @@ def main(argv: list[str] | None = None) -> int:
     elif args.cmd == "bygg":
         from . import bygg
 
-        logging.info("bygg: %s", bygg.build(args.til or config.SITE_DIR, idag=args.idag))
+        if args.testkopi and not args.til:
+            parser.error("--testkopi needs --til (never into site/)")
+        logging.info("bygg: %s", bygg.build(args.til or config.SITE_DIR, idag=args.idag,
+                                            med_stortinget=args.med_stortinget or None, testkopi=args.testkopi))
     return 0
 
 

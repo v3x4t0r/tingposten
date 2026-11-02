@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "macros.html" import ikon, kildelinje, kildegrupper_html, figur_sak, rad, debatt_seksjon, del_lenker, meld_feil as meld_feil_lenker %}
-{% block title %}{{ s.overskrift }} · Bergen kommune · Tingposten{% endblock %}
+{% block title %}{{ s.overskrift }} · {{ k.navn }} · Tingposten{% endblock %}
 {% block jsonld %}{{ ld_sak(s) }}{% endblock %}
 {% block description %}{{ s.dek or s.tittel }}{% endblock %}
 {% block meta %}<meta property="article:published_time" content="{{ s.dato.isoformat() }}">
@@ -10,14 +10,14 @@
 {% set FELT = (("hva_endres", "Hva endres"), ("hvem_pavirkes", "Hvem påvirkes"), ("hvorfor", "Hvorfor"), ("status", "Status"), ("nar_og_hvor", "Når og hvor")) %}
 {% set FAKTA_IKON = {"sted": "sted", "stemmer": "stemmer", "falt": "stemmer", "kr": "kr"} %}
 {% set tema_href = (root ~ s.tema_side) if s.tema_side else none %}
-{% set mote_href = root ~ "bergen/mote/" ~ s.mote ~ "/" %}
+{% set mote_href = root ~ k.sti ~ "mote/" ~ s.mote ~ "/" %}
 {# The status pill and the facts under the dek: the same fakta() rule as the lists. #}
 {% set status = (s.fakta|selectattr("type", "eq", "status")|list or [none])[0] %}
 {% set fakta = s.fakta|rejectattr("type", "in", ("status", "bakgrunn"))|list %}
 {# The kommune's own title as h1 (no card) or a very long one: set quieter. #}
 {% set raa_tittel = not s.har_sammendrag or s.overskrift|length > 90 %}
 <nav class="brodsmule" aria-label="Brødsmuler"><ol>
-  <li><a href="{{ root }}bergen/">Forsiden</a></li>
+  <li><a href="{{ root }}{{ k.sti }}">Forsiden</a></li>
   <li>{% if tema_href %}<a href="{{ tema_href }}">{{ s.tema_navn }}</a>{% else %}{{ s.tema_navn }}{% endif %}</li>
   <li><a href="{{ mote_href }}">{{ s.organ_kort }} {{ s.dato_tekst }}</a></li>
 </ol></nav>
@@ -34,7 +34,7 @@
         {% for f in fakta %}<li class="faktum">{{ ikon(FAKTA_IKON[f.type]) }}{% if f.type == "falt" %}{{ f.verdi }} forslag falt{% else %}<span class="vh">{{ f.etikett }}: </span>{{ f.verdi|typo }}{% endif %}</li>{% endfor %}
       </ul>
       {% endif %}
-      {% if s.har_sammendrag and s.tittel != s.overskrift %}<p class="kommunetittel"><strong>Kommunens tittel:</strong> {{ s.tittel|typo }}</p>{% endif %}
+      {% if s.har_sammendrag and s.tittel != s.overskrift %}<p class="kommunetittel"><strong>{{ k.tittel_etikett }}:</strong> {{ s.tittel|typo }}</p>{% endif %}
       {% if s.har_sammendrag or s.artikkel %}
       <p class="paa-siden"><span>På siden:</span>{% if s.artikkel %}<span><a href="#artikkel">Saken</a>, ca.&nbsp;{{ s.lesetid }}&nbsp;min</span>{% endif %}{% if s.har_sammendrag %}<a href="#kort">Kort fortalt</a>{% endif %}<a href="#dokumenter">Dokumenter</a></p>
       {% endif %}
@@ -123,7 +123,7 @@
           {% for dok, href in s.pdf.items() %}<li><a href="{{ href }}">{{ ikon("dok") }}{% if dok == "protokoll" and s.venter_protokoll %}Protokoll fra en tidligere behandling{% else %}{{ dok|capitalize }}{% endif %}<span class="dok-type">PDF</span></a></li>{% endfor %}
           {% for v in s.vedlegg %}<li><a href="{{ v.href }}">{{ ikon("dok") }}Vedlegg {{ v.nr }}: {{ v.navn }}<span class="dok-type">PDF</span></a></li>{% endfor %}
         </ul>
-        <p class="smaatekst">Alt på denne siden bygger på Bergen kommunes egne dokumenter. Ser du en feil? {{ meld_feil_lenker(s) }}.</p>
+        <p class="smaatekst">Alt på denne siden bygger på {{ k.dok_eier }}. Ser du en feil? {{ meld_feil_lenker(s) }}.</p>
       </section>
     </div>
   </div>
@@ -133,7 +133,7 @@
 {% endif %}
 {% if relaterte %}
 <section class="relaterte lag" aria-labelledby="relaterte-tittel">
-  <div class="relaterte-hode"><h2 id="relaterte-tittel">Fra samme møte</h2><p class="andre"><a class="pil" href="{{ root }}bergen/mote/{{ mote.slug }}/">Alle {{ mote.saker|length }} saker fra møtet</a></p></div>
+  <div class="relaterte-hode"><h2 id="relaterte-tittel">Fra samme møte</h2><p class="andre"><a class="pil" href="{{ root }}{{ k.sti }}mote/{{ mote.slug }}/">Alle {{ mote.saker|length }} saker fra møtet</a></p></div>
   <ul class="rader">
     {% for r in relaterte %}{{ rad(r, root, med_dek=False) }}{% endfor %}
   </ul>

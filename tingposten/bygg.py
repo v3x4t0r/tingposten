@@ -92,8 +92,33 @@ UTFALL = (
 # Statuses rare and telling enough to be boxed under a story; the rest
 # (under behandling, venter på protokoll, tatt til orientering …) are plain text.
 STATUS_BOKS = ("innstillingen falt", "forslaget falt", "sendt tilbake", "utsatt", "ikke behandlet")
-DOK_NAVN = {"saksframlegg": "Saksframlegg", "protokoll": "Protokoll"}
-DOK_BESTEMT = {"saksframlegg": "saksframlegget", "protokoll": "protokollen"}
+DOK_NAVN = {"saksframlegg": "Saksframlegg", "protokoll": "Protokoll",
+            "innstilling": "Innstilling", "vedtak": "Vedtak", "votering": "Votering"}
+DOK_BESTEMT = {"saksframlegg": "saksframlegget", "protokoll": "protokollen",
+               "innstilling": "innstillingen", "vedtak": "vedtaket", "votering": "voteringen"}
+
+# The source a page is about (templates: {{ k.sti }}, {{ k.navn }} …). Bergen's values give
+# the templates exactly the text they had before Stortinget came (issue #25).
+KILDE_BERGEN = {
+    "sti": "bergen/", "navn": "Bergen kommune", "kort": "Bergen", "utgave": "Bergen-utgaven",
+    "slagord": "Hva kommunen faktisk vedtar", "rss": "bergen/rss.xml", "egennavn": False,
+    "bunntekst": "Tingposten viser hva Bergen kommune vedtar. Hver setning bygger på kommunens egne dokumenter, "
+                 "og hver sak lenker til dem.",
+    "egne_dok": "kommunens egne dokumenter", "dok_eier": "Bergen kommunes egne dokumenter",
+    "tittel_etikett": "Kommunens tittel", "ore_dok": "Kommunens dokumenter",
+    "moter_beskrivelse": "Alle møter i bystyret og byrådet i Bergen, nyeste først, hvert med alle sakene fra møtet.",
+    "moter_ingress": "Alle møter i bystyret og byrådet, nyeste først.",
+}
+KILDE_STORTINGET = {
+    "sti": "stortinget/", "navn": "Stortinget", "kort": "Stortinget", "utgave": "Stortinget",
+    "slagord": "Hva Stortinget faktisk vedtar", "rss": "stortinget/rss.xml", "egennavn": True,
+    "bunntekst": "Tingposten viser hva Stortinget vedtar. Hver setning bygger på Stortingets egne dokumenter, og "
+                 "hver sak lenker til dem. Kilde: Stortinget (data.stortinget.no, Norsk lisens for offentlige data).",
+    "egne_dok": "Stortingets egne dokumenter", "dok_eier": "Stortingets egne dokumenter",
+    "tittel_etikett": "Stortingets tittel", "ore_dok": "Stortingets dokumenter",
+    "moter_beskrivelse": "Alle møtedager i Stortinget med vedtak, nyeste først, hver med alle sakene fra dagen.",
+    "moter_ingress": "Alle dager Stortinget har stemt over saker, nyeste først.",
+}
 
 
 def dok_navn(dok: str, bestemt: bool = False) -> str:
@@ -106,6 +131,11 @@ def dok_navn(dok: str, bestemt: bool = False) -> str:
 def _kilde(item: dict, k: dict, data_dir: Path) -> dict | None:
     """A citation {dok, side} as a link to the page in the kommune's own document."""
     dok, side = k.get("dok"), k.get("side")
+    if item.get("kilde") == "stortinget":
+        from .stortinget import dokumenter as st_dok, regler as st_regler
+        if dok not in st_regler.DOKUMENTER or not isinstance(side, int):
+            return None
+        return {"dok": dok, "side": side, "href": st_dok.doc_url(item, dok, side, data_dir)}
     base = pdf.dok_url(item, dok, data_dir) if pdf.er_dok(dok) else None
     return {"dok": dok, "side": side, "href": f"{base}#page={side}"} if base and isinstance(side, int) else None
 ORD_PER_MINUTT = 200  # reading time of a background article
@@ -159,9 +189,17 @@ SIGNALS = {
 }
 
 
+TESTKOPI = "TESTKOPI"  # marker file: a private test copy; publiserer refuses to publish it
+
+
 def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, idag: date | None = None,
-          debatt_dir: Path | None = None) -> dict:
+          debatt_dir: Path | None = None, med_stortinget: bool | None = None, testkopi: bool = False) -> dict:
+    """`med_stortinget`: also /stortinget/ (default config.STORTINGET_PUBLISERT). `testkopi`: a private
+    copy to test before anything is published: noindex everywhere, robots.txt shuts everyone out, no
+    sitemap or IndexNow key, the comment server's files untouched, and a TESTKOPI marker."""
     idag = idag or date.today()
+    if med_stortinget is None:
+        med_stortinget = getattr(config, "STORTINGET_PUBLISERT", False)
     saker = load(data_dir)
     _guard(site_dir)
     tmp = site_dir.parent / f".{site_dir.name}.bygg"
@@ -170,6 +208,8 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
     tmp.mkdir(parents=True)
 
     env = _env()
+    if testkopi:
+        env.globals["skjult"] = True
     pages = 0
     i_sitemap: list[tuple[str, date | None]] = []   # (path, last changed) of the pages search engines should find
 
@@ -232,12 +272,19 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
         write("bergen/debatt/godkjenn/index.html", "godkjenn.html", side="godkjenn", noindex=True)
         write("om/debattregler/index.html", "debattregler.html", side="om", regler=REGLER, strenge=STRENGE,
               eksterne_moderatorer=_eksterne_moderatorer())
-        skriv_sak_indeks(saker, debatt_dir or config.DEBATT_DIR, innlegg)
-        skriv_testpanel(saker, debatt_dir or config.DEBATT_DIR, idag)
+        if not testkopi:
+            skriv_sak_indeks(saker, debatt_dir or config.DEBATT_DIR, innlegg)
+            skriv_testpanel(saker, debatt_dir or config.DEBATT_DIR, idag)
         write("bergen/testpanel/index.html", "testpanel.html", side="testpanel", noindex=True)
     # statichost serves /404.html for a missing path at any depth, so its links
     # can't be relative: they start at the site's own root path ("/").
     write("404.html", "404.html", side="404", root=urlsplit(_site_url()).path, sti=None, noindex=True)
+    st = None
+    if med_stortinget:
+        from .stortinget import side as st_side
+        st = st_side.bygg_sider(write, env, idag)
+        (tmp / "stortinget").mkdir(parents=True, exist_ok=True)
+        (tmp / "stortinget" / "rss.xml").write_text(st.pop("rss"))
     rss = [s_ for s_ in _window(saker, idag, 30)]
     rss.sort(key=lambda x: (x["dato"], x["score"]), reverse=True)
     (tmp / "bergen" / "rss.xml").write_text(env.get_template("rss.xml").render(
@@ -260,7 +307,10 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
     regler += kortlenke_regler(saker)
     if regler:
         (tmp / "_redirects").write_text("\n".join(regler) + "\n")
-    if getattr(config, "SKJUL_FOR_SOK", False):
+    if testkopi:
+        (tmp / "robots.txt").write_text("User-agent: *\nDisallow: /\n")
+        (tmp / TESTKOPI).write_text(f"Privat testkopi bygget {idag.isoformat()}. Skal ikke publiseres.\n")
+    elif getattr(config, "SKJUL_FOR_SOK", False):
         (tmp / "robots.txt").write_text("User-agent: *\nDisallow: /\n")
     else:
         # Being found (synlighet.py): robots.txt, the sitemap, llms.txt and the IndexNow key.
@@ -282,6 +332,8 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
     tmp.rename(site_dir)
     stats = {"sider": pages, "saker": len(saker), "fremhevet": sum(s["fremhevet"] for s in saker), "moter": len(moter),
              "rettet": sum(bool(s["rettelser"]) for s in saker)}
+    if st:
+        stats["stortinget"] = st
     log.info("built %s: %s", site_dir, stats)
     return stats
 
@@ -824,7 +876,7 @@ def forste_setning(dek: str) -> str:
     return split_first_sentence(dek, years=True)[0]
 
 
-def front_page(window: list[dict]) -> dict:
+def front_page(window: list[dict], tema: dict | None = None) -> dict:
     """Lead, the row of four, the list of ten, a tile per tema with saker
     left over, and the rest.
 
@@ -845,7 +897,7 @@ def front_page(window: list[dict]) -> dict:
     shown = {id(s) for s in stories}
     moter = _meetings(window)
     standard = standard_mote(stories, moter)
-    temaer = tema_counts(window)
+    temaer = tema_counts(window, tema)
     fliser, ogsa, i_fliser = [], [], 0
     for t in temaer:
         rest = [s for s in ordered if s["tema"] == t["tema"] and id(s) not in shown]
@@ -899,12 +951,14 @@ def panel_moter(moter: list[dict]) -> list[dict]:
     return _kapp(moter, PANEL_MOTER)
 
 
-def tema_counts(saker: list[dict]) -> list[dict]:
-    """Every tema present, with its number of saker: the biggest first, "Annet" always last."""
+def tema_counts(saker: list[dict], tema: dict | None = None) -> list[dict]:
+    """Every tema present, with its number of saker: the biggest first, "Annet" always last.
+    `tema`: the source's sections (Bergen's TEMA by default)."""
+    tema = tema or TEMA
     counts = defaultdict(int)
     for s in saker:
         counts[s["tema"]] += 1
-    temaer = [{"tema": t, "navn": TEMA[t], "antall": counts[t]} for t in TEMA if counts[t]]
+    temaer = [{"tema": t, "navn": tema[t], "antall": counts[t]} for t in tema if counts[t]]
     return sorted(temaer, key=lambda t: (t["tema"] == "annet", -t["antall"]))
 
 
@@ -1131,6 +1185,7 @@ def _env() -> Environment:
     env.globals["utgiver_ogsa"] = getattr(config, "UTGIVER_OGSA", None)
     env.globals["kontakt_epost"] = getattr(config, "KONTAKT_EPOST", None)
     env.globals["repo"] = config.REPO
+    env.globals["k"] = KILDE_BERGEN
     env.globals["figur"] = figur
     env.globals["artikkel_dokumenter"] = artikkel_dokumenter
     env.globals["fonter"] = (HERE / "static" / "fonts.css").exists()

@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% from "macros.html" import motegrupper %}
 {% block title %}Alle vedtak · {{ periode }} · Tingposten{% endblock %}
-{% block description %}Alle vedtak i Bergen kommune, {{ periode|lower }}, samlet per møte.{% endblock %}
+{% block description %}Alle vedtak i {{ k.navn }}, {{ periode|lower }}, samlet per møte.{% endblock %}
 {% block hovedklasse %}listeside{% endblock %}
 {% block main %}
 <nav class="brodsmule" aria-label="Brødsmuler"><ol>
-  <li><a href="{{ root }}bergen/{{ visning }}">Forsiden, {{ periode|lower }}</a></li>
+  <li><a href="{{ root }}{{ k.sti }}{{ visning }}">Forsiden, {{ periode|lower }}</a></li>
   <li>Alle vedtak</li>
 </ol></nav>
 <header class="sidehode">
