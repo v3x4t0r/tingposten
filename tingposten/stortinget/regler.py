@@ -20,7 +20,7 @@ from pathlib import Path
 
 from ..llm import fence
 
-SKRIBENT_VERSJON = "stortinget-skribent-3"  # -3: who proposed it, and a proposal its party dropped; -2: FORSLAG
+SKRIBENT_VERSJON = "stortinget-skribent-4"  # -4: packages; -3: who proposed it, a dropped proposal; -2: FORSLAG
 FAKTASJEKKER_VERSJON = "stortinget-faktasjekker-2"
 ARTIKKELSJEKK_VERSJON = "stortinget-artikkelsjekker-2"
 KLASSIFISERER_VERSJON = "stortinget-klassifiserer-1"
@@ -142,6 +142,13 @@ parties and "regjeringen". Civil servants are not named.
 
 Formal saker (a proposal sent to the government without a decision, "vedlegges protokollen") still get a
 card, as short as possible: what was proposed and what came of it.
+
+PACKAGES: some saker bundle many unrelated changes (the budget's law part "L-delen", a
+"samleproposisjon", "endringer i … mv."). Then the card is about the changes that matter to the most
+people, and every field is about those same changes: never bring in a change in one field that the
+other fields don't mention. Say in "hva_endres" that the sak is a package when it is ("Endringene er en
+del av en større lovpakke …"). Technical changes for a few at most get one plain sentence at the end of
+"hva_endres" ("Pakken har også flere tekniske endringer, blant annet om …"), never their own field.
 """
 
 ARTICLE_RULES = f"""\
