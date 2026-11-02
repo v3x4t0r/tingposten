@@ -84,7 +84,8 @@ def sak(item: dict, ranked: dict, data_dir: Path) -> dict:
         "tema_side": None,
         "artikkel": bygg._article(item, art, data_dir) if usable else [],
         "figurer": [],
-        "pdf": {"innstilling": u} if (u := dokumenter.innstilling_pdf_url(sak_json)) else {},
+        "pdf": {navn: u for dok, navn in (("forslag", "representantforslag"), ("innstilling", "innstilling"))
+                if (u := dokumenter.pdf_url(sak_json, dok))},
         "vedlegg": [],
         "mote": f"{dato.isoformat()}",
         "anker": f"sak-{item['sakid']}",

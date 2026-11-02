@@ -62,6 +62,8 @@ def skriv_dokumenter(item: dict, data_dir: Path) -> str:
     for dok in dokumenter.DOKUMENTER:
         p = tekstfil(data_dir, item, dok)
         ny = dokumenter.tekst(item, dok, data_dir)
+        if not ny and not p.exists():
+            continue  # a document this sak doesn't have (Dokument 8 for a law) makes no card stale
         if not p.exists() or p.read_text() != ny:
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(ny)
@@ -134,7 +136,8 @@ def todo(step: str, items: list[dict], data_dir: Path) -> list[dict]:
                     and bergen._stale(digest, [innst]):
                 out.append(i)
         elif step == "skriv":
-            har_vedtak = any(p.exists() and p.read_text().strip() for p in tekster[:2])
+            har_vedtak = any(p.exists() and p.read_text().strip()
+                             for p in (tekstfil(data_dir, i, "vedtak"), tekstfil(data_dir, i, "votering")))
             if har_vedtak and bergen._stale(bergen._file(data_dir, "kort", i), tekster + [digest]):
                 out.append(i)
     return out

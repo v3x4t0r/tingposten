@@ -93,9 +93,10 @@ UTFALL = (
 # (under behandling, venter på protokoll, tatt til orientering …) are plain text.
 STATUS_BOKS = ("innstillingen falt", "forslaget falt", "sendt tilbake", "utsatt", "ikke behandlet")
 DOK_NAVN = {"saksframlegg": "Saksframlegg", "protokoll": "Protokoll",
-            "innstilling": "Innstilling", "vedtak": "Vedtak", "votering": "Votering"}
+            "innstilling": "Innstilling", "vedtak": "Vedtak", "votering": "Votering", "forslag": "Representantforslag"}
 DOK_BESTEMT = {"saksframlegg": "saksframlegget", "protokoll": "protokollen",
-               "innstilling": "innstillingen", "vedtak": "vedtaket", "votering": "voteringen"}
+               "innstilling": "innstillingen", "vedtak": "vedtaket", "votering": "voteringen",
+               "forslag": "representantforslaget"}
 
 # The source a page is about (templates: {{ k.sti }}, {{ k.navn }} …). Bergen's values give
 # the templates exactly the text they had before Stortinget came (issue #25).

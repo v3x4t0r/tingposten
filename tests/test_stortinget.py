@@ -181,6 +181,15 @@ def test_vedtak_pages_hold_the_adopted_text(sak, store):
         "https://www.stortinget.no/no/Saker-og-publikasjoner/Vedtak/Vedtak/Sak/?did=40036865")
 
 
+def test_dokument8_url():
+    sak = {"sak_sesjon": "2025-2026", "publikasjon_referanse_liste": [
+        {"eksport_id": "dok8-202526-226s", "lenke_tekst": "Dokument 8:226 S (2025-2026)"},
+        {"eksport_id": "inns-202526-457s", "lenke_tekst": "Innst. 457 S (2025-2026)"}]}
+    assert dokumenter.pdf_url(sak, "forslag") == (
+        "https://www.stortinget.no/globalassets/pdf/representantforslag/2025-2026/dok8-202526-226s.pdf")
+    assert dokumenter.pdf_url({"publikasjon_referanse_liste": []}, "forslag") is None
+
+
 def test_innstilling_url(sak, store):
     assert dokumenter.doc_url(sak, "innstilling", 3, store) == (
         "https://www.stortinget.no/globalassets/pdf/innstillinger/stortinget/2025-2026/inns-202526-362l.pdf#page=3")
@@ -188,7 +197,8 @@ def test_innstilling_url(sak, store):
 
 def test_kilder_and_schema(sak, store):
     kilder = kildetekst.kilder_for(sak, store)
-    assert set(kilder) == {"vedtak", "votering", "innstilling"}
+    assert set(kilder) == {"vedtak", "votering", "innstilling", "forslag"}
+    assert kilder["forslag"] == ""  # a law has no Dokument 8
     assert kildetekst.hovedkilde(kilder) == "vedtak"
     schema = kildetekst.med_dokumenter(skribent.CARD_SCHEMA, kilder)
     assert schema["properties"]["kilder"]["items"]["properties"]["dok"]["enum"] == list(regler.DOKUMENTER)
@@ -272,6 +282,7 @@ def test_kjor_writes_checks_and_edits_a_card(store):
     again = st_pipeline.kjor(store, llms={k: FakeLLM([]) for k in llms}, parallel=1,
                              steg=("dokumenter", "les", "skriv", "sjekk", "klassifiser"))
     assert again["dokumenter"]["antall"] == {"uendret": 1}
+    assert not (store / "tekst" / "2025-2026" / "200236" / "forslag.txt").exists()
     assert again["skriv"] == {} and again["sjekk"] == {} and again["klassifiser"] == {}
 
 

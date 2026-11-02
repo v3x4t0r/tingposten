@@ -1,11 +1,13 @@
 """A Stortinget sak as an item the model steps can handle, and the documents they cite.
 
-Three documents, each as text with "--- side N ---" markers like Bergen's PDFs:
+Four documents, each as text with "--- side N ---" markers like Bergen's PDFs:
 - "innstilling": the committee's recommendation, the PDF from www.stortinget.no
   (pdf/<sesjon>_<sakid>_innstilling.pdf; its printed page numbers match the PDF's).
 - "vedtak": what Stortinget adopted, one page per numbered decision (stortingsvedtak)
   and the law text of a lovvedtak. The adopted text can differ from the innstilling
   (200236: «innen utgangen av 2026» became «innen første halvår 2027»).
+- "forslag": a representantforslag (Dokument 8) itself, the PDF from www.stortinget.no: the
+  proposers' own reasons and proposed decisions (owner, 2.11: like Bergen's attachments).
 - "votering": one page per vote: what was voted on, the result, the parties on each
   side (counted from the per-seat results) and the proposal's text.
 Every page keeps the link a reader follows to check it (doc_url).
@@ -30,7 +32,7 @@ DOKUMENTGRUPPER = {0: "ikke_spesifisert", 1: "proposisjon", 2: "melding", 3: "re
 # The API's party ids → as the parties write themselves (Ap for "A").
 PARTI = {"A": "Ap"}
 STEMME = {1: "ikke til stede", 2: "for", 3: "mot"}
-DOKUMENTER = ("innstilling", "vedtak", "votering")
+DOKUMENTER = ("innstilling", "vedtak", "votering", "forslag")
 
 # Formal saker with nothing for a reader: elections to Stortinget's own bodies, reports
 # from its delegations, the list of saker left over at the end of a session, the split of
@@ -111,6 +113,22 @@ def lovvedtak_ref(sak: dict) -> dict | None:
     return next((r for r in _referanser(sak) if (r.get("eksport_id") or "").startswith("vedtak-")), None)
 
 
+def forslag_ref(sak: dict) -> dict | None:
+    return next((r for r in _referanser(sak) if (r.get("eksport_id") or "").startswith("dok8-")), None)
+
+
+def forslag_pdf_url(sak: dict) -> str | None:
+    ref = forslag_ref(sak)
+    if not ref:
+        return None
+    return (f"{config.STORTINGET_WWW}/globalassets/pdf/representantforslag/"
+            f"{sak.get('sak_sesjon')}/{ref['eksport_id']}.pdf")
+
+
+def pdf_url(sak: dict, dok: str) -> str | None:
+    return {"innstilling": innstilling_pdf_url, "forslag": forslag_pdf_url}[dok](sak)
+
+
 def innstilling_pdf_url(sak: dict) -> str | None:
     ref = innstilling_ref(sak)
     if not ref:
@@ -128,17 +146,18 @@ def pub_fil(data_dir: Path, eksport_id: str) -> Path:
 
 
 def hent_dokumenter(items: list[dict], data_dir: Path = config.STORTINGET_DATA_DIR, client=None) -> dict:
-    """Download what the saker still lack: the innstilling PDF and the lovvedtak XML."""
+    """Download what the saker still lack: the innstilling and Dokument 8 PDFs, the lovvedtak XML."""
     from .api import Client
 
     client = client or Client()
     teller = Counter()
     for i in items:
         sak = lagret(data_dir, i["sakid"])["sak"]
-        if (u := innstilling_pdf_url(sak)) and not (p := pdf_fil(data_dir, i)).exists():
-            p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_bytes(client.bytes(u))
-            teller["innstilling"] += 1
+        for dok in ("innstilling", "forslag"):
+            if (u := pdf_url(sak, dok)) and not (p := pdf_fil(data_dir, i, dok)).exists():
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_bytes(client.bytes(u))
+                teller[dok] += 1
         if (ref := lovvedtak_ref(sak)) and not (p := pub_fil(data_dir, ref["eksport_id"])).exists():
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(client.publikasjon(ref["eksport_id"]))
@@ -264,17 +283,17 @@ def sider(item: dict, dok: str, data_dir: Path = config.STORTINGET_DATA_DIR) -> 
 
 def tekst(item: dict, dok: str, data_dir: Path = config.STORTINGET_DATA_DIR) -> str:
     """A document as text with "--- side N ---" markers; "" when there is none."""
-    if dok == "innstilling":
-        p = pdf_fil(data_dir, item)
+    if dok in ("innstilling", "forslag"):
+        p = pdf_fil(data_dir, item, dok)
         return dokumenttekst(p) if p.exists() else ""
     return "\n".join(f"--- side {n} ---\n{s['tekst']}" for n, s in enumerate(sider(item, dok, data_dir), 1))
 
 
 def doc_url(item: dict, dok: str, side: int | None, data_dir: Path = config.STORTINGET_DATA_DIR) -> str:
     """Where a reader checks a citation: the PDF page, the decision, or the sak page."""
-    if dok == "innstilling":
+    if dok in ("innstilling", "forslag"):
         sak = lagret(data_dir, item["sakid"])["sak"]
-        base = innstilling_pdf_url(sak) or item["url"]
+        base = pdf_url(sak, dok) or item["url"]
         return f"{base}#page={side}" if side and base.endswith(".pdf") else base
     pages = sider(item, dok, data_dir)
     if side and 1 <= side <= len(pages):
@@ -286,7 +305,7 @@ MAKS_INNSTILLING_SIDER = 40  # longer innstillinger (the budget) go through the 
 
 
 def kilder_for(item: dict, data_dir: Path = config.STORTINGET_DATA_DIR) -> dict[str, str]:
-    """{"vedtak", "votering", "innstilling"} as text with page markers ("" when missing).
+    """{"vedtak", "votering", "innstilling", "forslag"} as text with page markers ("" when missing).
     A long innstilling is cut to the pages the cheap reader picked (innstillingsdigest/),
     or, before it has read it, to the first MAKS_INNSTILLING_SIDER pages."""
     from ..kildetekst import sider as sidetall
@@ -302,4 +321,8 @@ def kilder_for(item: dict, data_dir: Path = config.STORTINGET_DATA_DIR) -> dict[
         innst = (f"Utdrag: {len(valgt)} av {len(alle)} sider, valgt fordi de gjelder vedtaket, begrunnelsen og "
                  f"hvem som berøres.\n" + utdrag(innst, valgt))
     ut["innstilling"] = innst
+    forslag = tekst(item, "forslag", data_dir)
+    if len(fs := sidetall(forslag)) > MAKS_INNSTILLING_SIDER:
+        forslag = utdrag(forslag, fs[:MAKS_INNSTILLING_SIDER])
+    ut["forslag"] = forslag
     return ut
