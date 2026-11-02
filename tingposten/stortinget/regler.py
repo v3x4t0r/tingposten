@@ -21,7 +21,7 @@ from pathlib import Path
 from ..llm import fence
 
 SKRIBENT_VERSJON = "stortinget-skribent-4"  # -4: packages; -3: who proposed it, a dropped proposal; -2: FORSLAG
-FAKTASJEKKER_VERSJON = "stortinget-faktasjekker-2"
+FAKTASJEKKER_VERSJON = "stortinget-faktasjekker-3"  # -3: horer_hjemme
 ARTIKKELSJEKK_VERSJON = "stortinget-artikkelsjekker-2"
 KLASSIFISERER_VERSJON = "stortinget-klassifiserer-1"
 
@@ -214,10 +214,18 @@ Method: split each non-empty field ("overskrift" counts as one sentence) into se
   not the writer's inference.
 Be strict but fair: don't fail a sentence for harmless rewording; do fail it for any factual drift.
 The ingress and the overskrift compress; compression is fine, a dropped qualifier is not.
+- "horer_hjemme": the card tells ONE story, the change the headline and the ingress are about. true if
+  the sentence is about that story: its details, who it affects, why, the vote on it, when. false if it
+  brings in another change from the same sak that the headline and ingress don't cover, so a reader
+  would wonder why it is there (common in packages: the budget's law part, a samleproposisjon). One plain
+  closing sentence in "hva_endres" that names the package's other changes ("Pakken har også …") is true.
+  The headline and the ingress themselves are always true. This is about relevance only: false here is
+  never a factual error, and "stottet" is judged on its own.
 
 "setning" must be copied EXACTLY, character for character, from the card field, in order, and together
 the sentences of a field must cover the whole field. "kilde" is where you found support (or null);
-"begrunnelse" is short Norwegian: for false, what is wrong and what the source actually says.
+"begrunnelse" is short Norwegian: for stottet false, what is wrong and what the source actually says;
+for horer_hjemme false, which other change it is about.
 
 "personvern": short Norwegian notes on privacy problems in the card (names of private persons — not
 representatives or ministers, not companies; named civil servants). [] if none.

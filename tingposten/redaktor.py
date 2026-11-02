@@ -215,6 +215,10 @@ def edit(card: dict, check: dict | None) -> dict:
                 why = "ikke støttet av kilden" + (f": {s['begrunnelse'].strip()}" if (s.get("begrunnelse") or "").strip() else "")
             elif hit := banned(original, f):
                 why = f"forbudsliste: {hit}"
+            elif s.get("horer_hjemme") is False:
+                # Only Stortinget's check asks this so far (faktasjekker._card_schema).
+                why = "hører ikke til saken på kortet" + (
+                    f": {s['begrunnelse'].strip()}" if (s.get("begrunnelse") or "").strip() else "")
             else:
                 kept.append(original)
                 continue

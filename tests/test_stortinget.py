@@ -243,7 +243,7 @@ def test_headline_may_not_start_with_stortinget():
 def test_checker_and_classifier_use_stortinget_rules(sak, store):
     skribent.skriv(sak, store, FakeLLM([dict(KORT)]))
     sjekk = FakeLLM([{"setninger": [{"felt": f, "setning": KORT[f], "stottet": True, "kilde": None,
-                                      "begrunnelse": ""} for f in ("overskrift", "ingress", "hva_endres", "status")],
+                                      "begrunnelse": "", "horer_hjemme": True} for f in ("overskrift", "ingress", "hva_endres", "status")],
                       "personvern": [], "blocked": ""}])
     assert faktasjekker.sjekk(sak, store, sjekk).startswith("sjekket")
     assert "what Stortinget decides" in sjekk.prompts[0]
@@ -267,7 +267,8 @@ def test_vedtaksdato_without_votes_uses_saksgang():
 def test_kjor_writes_checks_and_edits_a_card(store):
     from tingposten.stortinget import pipeline as st_pipeline
 
-    sjekk = {"setninger": [{"felt": f, "setning": KORT[f], "stottet": True, "kilde": None, "begrunnelse": ""}
+    sjekk = {"setninger": [{"felt": f, "setning": KORT[f], "stottet": True, "kilde": None, "begrunnelse": "",
+                            "horer_hjemme": True}
                            for f in ("overskrift", "ingress", "hva_endres", "status")],
              "personvern": [], "blocked": ""}
     signal = {"verdi": 4, "begrunnelse": "x"}
@@ -395,3 +396,31 @@ def test_empty_period_shows_the_latest_decisions(store, tmp_path, monkeypatch):
     forside = (site / "stortinget" / "index.html").read_text()
     assert "Ingen vedtak i perioden" not in forside
     assert "Stortinget har ikke gjort vedtak de siste 14 dagene. Her er de siste vedtakene, fra 11. juni 2026." in forside
+
+
+def test_checker_asks_if_each_sentence_belongs_and_editor_deletes_strays(sak, store):
+    from tingposten import redaktor
+
+    kort = {**KORT, "hvem_pavirkes": "Boligeiere får lavere skatt. Aktører må registrere seg hos Tolletaten.",
+            "kilder": KORT["kilder"] + [{"felt": "hvem_pavirkes", "dok": "innstilling", "side": 3}]}
+    skribent.skriv(sak, store, FakeLLM([kort]))
+
+    def s(felt, tekst, hjemme=True):
+        return {"felt": felt, "setning": tekst, "stottet": True, "kilde": None, "begrunnelse": "tollregel",
+                "horer_hjemme": hjemme}
+    svar = {"setninger": [s("overskrift", kort["overskrift"]), s("ingress", "I."), s("hva_endres", "H."),
+                          s("hvem_pavirkes", "Boligeiere får lavere skatt."),
+                          s("hvem_pavirkes", "Aktører må registrere seg hos Tolletaten.", False),
+                          s("status", "Vedtatt.")], "personvern": [], "blocked": ""}
+    llm = FakeLLM([svar])
+    assert faktasjekker.sjekk(sak, store, llm).startswith("sjekket")
+    assert '"horer_hjemme"' in llm.prompts[0]
+    check = json.loads((store / "sjekk" / "2025-2026" / "200236.json").read_text())
+    kortet = json.loads((store / "kort" / "2025-2026" / "200236.json").read_text())
+    r = redaktor.edit(kortet, check)
+    assert r["felt"]["hvem_pavirkes"] == "Boligeiere får lavere skatt."
+    assert r["slettet"][0]["grunn"].startswith("hører ikke til saken på kortet")
+
+
+def test_bergen_check_schema_is_unchanged():
+    assert faktasjekker._card_schema({"saksframlegg": "", "protokoll": "x"}) is faktasjekker.SCHEMA

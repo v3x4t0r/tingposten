@@ -92,7 +92,7 @@ def sjekk(item: dict, data_dir: Path = config.DATA_DIR, llm=None, force: bool = 
     if not kilder[hoved := kildetekst.hovedkilde(kilder)]:
         return f"mangler kilde: {hoved}"
     prompt = _prompt(card, kilder)
-    schema = kildetekst.med_dokumenter(SCHEMA, kilder)
+    schema = kildetekst.med_dokumenter(_card_schema(kilder), kilder)
     answer = llm.ask(prompt, schema)
     errors = [] if answer["blocked"].strip() else dekning(card, answer["setninger"])
     if errors:
@@ -281,6 +281,20 @@ def _prompt(card: dict, kilder: dict) -> str:
         fence("KORT", json.dumps(shown, ensure_ascii=False, indent=1)),
         *kildetekst.blokker(kilder),
     ])
+
+
+def _card_schema(kilder: dict) -> dict:
+    """Stortinget's check also asks whether each sentence belongs to the card's story
+    ("horer_hjemme"; owner, 2.11, after a customs rule turned up on a tax card). Bergen's
+    schema is unchanged until that has been tried on Stortinget."""
+    if not _stortinget(kilder):
+        return SCHEMA
+    setning = SCHEMA["properties"]["setninger"]["items"]
+    props = dict(setning["properties"])
+    props["horer_hjemme"] = {"type": "boolean"}
+    return {**SCHEMA, "properties": {**SCHEMA["properties"], "setninger": {
+        **SCHEMA["properties"]["setninger"], "items": {**setning, "properties": props,
+                                                       "required": [*setning["required"], "horer_hjemme"]}}}}
 
 
 def _stortinget(kilder: dict):
