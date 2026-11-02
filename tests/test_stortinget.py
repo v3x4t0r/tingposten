@@ -206,9 +206,10 @@ def test_kilder_and_schema(sak, store):
 
 def test_long_innstilling_is_cut(sak, store, monkeypatch):
     lang = "\n".join(f"--- side {n} ---\ntekst {n}" for n in range(1, 61))
-    monkeypatch.setattr(dokumenter, "tekst", lambda item, dok, d: lang if dok == "innstilling" else "x")
+    monkeypatch.setattr(dokumenter, "tekst", lambda item, dok, d: lang if dok in ("innstilling", "vedtak") else "x")
     kilder = dokumenter.kilder_for(sak, store)
-    assert kildetekst.sider(kilder["innstilling"]) == list(range(1, 41))
+    assert kildetekst.sider(kilder["innstilling"]) == list(range(1, 21))
+    assert kildetekst.sider(kilder["vedtak"]) == list(range(1, 16))
     (store / "innstillingsdigest" / "2025-2026").mkdir(parents=True)
     (store / "innstillingsdigest" / "2025-2026" / "200236.json").write_text(json.dumps({"sider": [{"side": 55}]}))
     assert kildetekst.sider(dokumenter.kilder_for(sak, store)["innstilling"]) == [55]
@@ -325,3 +326,26 @@ def test_normal_build_has_no_stortinget(store, tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DEBATT", None)
     bygg.build(tmp_path / "site", data_dir=tmp_path / "bergen", idag=date(2026, 6, 20))
     assert not (tmp_path / "site" / "stortinget").exists()
+
+
+def test_reader_picks_pages_of_long_innstilling_and_vedtak(sak, store, monkeypatch):
+    from tingposten.stortinget import pipeline as st_pipeline
+
+    lang = "\n".join(f"--- side {n} ---\ntekst {n}" for n in range(1, 81))
+    monkeypatch.setattr(dokumenter, "tekst", lambda item, dok, d: lang if dok in ("innstilling", "vedtak") else "")
+    llm = FakeLLM([{"sider": [{"side": n, "hva": "x"} for n in (2, 3, 999)]},
+                   {"sider": [{"side": 50, "hva": "y"}]}] * 2)
+    assert st_pipeline.les(sak, store, llm) == "lest: innstilling, vedtak"
+    digest = json.loads(dokumenter.digest_fil(store, sak, "vedtak").read_text())
+    assert [s["side"] for s in digest["sider"]] == [2, 3, 50]
+    assert "vedtakene som betyr mest" in llm.prompts[2]
+
+
+def test_long_vote_documents_get_short_proposal_texts(sak, store, monkeypatch):
+    monkeypatch.setattr(dokumenter, "MAKS_VOTERING_TEGN", 1000)
+    tekst = dokumenter.tekst(sak, "votering", store)
+    assert "(forkortet; hele teksten står i vedtaket)" not in tekst  # 200236's proposal is short
+    monkeypatch.setattr(dokumenter, "FORSLAG_KORT", 50)
+    tekst = dokumenter.tekst(sak, "votering", store)
+    assert "(forkortet; hele teksten står i vedtaket)" in tekst
+    assert "For: FrP 29, H 14, Sp 5, KrF 4, V 2." in tekst

@@ -240,7 +240,14 @@ def _partiliste(c: Counter) -> str:
     return ", ".join(f"{p} {n}" for p, n in sorted(c.items(), key=lambda x: (-x[1], x[0]))) or "ingen"
 
 
-def votering_sider(item: dict, data_dir: Path = config.STORTINGET_DATA_DIR) -> list[dict]:
+def votering_sider(item: dict, data_dir: Path = config.STORTINGET_DATA_DIR, kort: bool | None = None) -> list[dict]:
+    """One page per vote. When the whole is over MAKS_VOTERING_TEGN (the budget), each proposal's
+    text is shortened to FORSLAG_KORT characters; the result, the count and the parties stay."""
+    if kort is None:
+        hele = votering_sider(item, data_dir, kort=False)
+        if sum(len(s["tekst"]) for s in hele) <= MAKS_VOTERING_TEGN:
+            return hele
+        return votering_sider(item, data_dir, kort=True)
     lagret_sak = lagret(data_dir, item["sakid"])
     def orden(v):
         t = tid(v.get("votering_tid"))
@@ -268,6 +275,8 @@ def votering_sider(item: dict, data_dir: Path = config.STORTINGET_DATA_DIR) -> l
             fra = f.get("forslag_paa_vegne_av_tekst")
             linjer.append(f"Forslaget: {f.get('forslag_betegnelse') or ''}" + (f" (på vegne av {fra})" if fra else ""))
             if tekst := _tekst_fra_html(f.get("forslag_tekst")):
+                if kort and len(tekst) > FORSLAG_KORT:
+                    tekst = tekst[:FORSLAG_KORT].rsplit(" ", 1)[0] + " … (forkortet; hele teksten står i vedtaket)"
                 linjer.append(tekst)
         sider.append({"tekst": "\n".join(linjer), "url": item["url"]})
     return sider
@@ -301,28 +310,44 @@ def doc_url(item: dict, dok: str, side: int | None, data_dir: Path = config.STOR
     return item["url"]
 
 
-MAKS_INNSTILLING_SIDER = 40  # longer innstillinger (the budget) go through the cheap reader's pages
+MAKS_INNSTILLING_SIDER = 40  # longer documents (the budget) go through the cheap reader's pages
+LESES = ("innstilling", "vedtak")  # the documents the cheap reader cuts when they are that long
+MAKS_VALGT = {"innstilling": 20, "vedtak": 15}  # pages it may pick in all
+MAKS_VOTERING_TEGN = 60_000  # longer vote documents (the budget's hundreds of votes) get short proposal texts
+FORSLAG_KORT = 400
+
+
+def digest_fil(data_dir: Path, item: dict, dok: str) -> Path:
+    """The cheap reader's picked pages: innstillingsdigest/, vedtaksdigest/."""
+    return data_dir / f"{dok}sdigest" / f"{key(item)}.json"
+
+
+def for_lang(tekst_: str) -> bool:
+    from ..kildetekst import sider as sidetall
+
+    return len(sidetall(tekst_)) > MAKS_INNSTILLING_SIDER
 
 
 def kilder_for(item: dict, data_dir: Path = config.STORTINGET_DATA_DIR) -> dict[str, str]:
     """{"vedtak", "votering", "innstilling", "forslag"} as text with page markers ("" when missing).
-    A long innstilling is cut to the pages the cheap reader picked (innstillingsdigest/),
-    or, before it has read it, to the first MAKS_INNSTILLING_SIDER pages."""
+    A long innstilling or vedtak is cut to the pages the cheap reader picked (<dok>sdigest/),
+    or, before it has read it, to its first pages."""
     from ..kildetekst import sider as sidetall
     from ..kildetekst import utdrag
 
-    ut = {d: tekst(item, d, data_dir) for d in ("vedtak", "votering")}
-    innst = tekst(item, "innstilling", data_dir)
-    alle = sidetall(innst)
-    if len(alle) > MAKS_INNSTILLING_SIDER:
-        digest = data_dir / "innstillingsdigest" / f"{key(item)}.json"
-        valgt = [s["side"] for s in (json.loads(digest.read_text()).get("sider", []) if digest.exists() else [])]
-        valgt = valgt or alle[:MAKS_INNSTILLING_SIDER]
-        innst = (f"Utdrag: {len(valgt)} av {len(alle)} sider, valgt fordi de gjelder vedtaket, begrunnelsen og "
-                 f"hvem som berøres.\n" + utdrag(innst, valgt))
-    ut["innstilling"] = innst
+    ut = {"votering": tekst(item, "votering", data_dir)}
+    for dok in LESES:
+        t = tekst(item, dok, data_dir)
+        if for_lang(t):
+            alle = sidetall(t)
+            digest = digest_fil(data_dir, item, dok)
+            valgt = [s["side"] for s in (json.loads(digest.read_text()).get("sider", []) if digest.exists() else [])]
+            valgt = valgt or alle[:MAKS_VALGT[dok]]
+            t = (f"Utdrag: {len(valgt)} av {len(alle)} sider, valgt fordi de gjelder vedtaket, begrunnelsen og "
+                 f"hvem som berøres.\n" + utdrag(t, valgt))
+        ut[dok] = t
     forslag = tekst(item, "forslag", data_dir)
     if len(fs := sidetall(forslag)) > MAKS_INNSTILLING_SIDER:
         forslag = utdrag(forslag, fs[:MAKS_INNSTILLING_SIDER])
     ut["forslag"] = forslag
-    return ut
+    return {d: ut[d] for d in ("vedtak", "votering", "innstilling", "forslag")}
