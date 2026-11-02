@@ -433,7 +433,7 @@ def test_mixed_front_takes_turns_and_leads_with_the_best():
         return {"kilde": kilde, "score": score, "dato": date(2026, 10, 1 + n), "seq": n, "fremhevet": True,
                 "har_sammendrag": True, "mote": f"{kilde}-{n}", "organ": kilde, "organ_kort": kilde,
                 "dato_tekst": "", "venter_protokoll": False}
-    bergen = [s("bergen", 90 - i, i) for i in range(12)]
+    bergen = [s("bergen", 90 - i, i) for i in range(15)]
     stortinget = [s("stortinget", 95 - i, i) for i in range(3)]
     front = side.blandet_front(bergen, stortinget)
     rekke = [x["kilde"] for x in [front["lead"], *front["sekundaer"], *front["liste"]]]
