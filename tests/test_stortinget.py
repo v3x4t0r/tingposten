@@ -349,3 +349,10 @@ def test_long_vote_documents_get_short_proposal_texts(sak, store, monkeypatch):
     tekst = dokumenter.tekst(sak, "votering", store)
     assert "(forkortet; hele teksten står i vedtaket)" in tekst
     assert "For: FrP 29, H 14, Sp 5, KrF 4, V 2." in tekst
+
+
+def test_decisive_vote_is_the_law_as_a_whole(store, sak):
+    from tingposten.stortinget import score as st_score
+
+    sig = st_score.signaler(sak, store)
+    assert (sig["for"], sig["mot"]) == (89, 10)  # not the request's 54–47

@@ -7,6 +7,7 @@ a later decision (issue #25).
 """
 
 import json
+import re
 from pathlib import Path
 
 from .. import config
@@ -26,10 +27,7 @@ BADGE_MIN = {"angar": 0.75, "konkret": 0.75, "juridisk_vekt": 0.8, "uenighet": 0
 def signaler(item: dict, data_dir: Path = config.STORTINGET_DATA_DIR) -> dict:
     lagret_sak = lagret(data_dir, item["sakid"]) or {"voteringer": []}
     tellbare = [v for v in lagret_sak["voteringer"] if (v.get("antall_for") or 0) + (v.get("antall_mot") or 0) > 0]
-    # The decisive vote: the adopted one with the most votes cast (the committee's proposal
-    # or the law as a whole); if none was adopted, the largest one.
-    vedtatt = [v for v in tellbare if v.get("vedtatt")]
-    avgjorende = max(vedtatt or tellbare, key=lambda v: v["antall_for"] + v["antall_mot"], default=None)
+    avgjorende = avgjorende_votering(tellbare)
     modell = _read(Path(data_dir) / "signaler" / f"{key(item)}.json") or {}
     return {
         "type": item.get("type"),
@@ -41,6 +39,22 @@ def signaler(item: dict, data_dir: Path = config.STORTINGET_DATA_DIR) -> dict:
         "angar": _verdi(modell.get("angar")),
         "konkret": _verdi(modell.get("konkret")),
     }
+
+
+HOVEDVOTERING = re.compile(r"loven i sin helhet|komiteens tilråding|innstillingen", re.IGNORECASE)
+
+
+def avgjorende_votering(tellbare: list[dict]) -> dict | None:
+    """The vote that decided the sak: on the law as a whole or on the committee's
+    proposal (200236: the law passed 89–10, while a request in the same sak went 54–47);
+    otherwise the adopted vote with the most votes cast; if none was adopted, the largest."""
+    def stemmer(v):
+        return v["antall_for"] + v["antall_mot"]
+    hoved = [v for v in tellbare if HOVEDVOTERING.search(v.get("votering_tema") or "")]
+    if hoved:
+        return max(hoved, key=stemmer)
+    vedtatt = [v for v in tellbare if v.get("vedtatt")]
+    return max(vedtatt or tellbare, key=stemmer, default=None)
 
 
 def _parts(sig: dict) -> dict:
