@@ -240,6 +240,14 @@ def _partiliste(c: Counter) -> str:
     return ", ".join(f"{p} {n}" for p, n in sorted(c.items(), key=lambda x: (-x[1], x[0]))) or "ingen"
 
 
+def forslagstillere(item: dict, data_dir: Path = config.STORTINGET_DATA_DIR) -> str:
+    """"5 representanter fra Sp", "7 fra FrP og 2 fra H"; "" when not known."""
+    partier = (lagret(data_dir, item["sakid"]) or {}).get("forslagstillere") or {}
+    deler = [f"{n} {'representant' if n == 1 else 'representanter'} fra {parti(p)}"
+             for p, n in sorted(partier.items(), key=lambda x: (-x[1], x[0]))]
+    return " og ".join([", ".join(deler[:-1]), deler[-1]]) if len(deler) > 1 else "".join(deler)
+
+
 def votering_sider(item: dict, data_dir: Path = config.STORTINGET_DATA_DIR, kort: bool | None = None) -> list[dict]:
     """One page per vote. When the whole is over MAKS_VOTERING_TEGN (the budget), each proposal's
     text is shortened to FORSLAG_KORT characters; the result, the count and the parties stay."""
@@ -294,7 +302,13 @@ def tekst(item: dict, dok: str, data_dir: Path = config.STORTINGET_DATA_DIR) -> 
     """A document as text with "--- side N ---" markers; "" when there is none."""
     if dok in ("innstilling", "forslag"):
         p = pdf_fil(data_dir, item, dok)
-        return dokumenttekst(p) if p.exists() else ""
+        if not p.exists():
+            return ""
+        t = dokumenttekst(p)
+        if dok == "forslag" and (hvem := forslagstillere(item, data_dir)):
+            # Stortinget's own record of who proposed it, so the party is never guessed from names.
+            t = t.replace("--- side 1 ---\n", f"--- side 1 ---\nFremmet av {hvem} (Stortingets saksopplysninger).\n", 1)
+        return t
     return "\n".join(f"--- side {n} ---\n{s['tekst']}" for n, s in enumerate(sider(item, dok, data_dir), 1))
 
 

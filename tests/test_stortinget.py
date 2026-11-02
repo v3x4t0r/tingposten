@@ -356,3 +356,29 @@ def test_decisive_vote_is_the_law_as_a_whole(store, sak):
 
     sig = st_score.signaler(sak, store)
     assert (sig["for"], sig["mot"]) == (89, 10)  # not the request's 54–47
+
+
+def test_forslag_names_the_proposers_party(store, sak, monkeypatch):
+    path = store / "sak" / "200236.json"
+    lagret_sak = json.loads(path.read_text())
+    lagret_sak["forslagstillere"] = {"Sp": 5}
+    path.write_text(json.dumps(lagret_sak))
+    assert dokumenter.forslagstillere(sak, store) == "5 representanter fra Sp"
+    (store / "pdf").mkdir(exist_ok=True)
+    dokumenter.pdf_fil(store, sak, "forslag").write_bytes(b"x")
+    monkeypatch.setattr(dokumenter, "dokumenttekst", lambda p: "--- side 1 ---\nRepresentantforslag 226 S")
+    assert dokumenter.tekst(sak, "forslag", store).startswith(
+        "--- side 1 ---\nFremmet av 5 representanter fra Sp (Stortingets saksopplysninger).\n")
+
+
+def test_proposers_are_added_from_the_session_list(store):
+    class Liste(FakeClient):
+        def saker(self, sesjon):
+            return [{"id": 200236, "forslagstiller_liste": [{"parti": {"id": "A"}}, {"parti": {"id": "SV"}},
+                                                             {"parti": {"id": "A"}}]}]
+    (store / "saker" / "2025-2026.json").unlink(missing_ok=True)
+    data = json.loads((store / "sak" / "200236.json").read_text())
+    data.pop("forslagstillere", None)
+    (store / "sak" / "200236.json").write_text(json.dumps(data))
+    assert innhenter.legg_til_forslagstillere(store, Liste()) == 1
+    assert innhenter.lagret(store, 200236)["forslagstillere"] == {"A": 2, "SV": 1}

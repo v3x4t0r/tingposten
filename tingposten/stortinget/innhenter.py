@@ -74,6 +74,8 @@ def hent(data_dir: Path = config.STORTINGET_DATA_DIR, client: Client | None = No
             continue
         ny = hent_sak(client, sakid)
         ny["sist_oppdatert_dato"] = oppdatert
+        if for_ and "forslagstillere" in for_:
+            ny["forslagstillere"] = for_["forslagstillere"]
         _skriv(data_dir / "sak" / f"{sakid}.json", ny)
         teller["hentet"] += 1
         endrede_sesjoner.add(ny["sak"].get("sak_sesjon") or "")
@@ -81,6 +83,7 @@ def hent(data_dir: Path = config.STORTINGET_DATA_DIR, client: Client | None = No
 
     for sesjon in sorted(s for s in endrede_sesjoner if s):
         _skriv(data_dir / "stortingsvedtak" / f"{sesjon}.json", client.stortingsvedtak(sesjon))
+    teller["forslagstillere"] = legg_til_forslagstillere(data_dir, client)
 
     if endringer:
         with open(data_dir / "endringer.jsonl", "a") as f:
@@ -103,6 +106,32 @@ def hent_sak(client: Client, sakid: int) -> dict:
         forslag = client.voteringsforslag(vid)
         voteringer.append({**_uten_person(v), "resultat": resultat, "forslag": forslag})
     return {"sak": sak, "voteringer": voteringer, "hentet": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+
+
+def legg_til_forslagstillere(data_dir: Path, client: Client) -> int:
+    """A representantforslag's proposers, as parties ({"Sp": 5}), from the session's sak list
+    (the sak itself doesn't carry them). A session outside the scope is fetched once."""
+    lister: dict[str, dict] = {}
+    antall = 0
+    for path in sorted((data_dir / "sak").glob("*.json")):
+        lagret_sak = json.loads(path.read_text())
+        if "forslagstillere" in lagret_sak:
+            continue
+        sesjon = lagret_sak["sak"].get("sak_sesjon")
+        if sesjon not in lister:
+            fil = data_dir / "saker" / f"{sesjon}.json"
+            if not fil.exists():
+                _skriv(fil, client.saker(sesjon))
+            lister[sesjon] = {int(s["id"]): s for s in json.loads(fil.read_text())}
+        fra_liste = lister[sesjon].get(int(lagret_sak["sak"]["id"])) or {}
+        partier: dict[str, int] = {}
+        for r in fra_liste.get("forslagstiller_liste") or []:
+            p = (r.get("parti") or {}).get("id") or "uavhengig"
+            partier[p] = partier.get(p, 0) + 1
+        lagret_sak["forslagstillere"] = partier
+        _skriv(path, lagret_sak)
+        antall += 1
+    return antall
 
 
 def _uten_person(v: dict) -> dict:
