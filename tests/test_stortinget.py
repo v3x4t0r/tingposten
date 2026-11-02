@@ -5,7 +5,7 @@ Fixtures are Stortinget's own answers for sak 200236 (Endringer i barnevernslove
 
 import json
 import shutil
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 import pytest
@@ -90,9 +90,8 @@ def test_client_spaces_requests_per_host_and_sends_user_agent():
             return {"innevaerende_sesjon": {"id": "2026-2027"}}
 
     class Session:
-        headers = {}
-
         def __init__(self):
+            self.headers = {}
             self.urls = []
 
         def get(self, url, params=None, timeout=None):
@@ -290,7 +289,7 @@ def test_testkopi_builds_stortinget_privately_and_cannot_be_published(store, tmp
     monkeypatch.setattr(config, "DEBATT", None)
     skribent.skriv(dokumenter.saker(store)[0], store, FakeLLM([dict(KORT)]))
     site = tmp_path / "site-test"
-    stats = bygg.build(site, data_dir=tmp_path / "bergen", idag=datetime(2026, 6, 20).date(),
+    stats = bygg.build(site, data_dir=tmp_path / "bergen", idag=date(2026, 6, 20),
                        med_stortinget=True, testkopi=True)
     assert stats["stortinget"]["saker"] == 1
     side = (site / "stortinget" / "sak" / "2025-2026" / "200236" / "index.html").read_text()
@@ -310,5 +309,5 @@ def test_normal_build_has_no_stortinget(store, tmp_path, monkeypatch):
 
     monkeypatch.setattr(config, "STORTINGET_DATA_DIR", store)
     monkeypatch.setattr(config, "DEBATT", None)
-    bygg.build(tmp_path / "site", data_dir=tmp_path / "bergen", idag=datetime(2026, 6, 20).date())
+    bygg.build(tmp_path / "site", data_dir=tmp_path / "bergen", idag=date(2026, 6, 20))
     assert not (tmp_path / "site" / "stortinget").exists()

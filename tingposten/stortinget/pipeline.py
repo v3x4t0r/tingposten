@@ -22,7 +22,16 @@ from pathlib import Path
 
 from .. import config, faktasjekker, kildetekst, klassifiserer, redaktor, skribent
 from .. import pipeline as bergen
-from ..llm import ClaudeCLI, CodexCLI, MedReserve, fence, obj, read_json, run_parallel, write_json
+from ..llm import (
+    ClaudeCLI,
+    CodexCLI,
+    MedReserve,
+    fence,
+    obj,
+    read_json,
+    run_parallel,
+    write_json,
+)
 from . import dokumenter, score
 from .dokumenter import key
 
