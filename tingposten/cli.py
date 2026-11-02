@@ -61,6 +61,17 @@ def main(argv: list[str] | None = None) -> int:
     kjorp.add_argument("--parallel", type=int, default=3)
     kjorp.add_argument("--fra", help="oldest meeting date YYYY-MM-DD (default: config.TILBAKE_DAGER back)")
 
+    stp = sub.add_parser("stortinget", help="Stortinget (issue #25): fetch, write and check; nothing is published")
+    stsub = stp.add_subparsers(dest="st_cmd", required=True)
+    sthent = stsub.add_parser("hent", help="fetch decided saker, votes and their documents from Stortinget")
+    sthent.add_argument("--sak", type=int, action="append", help="a sakid to add (a test sak); repeatable")
+    sthent.add_argument("--uten-dokumenter", action="store_true", help="skip the innstilling PDFs and lovvedtak")
+    stkjor = stsub.add_parser("kjor", help="write, fact-check, classify and edit the Stortinget saker")
+    stkjor.add_argument("--steg", help="comma-separated subset of the steps (see stortinget/pipeline.py)")
+    stkjor.add_argument("--sak", type=int, action="append", help="only these sakids; repeatable")
+    stkjor.add_argument("--parallel", type=int, default=3)
+    stsub.add_parser("saker", help="list the Stortinget saker on disk with score and card status")
+
     byggp = sub.add_parser("bygg", help="build the static site into site/")
     byggp.add_argument("--idag", type=date.fromisoformat, help="pretend today is YYYY-MM-DD (for previews)")
     byggp.add_argument("--til", type=Path, help="build into this directory instead of site/")
@@ -245,6 +256,8 @@ def main(argv: list[str] | None = None) -> int:
         if unknown := set(steg) - set(pipeline.STEG):
             parser.error(f"unknown steg: {', '.join(sorted(unknown))}")
         pipeline.kjor(utvalg=args.utvalg, dato=args.dato, steg=steg, parallel=args.parallel, fra=args.fra)
+    elif args.cmd == "stortinget":
+        return _stortinget(args, parser)
     elif args.cmd == "utgave":
         from . import utgave
 
@@ -262,6 +275,35 @@ def main(argv: list[str] | None = None) -> int:
         from . import bygg
 
         logging.info("bygg: %s", bygg.build(args.til or config.SITE_DIR, idag=args.idag))
+    return 0
+
+
+def _stortinget(args, parser) -> int:
+    from .stortinget import dokumenter, innhenter as st_innhenter, pipeline as st_pipeline, score as st_score
+
+    data_dir = config.STORTINGET_DATA_DIR
+    if args.st_cmd == "hent":
+        try:
+            logging.info("stortinget: %s", st_innhenter.hent(data_dir, saker=args.sak))
+            if not args.uten_dokumenter:
+                logging.info("stortinget dokumenter: %s", dokumenter.hent_dokumenter(st_pipeline.saker(data_dir), data_dir))
+        except Blocked as e:
+            logging.error("giving up this run, server keeps refusing: %s", e)
+            return 2
+    elif args.st_cmd == "kjor":
+        steg = tuple(args.steg.split(",")) if args.steg else st_pipeline.STEG
+        if unknown := set(steg) - set(st_pipeline.STEG):
+            parser.error(f"unknown steg: {', '.join(sorted(unknown))}")
+        logging.info("stortinget kjor: %s", st_pipeline.kjor(data_dir, steg=steg, parallel=args.parallel,
+                                                             saker_=args.sak))
+    elif args.st_cmd == "saker":
+        items = st_pipeline.saker(data_dir)
+        by_key = {dokumenter.key(i): i for i in items}
+        for r in st_score.rank(items, data_dir):
+            i = by_key[r["key"]]
+            red = data_dir / "redigert" / f"{r['key']}.json"
+            status = ("avvist" if json.loads(red.read_text()).get("avvist") else "klar") if red.exists() else "uten kort"
+            print(f"{r['score']:3d}  {i['moteDato']}  {i['sakid']}  {status:9s}  {i['korttittel'][:70]}")
     return 0
 
 

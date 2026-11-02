@@ -249,3 +249,35 @@ def test_vedtaksdato_without_votes_uses_saksgang():
     lagret = {"sak": {"saksgang": {"saksgang_steg_liste": [{"saksgang_hendelse_liste": [
         {"dato": "01.01.0001 00:00:00"}, {"dato": "09.04.2026 00:00:00"}]}]}}, "voteringer": []}
     assert innhenter.vedtaksdato(lagret) == datetime(2026, 4, 9, tzinfo=api.NORSK_TID)
+
+
+def test_kjor_writes_checks_and_edits_a_card(store):
+    from tingposten.stortinget import pipeline as st_pipeline
+
+    sjekk = {"setninger": [{"felt": f, "setning": KORT[f], "stottet": True, "kilde": None, "begrunnelse": ""}
+                           for f in ("overskrift", "ingress", "hva_endres", "status")],
+             "personvern": [], "blocked": ""}
+    signal = {"verdi": 4, "begrunnelse": "x"}
+    llms = {"les": FakeLLM([]), "skriv": FakeLLM([dict(KORT)]), "sjekk": FakeLLM([sjekk]),
+            "klassifiser": FakeLLM([{"angar": signal, "konkret": signal, "tema": "justis",
+                                     "tema_begrunnelse": "", "blocked": ""}]),
+            "artikkel": FakeLLM([{"avsnitt": [], "blocked": ""}] * 2), "artikkelsjekk": FakeLLM([])}
+    result = st_pipeline.kjor(store, llms=llms, parallel=1)
+    assert result["skriv"]["antall"] == {"skrevet": 1}
+    assert result["rediger"]["publiserbar"] == 1
+    assert (store / "tekst" / "2025-2026" / "200236" / "vedtak.txt").exists()
+    # A second run with the same documents does nothing new: no rewrite.
+    again = st_pipeline.kjor(store, llms={k: FakeLLM([]) for k in llms}, parallel=1,
+                             steg=("dokumenter", "les", "skriv", "sjekk", "klassifiser"))
+    assert again["dokumenter"]["antall"] == {"uendret": 1}
+    assert again["skriv"] == {} and again["sjekk"] == {} and again["klassifiser"] == {}
+
+
+def test_score_reads_votes_and_signals(store, sak):
+    from tingposten.stortinget import score as st_score
+
+    r = st_score.rank([sak], store)[0]
+    assert r["signaler"]["forslag_falt"] == 5
+    assert r["signaler"]["type"] == "lovsak"
+    assert 0 < r["score"] <= 100
+    assert "lovendring" in r["grunner"]
