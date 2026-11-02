@@ -440,3 +440,11 @@ def test_mixed_front_takes_turns_and_leads_with_the_best():
     assert rekke[:6] == ["stortinget", "bergen", "stortinget", "bergen", "stortinget", "bergen"]
     assert len(rekke) == 15 and rekke[6:] == ["bergen"] * 9  # Stortinget ran out: Bergen fills
     assert [f["navn"] for f in front["fliser"]] == ["Mer fra Bergen kommune"]
+
+
+def test_mixed_page_names_bergen():
+    from tingposten.stortinget import side
+
+    s = {"organ_kort": "Bystyret", "tittel": "x"}
+    assert side.med_sted([s])[0]["organ_kort"] == "Bystyret i Bergen"
+    assert s["organ_kort"] == "Bystyret"  # Bergen's own pages keep theirs

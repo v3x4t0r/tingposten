@@ -239,10 +239,17 @@ def blandet_front(bergen: list[dict], stortinget: list[dict]) -> dict:
     }
 
 
+def med_sted(saker: list[dict]) -> list[dict]:
+    """Copies of a kommune's saker whose organ says where: «Bystyret i Bergen». On a page mixed
+    with Stortinget, "Bystyret" alone doesn't say which city (owner, 2.11)."""
+    return [{**s_, "organ_kort": f"{s_['organ_kort']} i Bergen"} for s_ in saker]
+
+
 def bygg_blandet(write, idag: date, bergen: list[dict], data_dir: Path | None = None) -> int:
     """/blandet/: the front page as it could look when a reader has chosen Bergen, with
     Stortinget mixed in. Only in the private test copy, for the owner to judge."""
     stortinget = load(data_dir or config.STORTINGET_DATA_DIR)
+    bergen = med_sted(bergen)
     k = bygg.KILDE_BLANDET
     idag_tekst = bygg.nb_weekday_date(idag)
     sider = 0
