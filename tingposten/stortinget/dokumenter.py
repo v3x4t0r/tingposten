@@ -33,9 +33,14 @@ STEMME = {1: "ikke til stede", 2: "for", 3: "mot"}
 DOKUMENTER = ("innstilling", "vedtak", "votering")
 
 # Formal saker with nothing for a reader: elections to Stortinget's own bodies, reports
-# from its delegations, the list of saker left over at the end of a session.
+# from its delegations, the list of saker left over at the end of a session, the split of
+# the budget between the committees, ministers' statements (redegjørelser, which are
+# only "vedlagt protokollen"). The throne speech debate stays: it can end in requests to
+# the government.
 STOY = re.compile(r"^(valg av|innberetning|saker som stortinget ikke har behandlet|rapport til stortinget fra "
-                  r"stortingets delegasjon|referat|melding fra stortingets presidentskap)", re.IGNORECASE)
+                  r"stortingets delegasjon|referat|melding fra stortingets presidentskap|innstilling fra valgkomiteen"
+                  r"|endringer i de faste komiteers sammensetning|den norske nobelkomit|fordeling til komiteene"
+                  r"|redegjørelse)", re.IGNORECASE)
 
 
 def parti(pid: str | None) -> str:

@@ -144,7 +144,10 @@ def test_item_and_key(sak):
 def test_formal_saker_are_noise():
     assert dokumenter.er_stoy({"korttittel": "Valg av nytt medlem til Stortingets delegasjon", "dokumentgruppe": 4})
     assert dokumenter.er_stoy({"korttittel": "Noe", "dokumentgruppe": 8})
+    assert dokumenter.er_stoy({"korttittel": "Redegjørelse av utviklingsministeren om nordisk samarbeid"})
+    assert dokumenter.er_stoy({"korttittel": "Endringer i de faste komiteers sammensetning"})
     assert not dokumenter.er_stoy({"korttittel": "Endringer i barnevernsloven", "dokumentgruppe": 1})
+    assert not dokumenter.er_stoy({"korttittel": "Hans Majestet Kongens tale til det 171. storting"})
 
 
 def test_party_counts_match_the_totals():
