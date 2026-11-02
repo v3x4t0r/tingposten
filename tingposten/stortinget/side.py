@@ -20,6 +20,7 @@ from .innhenter import lagret
 log = logging.getLogger(__name__)
 
 STI = "stortinget/"
+SISTE = 20  # saker on a period's page when the period itself has none
 
 
 def _status(item: dict, data_dir: Path) -> dict:
@@ -146,9 +147,17 @@ def bygg_sider(write, env, idag: date, data_dir: Path | None = None) -> dict:
     idag_tekst = bygg.nb_weekday_date(idag)
     for slug, (days, label) in bygg.VIEWS.items():
         window = bygg._window(saker, idag, days)
+        reserve = ""
+        if not window and days is not None and saker:
+            # Stortinget can go weeks without a decision (summer, a new session's first weeks):
+            # then the period shows the latest decisions instead of an empty page, and says so.
+            window = sorted(saker, key=lambda x: (x["dato"], x["score"]), reverse=True)[:SISTE]
+            label = f"Siste vedtak, fra {bygg.nb_date(min(x['dato'] for x in window))}"
+            reserve = (f"Stortinget har ikke gjort vedtak de siste {days} dagene. "
+                       f"Her er de siste vedtakene, fra {bygg.nb_date(min(x['dato'] for x in window))}.")
         front = _med_sti(bygg.front_page(window, regler.TEMA))
         write(f"{STI}{slug}index.html", "forside.html", side="forside", visning=slug, periode=label,
-              idag_tekst=idag_tekst, endret=idag, **front, **felles)
+              idag_tekst=idag_tekst, endret=idag, reserve=reserve, **front, **felles)
         aar = days is None
         write(f"{STI}{slug}alle/index.html", "alle.html", side="alle", visning=slug, periode=label,
               moter=[{**m, "sti": STI} for m in bygg._meetings(window)], antall=len(window), aar=aar, **felles)

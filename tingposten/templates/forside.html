@@ -16,6 +16,7 @@
 {% if not lead %}
 <p class="tomt">Ingen vedtak i perioden. Se <a href="{{ root }}{{ k.sti }}moter/">alle møter</a>.</p>
 {% else %}
+{% if reserve is defined and reserve %}<p class="tomt">{{ reserve }}</p>{% endif %}
 <div class="toppsone">
 {{ lead_story(lead, root) }}
 <aside class="periode" aria-labelledby="periode-tittel">

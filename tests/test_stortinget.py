@@ -382,3 +382,16 @@ def test_proposers_are_added_from_the_session_list(store):
     (store / "sak" / "200236.json").write_text(json.dumps(data))
     assert innhenter.legg_til_forslagstillere(store, Liste()) == 1
     assert innhenter.lagret(store, 200236)["forslagstillere"] == {"A": 2, "SV": 1}
+
+
+def test_empty_period_shows_the_latest_decisions(store, tmp_path, monkeypatch):
+    from tingposten import bygg, config
+
+    monkeypatch.setattr(config, "STORTINGET_DATA_DIR", store)
+    monkeypatch.setattr(config, "DEBATT", None)
+    skribent.skriv(dokumenter.saker(store)[0], store, FakeLLM([dict(KORT)]))
+    site = tmp_path / "site-test"
+    bygg.build(site, data_dir=tmp_path / "bergen", idag=date(2026, 11, 2), med_stortinget=True, testkopi=True)
+    forside = (site / "stortinget" / "index.html").read_text()
+    assert "Ingen vedtak i perioden" not in forside
+    assert "Stortinget har ikke gjort vedtak de siste 14 dagene. Her er de siste vedtakene, fra 11. juni 2026." in forside
