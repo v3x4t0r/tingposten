@@ -1,0 +1,10 @@
+# What is particular to this Pi. Defaults: roles/tingposten/defaults/main.yml.
+tingposten_bruker: hemep
+tingposten_dir: /home/hemep/tingposten
+# The daily runs as timers (owner, 2.11.2026: Bergen at 06:00, Stortinget at 07:30). Bergen's
+# never downloads PDFs or publishes on its own (PUBLISER is not set); Stortinget's builds only
+# the private test copy. Turn on here and run site.yml.
+tingposten_daglig_kjoring: true
+tingposten_stortinget_kjoring: true
+# Stortinget lives on the branch `stortinget` in its own worktree until it is merged (issue #25).
+tingposten_stortinget_dir: /home/hemep/tingposten-stortinget

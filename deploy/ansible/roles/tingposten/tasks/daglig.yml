@@ -1,0 +1,51 @@
+# The daily runs as systemd user timers (they run while the user lingers, see kontrollpanel.yml).
+# Each has its own switch; a timer that is switched off is stopped and disabled, not removed.
+- name: Remove the old cron entries (the timers replace them)
+  ansible.builtin.cron:
+    name: "{{ item.navn }}"
+    env: "{{ item.env }}"
+    state: absent
+  loop:
+    - {navn: PATH, env: true}
+    - {navn: tingposten daglig kjøring, env: false}
+  loop_control:
+    label: "{{ item.navn }}"
+
+- name: Folder for user services
+  ansible.builtin.file:
+    path: "/home/{{ tingposten_bruker }}/.config/systemd/user"
+    state: directory
+    mode: "0755"
+
+- name: The daily runs' services
+  ansible.builtin.template:
+    src: tingposten-kjoring.service.j2
+    dest: "/home/{{ tingposten_bruker }}/.config/systemd/user/{{ item.navn }}.service"
+    mode: "0644"
+  loop: "{{ tingposten_timere }}"
+  loop_control:
+    label: "{{ item.navn }}"
+
+- name: The daily runs' timers
+  ansible.builtin.template:
+    src: tingposten-kjoring.timer.j2
+    dest: "/home/{{ tingposten_bruker }}/.config/systemd/user/{{ item.navn }}.timer"
+    mode: "0644"
+  loop: "{{ tingposten_timere }}"
+  loop_control:
+    label: "{{ item.navn }}"
+
+- name: Timers on or off as host_vars say
+  ansible.builtin.systemd_service:
+    name: "{{ item.navn }}.timer"
+    scope: user
+    enabled: "{{ item.aktiv }}"
+    state: "{{ 'started' if item.aktiv else 'stopped' }}"
+    daemon_reload: true
+  environment: "{{ tingposten_systemd_env }}"
+  register: tingposten_timer_status
+  # In a dry run (--check) a timer that isn't installed yet can't be found; the real run installs it first.
+  failed_when: tingposten_timer_status is failed and not ansible_check_mode
+  loop: "{{ tingposten_timere }}"
+  loop_control:
+    label: "{{ item.navn }}: {{ 'på' if item.aktiv else 'av' }}"

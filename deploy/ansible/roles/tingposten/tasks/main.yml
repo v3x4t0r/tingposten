@@ -1,0 +1,46 @@
+# Tingposten on the Pi, from the repository: safe to run again, and a run on a Pi that is
+# already as described changes nothing. Tags: repo, hemmeligheter, python, kontrollpanel,
+# debatt, system (needs -K: the firewall in /usr/local/sbin and /etc/systemd), daglig.
+- name: The user's id, for systemd --user
+  ansible.builtin.command: id -u
+  register: tingposten_uid
+  changed_when: false
+  check_mode: false
+  tags: [always]
+
+- name: The environment systemd --user needs over SSH
+  ansible.builtin.set_fact:
+    tingposten_systemd_env:
+      XDG_RUNTIME_DIR: "/run/user/{{ tingposten_uid.stdout }}"
+  tags: [always]
+
+- name: Repository, uv and data folders
+  ansible.builtin.import_tasks: repo.yml
+  tags: [repo]
+
+- name: Secret files (checked, never read)
+  ansible.builtin.import_tasks: hemmeligheter.yml
+  tags: [hemmeligheter]
+
+- name: Python environment
+  ansible.builtin.import_tasks: python.yml
+  tags: [python]
+
+- name: Control panel
+  ansible.builtin.import_tasks: kontrollpanel.yml
+  when: tingposten_kontrollpanel
+  tags: [kontrollpanel]
+
+- name: Comment server
+  ansible.builtin.import_tasks: debatt.yml
+  when: tingposten_debatt
+  tags: [debatt]
+
+- name: Comment server firewall (root)
+  ansible.builtin.import_tasks: brannmur.yml
+  when: tingposten_debatt
+  tags: [debatt, system]
+
+- name: Daily run
+  ansible.builtin.import_tasks: daglig.yml
+  tags: [daglig]

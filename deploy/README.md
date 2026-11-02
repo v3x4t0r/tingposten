@@ -84,6 +84,10 @@ Etter `git pull`: `systemctl --user restart tingposten-admin` (eller `sudo syste
 
 Lokalt, uten passord: `uv run tingposten admin` og åpne http://127.0.0.1:8787/.
 
+## Rulle ut og sette opp med Ansible
+
+Fra arbeidsmaskinen ruller én kommando ut det som ligger på main: `cd deploy/ansible && ansible-playbook deploy.yml`. Den henter koden, bygger kommentarserveren på nytt bare når koden dens er endret, starter kontrollpanelet på nytt, og bygger og publiserer siden. `site.yml` setter Pi-en opp, eller tilbake til det repoet sier. Se [ansible/README.md](ansible/README.md).
+
 ## Første gangs oppsett
 
 ```sh

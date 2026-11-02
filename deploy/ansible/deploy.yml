@@ -1,0 +1,136 @@
+# Roll out what is on main (#21): one command instead of pull, rebuild, restart, build, publish.
+#
+#   cd deploy/ansible
+#   ansible-playbook deploy.yml                      update, rebuild what changed, build and publish
+#   ansible-playbook deploy.yml -e publiser=false    the same, without building and publishing the site
+#   ansible-playbook deploy.yml --check              what would be updated, changing nothing
+#
+# - The code: fast-forward to origin/main (stops if the Pi's copy has local changes).
+# - The Python environment: synced when pyproject.toml or uv.lock changed.
+# - The control panel: restarted when the code changed.
+# - The comment server: rebuilt only when its image's inputs changed (Dockerfile: pyproject.toml,
+#   uv.lock, README.md, tingposten/), then its health is checked.
+# - The firewall: a change to it needs root, so it is pointed out (site.yml -K --tags system).
+# - The site: built and published with deploy/run-daily.sh --publiser, which respects STOP and
+#   shows up in the control panel like a run started there.
+- name: Roll out Tingposten
+  hosts: all
+  vars:
+    publiser: true
+  tasks:
+    - name: The role's defaults (paths, user), with host_vars on top
+      ansible.builtin.include_role:
+        name: tingposten
+        tasks_from: standard.yml
+        public: true
+
+    - name: The user's id, for systemd --user
+      ansible.builtin.command: id -u
+      register: tingposten_uid
+      changed_when: false
+      check_mode: false
+
+    - name: The systemd environment
+      ansible.builtin.set_fact:
+        tingposten_systemd_env:
+          XDG_RUNTIME_DIR: "/run/user/{{ tingposten_uid.stdout }}"
+
+    - name: The commit running now
+      ansible.builtin.command: git -C {{ tingposten_dir | quote }} rev-parse HEAD  # noqa: command-instead-of-module (the git module can't read HEAD)
+      register: foer
+      changed_when: false
+      check_mode: false
+
+    - name: Update to main (fast-forward only)
+      ansible.builtin.git:
+        repo: "{{ tingposten_repo }}"
+        dest: "{{ tingposten_dir }}"
+        version: "{{ tingposten_versjon }}"
+        update: true
+        force: false
+      register: kode
+
+    - name: What changed
+      ansible.builtin.command: git -C {{ tingposten_dir | quote }} diff --name-only {{ foer.stdout }} {{ kode.after }}  # noqa: command-instead-of-module
+      register: endret
+      changed_when: false
+      when: kode.changed and not ansible_check_mode
+
+    - name: Group the changed files
+      ansible.builtin.set_fact:
+        filer: "{{ endret.stdout_lines | default([]) }}"
+        python_endret: "{{ endret.stdout_lines | default([]) | select('in', ['pyproject.toml', 'uv.lock']) | list | length > 0 }}"
+        kode_endret: "{{ endret.stdout_lines | default([]) | select('match', '^(tingposten/|pyproject.toml|uv.lock)') | list | length > 0 }}"
+        debatt_endret: >-
+          {{ endret.stdout_lines | default([])
+             | select('match', '^(tingposten/|pyproject.toml$|uv.lock$|README.md$|deploy/debatt/(Dockerfile|compose.yml)$)')
+             | list | length > 0 }}
+        brannmur_endret: >-
+          {{ endret.stdout_lines | default([])
+             | select('match', '^deploy/debatt/(brannmur.sh|tingposten-debatt-brannmur.service)$') | list | length > 0 }}
+        panel_endret: "{{ endret.stdout_lines | default([]) | select('match', '^deploy/ansible/roles/tingposten/templates/') | list | length > 0 }}"
+
+    - name: Sync the Python environment
+      ansible.builtin.include_role:
+        name: tingposten
+        tasks_from: python.yml
+      when: python_endret
+
+    - name: The control panel's unit, if its template changed
+      ansible.builtin.include_role:
+        name: tingposten
+        tasks_from: kontrollpanel.yml
+      when: panel_endret and tingposten_kontrollpanel
+
+    - name: Restart the control panel (new code)
+      ansible.builtin.systemd_service:
+        name: tingposten-admin
+        scope: user
+        state: restarted
+      environment: "{{ tingposten_systemd_env }}"
+      when: kode_endret and tingposten_kontrollpanel
+
+    - name: Rebuild and restart the comment server
+      ansible.builtin.command:
+        cmd: docker compose up -d --build debatt
+        chdir: "{{ tingposten_dir }}/deploy/debatt"
+      when: debatt_endret and tingposten_debatt
+      changed_when: true
+
+    - name: The comment server answers
+      ansible.builtin.command:
+        cmd: >-
+          docker compose exec -T debatt python -c
+          "import urllib.request,sys; sys.exit(urllib.request.urlopen('http://127.0.0.1:8790/api/helse',timeout=3).status!=200)"
+        chdir: "{{ tingposten_dir }}/deploy/debatt"
+      register: helse
+      until: helse.rc == 0
+      retries: 30
+      delay: 2
+      changed_when: false
+      when: debatt_endret and tingposten_debatt
+
+    - name: The firewall changed and needs root
+      ansible.builtin.debug:
+        msg: "Brannmuren er endret. Kjør: ansible-playbook site.yml -K --tags system"
+      when: brannmur_endret
+
+    - name: Build and publish the site (run-daily.sh --publiser; STOP wins)
+      ansible.builtin.command:
+        cmd: deploy/run-daily.sh --publiser
+        chdir: "{{ tingposten_dir }}"
+      environment:
+        PATH: "/home/{{ tingposten_bruker }}/.local/bin:/usr/local/bin:/usr/bin:/bin"
+      register: publisert
+      when: publiser | bool
+      changed_when: true
+
+    - name: Summary
+      ansible.builtin.debug:
+        msg:
+          - "Kode: {{ foer.stdout[:7] }} → {{ (kode.after | default(foer.stdout))[:7] }}{{ '' if kode.changed else ' (uendret)' }}"
+          - "Filer endret: {{ filer | length }}"
+          - "Python-miljø synket: {{ 'ja' if python_endret else 'nei' }}"
+          - "Kontrollpanelet startet på nytt: {{ 'ja' if (kode_endret and tingposten_kontrollpanel) else 'nei' }}"
+          - "Kommentarserveren bygget på nytt: {{ 'ja' if (debatt_endret and tingposten_debatt) else 'nei' }}"
+          - "Siden bygget og publisert: {{ 'ja (se kontrollpanelet / data/logs)' if (publiser | bool and not ansible_check_mode) else 'nei' }}"

@@ -1,0 +1,5 @@
+# Nothing to do: deploy.yml includes this with public: true to get the role's defaults.
+- name: Tingposten's settings
+  ansible.builtin.debug:
+    msg: "{{ tingposten_dir }} ({{ tingposten_bruker }})"
+    verbosity: 1

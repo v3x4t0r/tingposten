@@ -1,0 +1,19 @@
+- name: Would the Python environment change? (uv sync --dry-run)
+  ansible.builtin.command:
+    cmd: >-
+      /home/{{ tingposten_bruker }}/.local/bin/uv sync --frozen --dry-run
+      {% for e in tingposten_uv_ekstra %}--extra {{ e }} {% endfor %}
+    chdir: "{{ tingposten_dir }}"
+  register: tingposten_uv_proeve
+  changed_when: false
+  check_mode: false
+
+- name: Sync the Python environment with uv.lock
+  ansible.builtin.command:
+    cmd: >-
+      /home/{{ tingposten_bruker }}/.local/bin/uv sync --frozen
+      {% for e in tingposten_uv_ekstra %}--extra {{ e }} {% endfor %}
+    chdir: "{{ tingposten_dir }}"
+  when: "'Would make no changes' not in tingposten_uv_proeve.stderr ~ tingposten_uv_proeve.stdout"
+  changed_when: true
+  notify: Restart kontrollpanelet

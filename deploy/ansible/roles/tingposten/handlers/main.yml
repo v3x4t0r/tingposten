@@ -1,0 +1,14 @@
+- name: Restart kontrollpanelet
+  ansible.builtin.systemd_service:
+    name: tingposten-admin
+    scope: user
+    state: restarted
+    daemon_reload: true
+  environment: "{{ tingposten_systemd_env }}"
+
+- name: Restart brannmuren
+  become: true
+  ansible.builtin.systemd_service:
+    name: tingposten-debatt-brannmur
+    state: restarted
+    daemon_reload: true

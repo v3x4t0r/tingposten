@@ -1,0 +1,8 @@
+# Tingposten's Pi. The base system (Docker, Hailo, the camera stack) is ~/Projects/rpi-setup's
+# playbook; this one only does Tingposten. Reached over Tailscale: the home network address
+# (192.168.8.205) has been unreliable from the workstation.
+all:
+  hosts:
+    pi:
+      ansible_host: 100.65.247.104
+      ansible_user: hemep

@@ -1,0 +1,11 @@
+# {{ ansible_managed }}
+# {{ item.beskrivelse }}. Started by {{ item.navn }}.timer; the script logs to its own files
+# under data/logs and holds its own lock, so a run started from the panel and this one never overlap.
+[Unit]
+Description={{ item.beskrivelse }}
+
+[Service]
+Type=oneshot
+WorkingDirectory={{ item.mappe }}
+Environment=PATH=/home/{{ tingposten_bruker }}/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/bash {{ item.mappe }}/{{ item.skript }}

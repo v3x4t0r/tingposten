@@ -1,0 +1,18 @@
+# {{ ansible_managed }}
+# Tingposten's control panel: http://<the Pi>:{{ tingposten_admin_port }}/ on the home network.
+# A user service (systemctl --user status tingposten-admin; the user lingers, so it starts
+# with the Pi). Password: TINGPOSTEN_ADMIN_PASSORD in .env; any user name.
+[Unit]
+Description=Tingposten kontrollpanel
+
+[Service]
+WorkingDirectory={{ tingposten_dir }}
+# The same PATH as the daily run: uv, claude and codex.
+Environment=PATH=/home/{{ tingposten_bruker }}/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/{{ tingposten_bruker }}/.local/bin/uv run --no-sync tingposten admin --vert 0.0.0.0 --port {{ tingposten_admin_port }}
+Restart=on-failure
+# A run started from the panel keeps going if the panel restarts.
+KillMode=process
+
+[Install]
+WantedBy=default.target

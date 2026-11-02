@@ -1,0 +1,11 @@
+# {{ ansible_managed }}
+[Unit]
+Description={{ item.beskrivelse }} (kl. {{ item.tid }})
+
+[Timer]
+OnCalendar=*-*-* {{ item.tid }}:00
+# A morning the Pi was off, it runs when it is back.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

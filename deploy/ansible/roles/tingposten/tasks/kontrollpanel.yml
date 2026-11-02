@@ -1,0 +1,34 @@
+- name: Folder for user services
+  ansible.builtin.file:
+    path: "/home/{{ tingposten_bruker }}/.config/systemd/user"
+    state: directory
+    mode: "0755"
+
+- name: The control panel as a user service
+  ansible.builtin.template:
+    src: tingposten-admin.service.j2
+    dest: "/home/{{ tingposten_bruker }}/.config/systemd/user/tingposten-admin.service"
+    mode: "0644"
+  notify: Restart kontrollpanelet
+
+- name: The user's services start with the Pi (linger)
+  ansible.builtin.command: loginctl show-user {{ tingposten_bruker | quote }} -p Linger --value
+  register: tingposten_linger
+  changed_when: false
+  check_mode: false
+
+- name: Turn linger on (needs -K)
+  become: true
+  ansible.builtin.command: loginctl enable-linger {{ tingposten_bruker | quote }}
+  when: tingposten_linger.stdout != "yes"
+  changed_when: true
+  tags: [system]
+
+- name: The control panel runs and starts with the Pi
+  ansible.builtin.systemd_service:
+    name: tingposten-admin
+    scope: user
+    enabled: true
+    state: started
+    daemon_reload: true
+  environment: "{{ tingposten_systemd_env }}"

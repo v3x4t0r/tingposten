@@ -1,0 +1,31 @@
+- name: The secret files exist
+  ansible.builtin.stat:
+    path: "{{ tingposten_dir }}/{{ item }}"
+  loop: "{{ tingposten_hemmeligheter if tingposten_debatt else ['.env'] }}"
+  register: tingposten_hemmelig
+
+- name: Stop when one is missing (they are written by hand, see the READMEs)
+  ansible.builtin.fail:
+    msg: >-
+      {{ item.item }} mangler på {{ inventory_hostname }}. Lag den for hånd fra eksempelfilen
+      (deploy/README.md, deploy/debatt/README.md) og kjør igjen.
+  when: not item.stat.exists
+  loop: "{{ tingposten_hemmelig.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Only the owner can read them
+  ansible.builtin.file:
+    path: "{{ tingposten_dir }}/{{ item.item }}"
+    mode: "0600"
+  loop: "{{ tingposten_hemmelig.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+# The models run on the subscriptions through the CLIs; a key here would bill the API.
+- name: ANTHROPIC_API_KEY is empty in .env
+  ansible.builtin.command: grep -c '^ANTHROPIC_API_KEY=.' {{ (tingposten_dir ~ '/.env') | quote }}
+  register: tingposten_apinokkel
+  changed_when: false
+  failed_when: tingposten_apinokkel.stdout | int > 0
+  check_mode: false
