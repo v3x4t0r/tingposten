@@ -1,6 +1,8 @@
 - name: The secret files exist
   ansible.builtin.stat:
     path: "{{ tingposten_dir }}/{{ item }}"
+    get_checksum: false  # only whether it exists and its mode; nothing about the contents
+    get_mime: false
   loop: "{{ tingposten_hemmeligheter if tingposten_debatt else ['.env'] }}"
   register: tingposten_hemmelig
 

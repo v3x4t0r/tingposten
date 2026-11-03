@@ -117,3 +117,24 @@ def test_indexnow_sends_recent_pages_only(monkeypatch, tmp_path):
     assert treg.sendt == []
     monkeypatch.setattr(config, "SKJUL_FOR_SOK", True)
     assert synlighet.varsle_indexnow(tmp_path, session=okt) == 0 and len(okt.sendt) == 1
+
+
+def test_indexnow_refused_by_bing_says_what_it_means(monkeypatch, tmp_path, caplog):
+    monkeypatch.setattr(config, "SITE_URL", URL)
+    monkeypatch.setattr(config, "SKJUL_FOR_SOK", False)
+    monkeypatch.setattr(config, "INDEXNOW_NOKKEL", "abc123abc123")
+    (tmp_path / "sitemap.xml").write_text(synlighet.sitemap(URL, [("bergen/", date(2026, 10, 1))]))
+    kart = (tmp_path / "sitemap.xml").read_text()
+    svar = lambda kode, tekst="": type("R", (), {"status_code": kode, "text": tekst})()  # noqa: E731
+
+    class Okt:
+        def get(self, url, timeout):
+            return svar(200, kart if url.endswith("sitemap.xml") else "abc123abc123\n")
+
+        def post(self, url, json, timeout):
+            return svar(403, '{"errorCode":"UserForbiddedToAccessSite","message":"User is unauthorized"}')
+
+    assert synlighet.varsle_indexnow(tmp_path, idag=date(2026, 10, 1), session=Okt(), sov=lambda s: None) == 0
+    linje = caplog.records[-1].getMessage()
+    assert linje.startswith("IndexNow svarte 403")   # the panel's warning keys on this
+    assert "Bing Webmaster Tools" in linje and "Siden er publisert" in linje and "errorCode" not in linje

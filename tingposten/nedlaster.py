@@ -66,11 +66,13 @@ def mangler(items: list[dict], data_dir: Path = config.DATA_DIR) -> list[tuple[d
 
 
 def last_ned(items: list[dict], data_dir: Path = config.DATA_DIR, client=None) -> dict:
-    todo = mangler(items, data_dir)
     if not config.ALLOW_PDF_FETCH:
-        if todo:
-            log.info("%d PDF(s) missing; automatic download is off (config.ALLOW_PDF_FETCH)", len(todo))
-        return {"av": len(todo)}
+        # Not a count of what's missing: that counted every PDF of the year, needed or not
+        # (3.11: «554» next to «1 to fetch»). pdf-urler --mangler logs what is needed.
+        log.info("Automatisk nedlasting av PDF-er er av (Bergen ber roboter la dem være, config.ALLOW_PDF_FETCH). "
+                 "Det som mangler, står på neste linje.")
+        return {"av": True}
+    todo = mangler(items, data_dir)
 
     cap = getattr(config, "MAKS_PDF_PER_KJORING", 200)
     client = client or Fetcher()

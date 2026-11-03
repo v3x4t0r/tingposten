@@ -237,7 +237,10 @@ def varsle_indexnow(site_dir: Path, idag: date | None = None, session=None, **ve
     try:
         r = (session or requests).post(INDEXNOW, json=body, timeout=30)
         if r.status_code >= 300:
-            log.warning("IndexNow svarte %s: %s", r.status_code, r.text[:200])
+            grunn = (" (Bing har ikke godkjent nettstedet ennå: verifiser det i Bing Webmaster Tools)"
+                     if "UserForbidded" in r.text else f": {r.text[:200]}")
+            log.warning("IndexNow svarte %s, så Bing fikk ikke lista over endrede sider%s. Siden er publisert, "
+                        "og søkemotorene finner sidene i sitemapen likevel.", r.status_code, grunn)
             return 0
     except requests.RequestException as e:
         log.warning("IndexNow: %s", e)

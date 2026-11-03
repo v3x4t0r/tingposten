@@ -73,3 +73,15 @@ def test_codex_out_of_quota_is_named_with_the_date():
            "purchase more credits or try again at Nov 4th, 2026 8:38 AM.); claude:fable takes over for the rest of this run"]
     a = admin.oppsummer(run)["advarsler"]
     assert a == [a[0]] and "Codex har brukt opp kvoten sin til 4. november kl. 08.38" in a[0]
+
+
+def test_the_wording_from_3_11_reads_the_same():
+    run = """2026-11-03T08:07:51+01:00 start (sjekk)
+2026-11-03T08:07:51+01:00 == hent
+2026-11-03 08:07:52,000 INFO Bergen bystyre 2026: 369 saker hos kommunen. Nye: 2, nye vedtak: 1, andre endringer: 0, borte: 0
+2026-11-03 08:07:53,000 INFO Byrådet – saker avgjort av byrådet 2026: 245 saker hos kommunen. Nye: 0, nye vedtak: 0, andre endringer: 0, borte: 0
+2026-11-03T08:07:53+01:00 == last-ned
+2026-11-03 08:07:54,218 INFO Dokumenter som mangler: 3, fra 2 møter siden 3.8.2026
+2026-11-03T08:07:59+01:00 done""".splitlines()
+    assert admin.oppsummer(run)["punkter"] == ["Nytt hos Bergen kommune: Bergen bystyre (3).",
+                                               "3 dokumenter fra 2 møter kan hentes med «Last ned og publiser»."]
