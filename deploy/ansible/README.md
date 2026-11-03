@@ -41,6 +41,11 @@ Playbooken dekker:
   PDF-er, bygger; laster aldri ned Bergens PDF-er og publiserer bare med `PUBLISER`) og Stortinget
   kl. 07:30 (`tingposten_stortinget_kjoring`: bygger bare den private testkopien). Se dem med
   `systemctl --user list-timers`.
+- en kopi av kommentarene hver natt kl. 03:15 (`deploy/sikkerhetskopi.sh`, `tingposten_sikkerhetskopi`):
+  til `data/backup/debatt/` og til `tingposten_backup_kopi` (USB-disken, `/media/data/tingposten-backup`),
+  30 dager på hvert sted. Er disken ikke montert, feiler timeren, og kopien finnes bare på SD-kortet.
+  Tilbake: stopp kommentarserveren (`docker compose stop debatt`), kopier en `debatt-ÅÅÅÅ-MM-DD.db` til
+  `data/debatt/debatt.db`, slett `debatt.db-wal` og `debatt.db-shm`, og start den igjen.
 
 Den kan trygt kjøres flere ganger. På en Pi som er som beskrevet, endrer den ingenting.
 

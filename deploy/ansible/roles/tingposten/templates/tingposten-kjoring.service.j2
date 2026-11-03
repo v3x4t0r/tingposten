@@ -8,4 +8,7 @@ Description={{ item.beskrivelse }}
 Type=oneshot
 WorkingDirectory={{ item.mappe }}
 Environment=PATH=/home/{{ tingposten_bruker }}/.local/bin:/usr/local/bin:/usr/bin:/bin
+{% for navn, verdi in (item.miljo | default({})).items() %}
+Environment={{ navn }}={{ verdi }}
+{% endfor %}
 ExecStart=/usr/bin/bash {{ item.mappe }}/{{ item.skript }}

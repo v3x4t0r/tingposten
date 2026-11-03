@@ -12,3 +12,11 @@ tingposten_timere:
     skript: deploy/run-stortinget.sh
     tid: "{{ tingposten_stortinget_tid }}"
     aktiv: "{{ tingposten_stortinget_kjoring | bool }}"
+  - navn: tingposten-sikkerhetskopi
+    beskrivelse: "Tingposten: kopi av kommentarene hver natt (data/backup/debatt og den andre disken)"
+    mappe: "{{ tingposten_dir }}"
+    skript: deploy/sikkerhetskopi.sh
+    tid: "{{ tingposten_sikkerhetskopi_tid }}"
+    aktiv: "{{ tingposten_debatt | bool and tingposten_sikkerhetskopi | bool }}"
+    miljo:
+      TINGPOSTEN_BACKUP_KOPI: "{{ tingposten_backup_kopi }}"
