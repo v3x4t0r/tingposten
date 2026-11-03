@@ -34,3 +34,11 @@ def test_daily_runs_are_timers_that_never_download_bergens_pdfs_or_publish_stort
     assert "skript: deploy/run-stortinget.sh\n" in timere
     assert "ansible.builtin.cron" in (rolle / "tasks" / "daglig.yml").read_text()  # only to remove the old entries
     assert "state: absent" in (rolle / "tasks" / "daglig.yml").read_text()
+
+
+def test_the_comments_are_backed_up_every_night():
+    rolle = ANSIBLE / "roles" / "tingposten"
+    timere = (rolle / "vars" / "main.yml").read_text()
+    assert "skript: deploy/sikkerhetskopi.sh\n" in timere and "TINGPOSTEN_BACKUP_KOPI" in timere
+    assert "Environment={{ navn }}={{ verdi }}" in (rolle / "templates" / "tingposten-kjoring.service.j2").read_text()
+    assert "tingposten_backup_kopi: /media/data/tingposten-backup" in (ANSIBLE / "host_vars" / "pi.yml").read_text()
