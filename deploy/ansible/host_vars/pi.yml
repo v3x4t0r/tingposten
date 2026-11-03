@@ -8,5 +8,7 @@ tingposten_daglig_kjoring: true
 # The owner, 3.11.2026: the morning run publishes new cards on its own.
 tingposten_daglig_publiser: true
 tingposten_stortinget_kjoring: true
+# The comments' second copy: the USB disk (owner, 3.11.2026), so a dead SD card keeps them.
+tingposten_backup_kopi: /media/data/tingposten-backup
 # Stortinget lives on the branch `stortinget` in its own worktree until it is merged (issue #25).
 tingposten_stortinget_dir: /home/hemep/tingposten-stortinget

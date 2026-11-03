@@ -26,6 +26,11 @@ tingposten_stortinget_kjoring: false
 tingposten_stortinget_tid: "07:30"
 # Where the Stortinget run starts: the repo, or a worktree while the branch isn't merged.
 tingposten_stortinget_dir: "{{ tingposten_dir }}"
+# Nightly copy of the comments database (deploy/sikkerhetskopi.sh), when the comment server runs.
+# tingposten_backup_kopi: a folder on a second disk for one more copy ("" = only the SD card).
+tingposten_sikkerhetskopi: true
+tingposten_sikkerhetskopi_tid: "03:15"
+tingposten_backup_kopi: ""
 # The secret files stay on the Pi, written by hand (deploy/README.md, deploy/debatt/README.md).
 # The role checks they exist and are 0600; it never reads or prints them.
 tingposten_hemmeligheter:
