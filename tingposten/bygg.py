@@ -1051,6 +1051,22 @@ def nb_date_short(d: date, year: bool = False, short: bool = True) -> str:
     return f"{d.day}. {(MONTHS_SHORT if short else MONTHS)[d.month - 1]}" + (f" {d.year}" if year else "")
 
 
+MAKS_TITTEL = 70  # Bing Webmaster Tools, 3.11: longer page titles get cut or ignored by search engines
+
+
+def sidetittel(overskrift: str, sted: str = "Bergen kommune") -> str:
+    """A sak page's <title>: the headline, then where and «Tingposten», within MAKS_TITTEL.
+    Drops «Bergen kommune» when it doesn't fit, and shortens a long headline (the
+    kommune's own title, for a sak without a card) at a word, with «…»."""
+    overskrift = " ".join((overskrift or "").split())
+    for hale in (f" · {sted} · Tingposten", " · Tingposten"):
+        if len(overskrift) + len(hale) <= MAKS_TITTEL:
+            return overskrift + hale
+    plass = MAKS_TITTEL - len(hale) - 1
+    kort = overskrift[:plass + 1].rsplit(" ", 1)[0] if " " in overskrift[:plass + 1] else overskrift[:plass]
+    return kort.rstrip(" ,.;:–-(") + "…" + hale
+
+
 def tittel_html(text: str) -> Markup:
     """A headline, escaped, with 'Dokken–Lyngbø'-style compounds kept on one
     line and the no-break spaces of typo.typo."""
@@ -1111,6 +1127,7 @@ def _env() -> Environment:
     env.filters["rfc822"] = _rfc822
     env.filters["kort_dato"] = nb_date_short
     env.filters["tittel"] = tittel_html
+    env.filters["sidetittel"] = sidetittel
     env.filters["minikart"] = minikart
     env.filters["figur_tittel"] = figur_tittel
     env.filters["kildegrupper"] = kildegrupper

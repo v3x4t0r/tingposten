@@ -61,3 +61,10 @@ def test_years_to_fetch():
     assert years_to_fetch(date(2026, 10, 29)) == [2026]
     assert years_to_fetch(date(2027, 1, 15)) == [2026, 2027]
     assert years_to_fetch(date(2027, 3, 15)) == [2027]
+
+
+def test_a_changed_tag_alone_is_no_change():
+    # 3.11: Bergen changes «tag» on every item now and then; nothing reads it.
+    assert diff({ITEM["id"]: {**ITEM, "tag": "a"}}, [{**ITEM, "tag": "b"}], complete=True) == []
+    changes = diff({ITEM["id"]: {**ITEM, "tag": "a"}}, [{**ITEM, "tag": "b", "tittel": "Ny"}], complete=True)
+    assert changes[0]["felt"] == ["tittel"]

@@ -4,7 +4,8 @@ Store: data/bergen/agendapunkter/<utvalgId>.json, raw API items keyed by id.
 Log:   data/bergen/endringer.jsonl, one line per change:
          ny         – item seen for the first time
          vedtatt    – vedtakFilId went from null to an id ("something was decided")
-         endret     – any other field changed (lists the field names)
+         endret     – any other field changed (lists the field names); fields in
+                      IKKE_ENDRING don't count
          forsvunnet – item no longer returned by the API (kept in the store)
 """
 
@@ -18,6 +19,11 @@ from . import config
 from .bk360 import Client
 
 log = logging.getLogger(__name__)
+
+
+# Fields that change without anything happening to the sak. "tag" changes for every
+# item now and then (3.11: all 958 on the day's first fetch), and nothing reads it.
+IKKE_ENDRING = {"tag"}
 
 
 def years_to_fetch(today: date) -> list[int]:
@@ -37,7 +43,8 @@ def diff(old: dict[str, dict], new: list[dict], complete: bool) -> list[dict]:
             if item.get("vedtakFilId"):
                 changes.append(_change("vedtatt", item))
             continue
-        fields = sorted(k for k in item.keys() | before.keys() if item.get(k) != before.get(k))
+        fields = sorted(k for k in item.keys() | before.keys()
+                        if k not in IKKE_ENDRING and item.get(k) != before.get(k))
         if not fields:
             continue
         if before.get("vedtakFilId") is None and item.get("vedtakFilId"):
@@ -86,7 +93,8 @@ def run(years: list[int], utvalg_ids: list[str], data_dir: Path = config.DATA_DI
             _append_log(data_dir / "endringer.jsonl", now, changes)
             total_changes += len(changes)
             counts = {k: sum(c["type"] == k for c in changes) for k in ("ny", "vedtatt", "endret", "forsvunnet")}
-            log.info("%s %s: %d items, %s", config.TIER1.get(uid, uid), year, len(fetched), counts)
+            log.info("%s %s: %d saker hos kommunen. Nye: %d, nye vedtak: %d, andre endringer: %d, borte: %d",
+                     config.TIER1.get(uid, uid), year, len(fetched), *counts.values())
     return total_changes
 
 

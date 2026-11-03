@@ -59,7 +59,7 @@ def allowed(monkeypatch):
 def test_off_by_default_downloads_nothing(tmp_path):
     assert config.ALLOW_PDF_FETCH is False
     client, _ = fetcher([Response()])
-    assert nedlaster.last_ned([item("1/26")], tmp_path, client) == {"av": 2}
+    assert nedlaster.last_ned([item("1/26")], tmp_path, client) == {"av": True}
     assert client.session.urls == []
 
 

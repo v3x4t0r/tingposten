@@ -105,6 +105,7 @@ fi
 if [ "$MODUS" = manuell ] && [ -f data/bergen/last-ned-mangler.sh ]; then
   # Space our requests out after the agenda fetch.
   [ "$hentet" = no ] || sleep 60
+  log "henter dokumentene som mangler fra bergen.kommune.no"
   rc=0
   bash data/bergen/last-ned-mangler.sh || rc=$?
   if [ "$rc" -ne 0 ]; then

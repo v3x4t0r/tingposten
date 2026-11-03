@@ -648,3 +648,12 @@ def test_goatcounter_is_self_hosted_and_explained(tmp_path, data_dir, monkeypatc
     assert "Besøkstall" not in (tmp_path / "uten" / "om" / "index.html").read_text()
     redirects = tmp_path / "uten" / "_redirects"
     assert not redirects.exists() or "/count" not in redirects.read_text()
+
+
+def test_page_titles_fit_in_70_characters():
+    from tingposten.bygg import sidetittel
+    assert sidetittel("Ny plan flytter tunnelrampene") == "Ny plan flytter tunnelrampene · Bergen kommune · Tingposten"
+    assert sidetittel("Ny plan flytter tunnelrampene i Sandviken") == "Ny plan flytter tunnelrampene i Sandviken · Tingposten"
+    lang = sidetittel("Representantforslag fra Lars Alsaker (H), Lise Ramsøy (H), Knut Vindenes (H) om nye friområder")
+    assert len(lang) <= 70 and lang.endswith("… · Tingposten") and "(H)" in lang
+    assert len(sidetittel("x" * 200)) == 70

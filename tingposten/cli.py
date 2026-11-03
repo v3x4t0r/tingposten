@@ -1,6 +1,7 @@
 import argparse
 import json
 import logging
+import math
 import os
 import sys
 from datetime import date, datetime
@@ -236,7 +237,8 @@ def main(argv: list[str] | None = None) -> int:
         from . import nedlaster, pipeline
 
         counts = nedlaster.last_ned(pipeline.saker(config.DATA_DIR, args.utvalg, args.dato))
-        logging.info("last-ned: %s", counts)
+        if not counts.get("av"):
+            logging.info("last-ned: %s", counts)
         return 2 if counts.get("blokkert") else 0
     elif args.cmd == "kjor":
         from . import pipeline
@@ -451,9 +453,14 @@ def _pdf_mangler(args) -> int:
     # Protokoller published before the meeting's decision was added are fetched again.
     targets = pipeline.pdf_som_mangler(items, config.DATA_DIR)
     if oppdater := sum(1 for t in targets if t.get("oppdater")):
-        logging.info("%d protokoll(er) mangler møtets vedtak og hentes på nytt", oppdater)
+        logging.info("%s hentet før møtet var ferdig behandlet, og Bergen har ikke lagt inn vedtaket ennå. "
+                     "%s på nytt til vedtaket er der.",
+                     "1 protokoll er" if oppdater == 1 else f"{oppdater} protokoller er",
+                     "Den hentes" if oppdater == 1 else "De hentes")
     meetings = sorted({t["filename"].rsplit("/", 1)[0] for t in targets})
-    logging.info("%d PDF(s) to fetch across %d meeting(s)%s", len(targets), len(meetings), f" since {fra}" if fra else "")
+    fra_tekst = f" siden {date.fromisoformat(fra):%-d.%-m.%Y}" if fra else ""
+    logging.info("Dokumenter som mangler: %d, fra %d %s%s", len(targets), len(meetings),
+                 "møte" if len(meetings) == 1 else "møter", fra_tekst)
     for t in targets:
         print(f"{t['url']}\t{t['filename']}")
     if args.script:
@@ -461,9 +468,9 @@ def _pdf_mangler(args) -> int:
             args.script.parent.mkdir(parents=True, exist_ok=True)
             args.script.write_text(pdf.build_script(targets, dest=str(config.DATA_DIR / "pdf")))
             args.script.chmod(0o755)
-            minutes = round(len(targets) * 6 / 60)
-            logging.info("wrote %s (about %d min at the polite pace) — run it yourself: bash %s",
-                         args.script, minutes, args.script)
+            minutes = max(1, math.ceil(len(targets) * 6 / 60))
+            logging.info("Lagret listen i %s. «Last ned og publiser» i kontrollpanelet henter dem "
+                         "(ca. %d min, én om gangen), eller kjør: bash %s", args.script, minutes, args.script)
         elif args.script.exists():
             args.script.unlink()  # a stale script would fetch nothing anyway; don't leave it lying around
     return 0

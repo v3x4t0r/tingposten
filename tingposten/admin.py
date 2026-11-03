@@ -317,9 +317,12 @@ def laast(lock: Path) -> bool:
 
 # What a run did, in words (owner 1.11: «Sjekk nå» seemed to give nothing, and the
 # log's «klassifiser: 87 saker» read like 87 new saker). Read from run-daily.sh's log.
-_HENT = re.compile(r"INFO (.+?) \d{4}: \d+ items, \{'ny': (\d+), 'vedtatt': (\d+)")
+# Both wordings: before 3.11 «369 items, {'ny': 0, 'vedtatt': 0, …}», from 3.11 «369 saker hos
+# kommunen. Nye: 0, nye vedtak: 0, …» (older logs are still shown).
+_HENT = re.compile(r"INFO (.+?) \d{4}: \d+ (?:items, \{'ny': |saker hos kommunen\. Nye: )(\d+),"
+                   r" (?:'vedtatt'|nye vedtak): (\d+)")
 _HENT_HOPPET = "hent: the agenda was fetched less than 30 minutes ago"
-_PDF = re.compile(r"(\d+) PDF\(s\) to fetch across (\d+) meeting")
+_PDF = re.compile(r"(?:(\d+) PDF\(s\) to fetch across|Dokumenter som mangler: (\d+), fra) (\d+) (?:meeting|møte)")
 _RESULTAT = re.compile(r"INFO (skriv|artikkel|omskriv)( artikkel)?: (\{.*\})$")
 _VEDLEGGSLISTER = re.compile(r"vedleggslister: (\d+) saker, (\d+) vedlegg")
 _VEDLEGG_LEST = re.compile(r"INFO vedlegg: \{'antall': \{[^}]*'lest': (\d+)")
@@ -349,7 +352,7 @@ def oppsummer(run: list[str], forrige_bygg: tuple[int, int] | None = None) -> di
         punkter.append("Nytt hos Bergen kommune: " + ", ".join(f"{organ} ({n})" for organ, n in endret) + "."
                        if endret else "Ingen nye saker eller vedtak hos Bergen kommune.")
     if m := _PDF.search(tekst):
-        n, moter_ = int(m.group(1)), _flertall(int(m.group(2)), "møte", "møter")
+        n, moter_ = int(m.group(1) or m.group(2)), _flertall(int(m.group(3)), "møte", "møter")
         if not n:
             punkter.append("Ingen nye dokumenter å hente.")
         elif "start (manuell)" in run[0] and "PDF download stopped" not in tekst:
