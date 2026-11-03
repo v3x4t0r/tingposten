@@ -18,6 +18,8 @@ tingposten_debatt: true
 # publishes only if the PUBLISER file exists.
 tingposten_daglig_kjoring: false
 tingposten_daglig_tid: "06:00"
+# The morning run publishes on its own (the PUBLISER file in the repo root). STOP still wins.
+tingposten_daglig_publiser: false
 # Stortinget (deploy/run-stortinget.sh, issue #25): fetch, write and check, build the private
 # test copy. Never publishes.
 tingposten_stortinget_kjoring: false

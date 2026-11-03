@@ -5,6 +5,8 @@ tingposten_dir: /home/hemep/tingposten
 # never downloads PDFs or publishes on its own (PUBLISER is not set); Stortinget's builds only
 # the private test copy. Turn on here and run site.yml.
 tingposten_daglig_kjoring: true
+# The owner, 3.11.2026: the morning run publishes new cards on its own.
+tingposten_daglig_publiser: true
 tingposten_stortinget_kjoring: true
 # Stortinget lives on the branch `stortinget` in its own worktree until it is merged (issue #25).
 tingposten_stortinget_dir: /home/hemep/tingposten-stortinget
