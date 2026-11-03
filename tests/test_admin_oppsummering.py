@@ -85,3 +85,15 @@ def test_the_wording_from_3_11_reads_the_same():
 2026-11-03T08:07:59+01:00 done""".splitlines()
     assert admin.oppsummer(run)["punkter"] == ["Nytt hos Bergen kommune: Bergen bystyre (3).",
                                                "3 dokumenter fra 2 møter kan hentes med «Last ned og publiser»."]
+
+
+def test_a_run_stopped_by_a_model_limit_says_it_was_not_published():
+    run = ["2026-11-03T18:01:03+01:00 start (manuell)", "2026-11-03T18:08:31+01:00 == kjor",
+           "2026-11-03 18:37:31,617 ERROR step failed for 355/26",
+           "tingposten.llm.LLMError: claude failed (success): You've hit your 5-hour limit · resets 10:30pm (Europe/Oslo)",
+           "2026-11-03T18:37:48+01:00 warning: a model limit stopped the run; the next run finishes it",
+           "2026-11-03T18:37:48+01:00 == bygg", "2026-11-03T18:38:24+01:00 == publiser",
+           "2026-11-03T18:38:24+01:00 model limit reached: site/ built, not published (the next run publishes when it is done)"]
+    o = admin.oppsummer(run)
+    assert "Publisert på tingposten.no." not in o["punkter"]
+    assert any(a.startswith("Ikke publisert: en modell nådde grensen") for a in o["advarsler"])

@@ -122,7 +122,13 @@ for cli in claude codex; do
 done
 rc=0
 run kjor || rc=$?
-if [ "$rc" -ne 0 ]; then
+grense=no
+if [ "$rc" -eq 3 ]; then
+  # A model's limit stopped the writing or checking: the site is built, but not
+  # published, so a half-finished run never goes out (owner, 3.11).
+  grense=yes
+  log "warning: a model limit stopped the run; the next run finishes it"
+elif [ "$rc" -ne 0 ]; then
   log "warning: kjor exit $rc (often a model session limit); the next run redoes what is missing"
 fi
 
@@ -140,6 +146,11 @@ fi
 # 5. Publishing is opt-in: `touch PUBLISER` in the repo root turns it on for
 # the daily run. A run started from the panel publishes without it.
 steg publiser
+if [ "${grense:-no}" = yes ]; then
+  log "model limit reached: site/ built, not published (the next run publishes when it is done)"
+  log "done"
+  exit 0
+fi
 if [ "$MODUS" = daglig ] && [ ! -e PUBLISER ]; then
   log "PUBLISER not set: site/ built locally, not published"
   log "done"

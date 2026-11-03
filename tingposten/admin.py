@@ -407,6 +407,9 @@ def oppsummer(run: list[str], forrige_bygg: tuple[int, int] | None = None) -> di
         punkter.append("Bygget, men ikke publisert: daglig publisering er av.")
     elif "STOP found" in tekst:
         advarsler.append("STOP er satt, så ingenting ble publisert.")
+    elif "model limit reached" in tekst:
+        advarsler.append("Ikke publisert: en modell nådde grensen sin før kjøringen var ferdig. Neste kjøring "
+                         "gjør resten og publiserer, eller trykk «Last ned og publiser» når grensen er nullstilt.")
     if m := _INDEXNOW.search(tekst):
         punkter.append(f"Meldte {m.group(1)} sider til Bing (IndexNow).")
 
