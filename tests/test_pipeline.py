@@ -323,3 +323,15 @@ def test_no_card_until_the_protokoll_covers_the_meeting(tmp_path, monkeypatch):
     monkeypatch.setattr(pipeline.protokoll, "parse_pdf", lambda path: {"motedato": "2026-10-27"})
     assert pipeline.todo("skriv", [a], tmp_path) == [a]
     assert pipeline.ufullstendige_protokoller([a], tmp_path, idag=datetime.date(2026, 10, 29)) == []
+
+
+def test_failures_from_a_model_limit_are_counted_anywhere_in_the_result():
+    from tingposten.pipeline import stoppet_av_grense
+    result = {"skriv": {"antall": {"skrevet": 3}, "feil": []},
+              "artikkelsjekk": {"antall": {"feil": 2}, "feil": [
+                  "341/26: feil: claude failed (success): You've hit your 5-hour limit · resets 10:30pm",
+                  "343/26: feil: unreadable PDF"]},
+              "omskriv": {"omskriv/sjekk": {"feil": ["x: You've hit your usage limit. Upgrade to Pro"]}},
+              "rediger": {"redigert": 3, "venter": 1}}
+    assert stoppet_av_grense(result) == 2
+    assert stoppet_av_grense({"skriv": {"feil": ["x: timeout"]}}) == 0

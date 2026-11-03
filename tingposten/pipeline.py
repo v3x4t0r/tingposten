@@ -27,6 +27,7 @@ config). Until then missing PDFs are reported, not downloaded.
 import json
 import logging
 import math
+import re
 from collections import defaultdict
 from datetime import date, timedelta
 from pathlib import Path
@@ -209,6 +210,21 @@ def pdf_som_mangler(items: list[dict], data_dir: Path = config.DATA_DIR) -> list
     out = [t for t in alle if not (data_dir / "pdf" / t["filename"]).exists()]
     oppdater = {pdf.filename(i, "protokoll") for i in ufullstendige_protokoller(items, data_dir)}
     return out + [{**t, "oppdater": True} for t in alle if t["filename"] in oppdater]
+
+
+# A model subscription's limit, in a step's failure: «You've hit your 5-hour limit · resets
+# 10:30pm», Codex's «You've hit your usage limit». The run is then unfinished (3.11: 13
+# article checks failed and the site was published anyway; the owner wants it to stop).
+GRENSE = re.compile(r"hit your [\w-]+ limit")
+
+
+def stoppet_av_grense(result) -> int:
+    """How many saker failed in `result` (kjor's return) because a model hit its limit."""
+    if isinstance(result, dict):
+        return sum(stoppet_av_grense(v) for v in result.values())
+    if isinstance(result, list):  # a step's «feil»: "341/26: feil: claude failed … limit …"
+        return sum(1 for f in result if isinstance(f, str) and GRENSE.search(f))
+    return 0
 
 
 def kjor(data_dir: Path = config.DATA_DIR, utvalg: str | None = None, dato: str | None = None,

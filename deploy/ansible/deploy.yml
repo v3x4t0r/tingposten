@@ -127,7 +127,7 @@
 
     - name: Whether STOP stopped the publish (the run's own lines in today's log)
       ansible.builtin.shell: >-
-        tac data/logs/$(date +%F).log | sed '/ start (publiser)$/q' | grep -c 'STOP found' || true
+        tac data/logs/$(date +%F).log | sed '/ start (publiser)$/q' | grep -c 'STOP found\|model limit reached' || true
       args:
         chdir: "{{ tingposten_dir }}"
       register: stoppet
@@ -142,4 +142,4 @@
           - "Python-miljø synket: {{ 'ja' if python_endret else 'nei' }}"
           - "Kontrollpanelet startet på nytt: {{ 'ja' if (kode_endret and tingposten_kontrollpanel) else 'nei' }}"
           - "Kommentarserveren bygget på nytt: {{ 'ja' if (debatt_endret and tingposten_debatt) else 'nei' }}"
-          - "Siden bygget og publisert: {{ 'nei, STOP er satt (bygget, ikke publisert)' if (stoppet.stdout | default('0') | int > 0) else 'ja (se kontrollpanelet / data/logs)' if (publiser | bool and not ansible_check_mode) else 'nei' }}"
+          - "Siden bygget og publisert: {{ 'nei, STOP er satt eller en modell nådde grensen (bygget, ikke publisert; se loggen)' if (stoppet.stdout | default('0') | int > 0) else 'ja (se kontrollpanelet / data/logs)' if (publiser | bool and not ansible_check_mode) else 'nei' }}"

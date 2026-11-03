@@ -246,7 +246,11 @@ def main(argv: list[str] | None = None) -> int:
         steg = tuple(args.steg.split(",")) if args.steg else pipeline.STEG
         if unknown := set(steg) - set(pipeline.STEG):
             parser.error(f"unknown steg: {', '.join(sorted(unknown))}")
-        pipeline.kjor(utvalg=args.utvalg, dato=args.dato, steg=steg, parallel=args.parallel, fra=args.fra)
+        result = pipeline.kjor(utvalg=args.utvalg, dato=args.dato, steg=steg, parallel=args.parallel, fra=args.fra)
+        if n := pipeline.stoppet_av_grense(result):
+            logging.warning("Modellgrensen er nådd: %d %s ble ikke ferdig. Neste kjøring tar resten.",
+                            n, "sak" if n == 1 else "saker")
+            return 3
     elif args.cmd == "utgave":
         from . import utgave
 
