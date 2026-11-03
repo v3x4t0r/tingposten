@@ -49,3 +49,11 @@
   loop: "{{ tingposten_timere }}"
   loop_control:
     label: "{{ item.navn }}: {{ 'på' if item.aktiv else 'av' }}"
+
+- name: The morning run publishes on its own, or only builds (the PUBLISER file; STOP still wins)
+  ansible.builtin.file:
+    path: "{{ tingposten_dir }}/PUBLISER"
+    state: "{{ 'touch' if tingposten_daglig_publiser | bool else 'absent' }}"
+    mode: "0644"
+    access_time: preserve
+    modification_time: preserve
