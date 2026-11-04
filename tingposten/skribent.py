@@ -26,7 +26,7 @@ from pathlib import Path
 from . import config, kildetekst, pdf, redaktor
 from .llm import fence, obj, read_json, run_parallel, write_json
 
-PROMPT_VERSJON = "skribent-4"  # -4: attachment excerpts; -3: written ingress, word caps, plain-language status, body with roles
+PROMPT_VERSJON = "skribent-5"  # -5: the sak's route in «bakgrunn»; -4: attachment excerpts; -3: written ingress, word caps, plain-language status, body with roles
 EKSEMPLER = Path(__file__).parent / "eksempler" / "kort"
 
 # The limits are the redaktør's (it rejects what breaks them); the writer only aims at them.
@@ -170,7 +170,12 @@ role ("rolle"), in this order; skip a role the documents give nothing for; use e
   "begrunnelse" the proposer's stated reasons (byrådet's, the administration's or the recommending body's)
                 and, where the protokoll's merknader state them, the reasons of those who voted differently,
                 each attributed to its party.
-  "bakgrunn"    earlier decisions, hearings and alternatives that were weighed, in time order.
+  "bakgrunn"    earlier decisions, hearings and alternatives that were weighed, in time order. Include the
+                sak's route as the PROTOKOLL lists it below today's decision (newest first there): which
+                committee or council handled it and when, what it recommended or asked for, and every
+                postponement with its stated reason ("Utvalg for miljø og byutvikling ba om mer informasjon
+                10. september og innstilte deretter på alternativ A"). A step that only took the sak "til
+                orientering" gets a clause at most.
   "videre"      what happens next: deadlines, who decides what, what is still open.
 The templates set a fixed sidehead above each role; write no headline and no sidehead yourself.
 
