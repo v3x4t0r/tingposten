@@ -657,3 +657,21 @@ def test_page_titles_fit_in_70_characters():
     lang = sidetittel("Representantforslag fra Lars Alsaker (H), Lise Ramsøy (H), Knut Vindenes (H) om nye friområder")
     assert len(lang) <= 70 and lang.endswith("… · Tingposten") and "(H)" in lang
     assert len(sidetittel("x" * 200)) == 70
+
+
+def test_search_page_and_index(site):
+    site_dir, stats = site
+    html = (site_dir / "bergen" / "sok" / "index.html").read_text()
+    assert 'data-sok="indeks.json"' in html and "static/sok.js" in html
+    assert '<meta name="robots" content="noindex, nofollow">' in html
+    # The menu on every page ends with Søk, after Om.
+    om = (site_dir / "om" / "index.html").read_text()
+    assert om.index(">Om</a>") < om.index("Søk</a>")
+    indeks = json.loads((site_dir / "bergen" / "sok" / "indeks.json").read_text())
+    assert len(indeks) == stats["saker"]
+    for rad in indeks:
+        assert set(rad) == {"t", "i", "u", "d", "dt", "o", "n", "e"}
+        assert (site_dir / rad["u"] / "index.html").exists()
+    assert [r["d"] for r in indeks] == sorted((r["d"] for r in indeks), reverse=True)
+    sitemap = site_dir / "sitemap.xml"
+    assert not sitemap.exists() or "bergen/sok/" not in sitemap.read_text()
