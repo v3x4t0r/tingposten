@@ -225,6 +225,11 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
         write(i["side"] + "index.html", "innlegg.html", side="innlegg", i=i, sak=sak_etter_key.get(i["sak"]),
               andre=[x for x in innlegg if x is not i][:4], endret=i["dato"])
     write("bergen/debatt/index.html", "debatt.html", side="debatt", innlegg=innlegg, maks_tegn=innlegg_mod.MAKS_TEGN)
+    # Search: the page and the index its script reads (every sak with a page, and the debattinnlegg).
+    # A result list is nothing for search engines, so the page stays out of the sitemap.
+    write("bergen/sok/index.html", "sok.html", side="sok", noindex=True)
+    (tmp / "bergen" / "sok" / "indeks.json").write_text(
+        json.dumps(sok_indeks(saker, innlegg), ensure_ascii=False, separators=(",", ":")))
     if env.globals["debatt"]:
         from .debatt.regler import REGLER, STRENGE
 
@@ -292,6 +297,20 @@ _EKSTERNE = {"jev": "TypeSafe (Jev)", "claude": "Anthropic (Claude)"}
 
 def _eksterne_moderatorer() -> list[str]:
     return [_EKSTERNE[m] for m in getattr(config, "DEBATT_MODERATOR", ()) if m in _EKSTERNE]
+
+
+def sok_indeks(saker: list[dict], innlegg: list[dict] = ()) -> list[dict]:
+    """bergen/sok/indeks.json, read by sok.js: short keys to keep it small (hundreds of saker).
+    t = headline, i = ingress (one sentence), u = page under the site root, d = date (sorting),
+    dt = date as written, o = organ, n = number, e = tema. Newest first, so ties keep that order."""
+    rader = [{"t": s_["overskrift"], "i": forste_setning(s_["dek"]) if s_["dek"] else "", "u": s_["side"],
+              "d": s_["dato"].isoformat(), "dt": s_["dato_tekst"], "o": s_["organ_kort"], "n": s_["nr_etikett"],
+              "e": s_["tema_navn"]} for s_ in saker]
+    rader += [{"t": i["tittel"], "i": i["avsnitt"][0] if i["avsnitt"] else "", "u": i["side"],
+               "d": i["dato"].isoformat(), "dt": nb_date(i["dato"]), "o": "Debattinnlegg", "n": i["forfatter"],
+               "e": "Debatt"} for i in innlegg]
+    rader.sort(key=lambda r: r["d"], reverse=True)
+    return rader
 
 
 def skriv_sak_indeks(saker: list[dict], debatt_dir: Path, innlegg: list[dict] = ()) -> Path:

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{# Search (5.11): a box and a result list filled by sok.js from indeks.json next to this page.
+   Everything happens in the reader's browser: no request leaves the site, nothing is logged. #}
+{% block title %}Søk · Tingposten{% endblock %}
+{% block description %}Søk i vedtak fra Bergen kommune og i debattinnleggene.{% endblock %}
+{% block hovedklasse %}listeside sokside{% endblock %}
+{% block main %}
+<header class="sidehode">
+  <h1 class="side-tittel">Søk</h1>
+  <p class="side-ingress">Søk i overskrifter, ingresser og saksnummer for alle vedtak Tingposten har omtalt, og i debattinnleggene. Søket skjer i nettleseren din.</p>
+</header>
+<form class="sok-skjema" role="search" action="" method="get" data-sok="indeks.json">
+  <label for="sok-felt" class="skjult">Søkeord</label>
+  <input id="sok-felt" type="search" name="q" autocomplete="off" spellcheck="false" placeholder="For eksempel bybane, barnehage eller 266/26" autofocus>
+  <button type="submit">Søk</button>
+</form>
+<p class="sok-status" data-sok-status aria-live="polite"></p>
+<noscript><p class="tomt">Søket trenger JavaScript. Uten det finner du sakene under <a href="{{ root }}bergen/i-ar/alle/">alle vedtak i år</a> og <a href="{{ root }}bergen/moter/">møtene</a>.</p></noscript>
+<ol class="sok-treff rader" data-sok-treff></ol>
+{% endblock %}

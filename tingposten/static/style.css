@@ -973,3 +973,21 @@ main > .sidehode:first-child { padding-top: 38px; }
 .testpanel-funn button { padding: 5px 11px; font: 600 0.8125rem/1.2 var(--sans); color: var(--papir); background: var(--blekk);
   border: 1px solid var(--blekk); border-radius: 3px; cursor: pointer; }
 .testpanel.gjennomgang .testpanel-sak:not(.har-funn) { display: none; }
+
+/* === Search (5.11): the search box and its result list (Søk sits before Om in the menu) === */
+.sok-skjema { display: flex; gap: 8px; max-width: 40em; margin: 6px 0 10px; }
+.sok-skjema input[type="search"] { flex: 1 1 10em; min-width: 0; padding: 9px 12px; font: 400 1.0625rem/1.45 var(--serif); color: var(--blekk);
+  background: var(--papir); border: 1px solid var(--linje-2); border-radius: 2px; -webkit-appearance: none; appearance: none; }
+.sok-skjema input:focus-visible { outline: 3px solid var(--fokus); outline-offset: 0; }
+.sok-skjema button { font: 600 0.875rem/1.2 var(--sans); color: var(--papir); background: var(--blekk);
+  border: 1px solid var(--blekk); border-radius: 2px; padding: 8px 16px; cursor: pointer; }
+.sok-status { margin: 0 0 6px; min-height: 1.5em; font: 400 0.9375rem/1.5 var(--sans); color: var(--dempet); }
+.sok-treff { list-style: none; margin: 0; padding: 0; }
+.sok-treff:empty { display: none; }
+.sok-treff .rad-tittel { font-size: 1.375rem; line-height: 1.15; }
+.sok-treff mark { background: var(--merket); color: inherit; padding: 0 0.05em; }
+.skjult { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media print { .sok-skjema { display: none; } }
+/* Five menu items must fit on one line on a phone (390 px): tighter gaps there. */
+@media (max-width: 479px) { .meny { gap: 2px 16px; } }
+@media (max-width: 374px) { .meny { gap: 2px 11px; font-size: 1rem; letter-spacing: 0.04em; } }

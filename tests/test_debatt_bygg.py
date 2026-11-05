@@ -122,7 +122,7 @@ def test_debatt_page_innlegg_and_login_link(monkeypatch, tmp_path, data_dir):  #
     forside = (site / "bergen/index.html").read_text()
     # menu: Forside · Debatt · Møter · Om, and "Logg inn" in the corner; the script on every page
     meny = re.search(r'<nav class="meny"[^>]*>(.*?)</nav>', forside, re.S).group(1)
-    assert re.findall(r">([^<]+)</a>", meny) == ["Forside", "Debatt", "Møter", "Om"]
+    assert re.findall(r">([^<]+)</a>", meny) == ["Forside", "Debatt", "Møter", "Søk", "Om"]
     assert '<a href="../bergen/debatt/#konto" data-konto-lenke>Logg inn</a>' in forside and "static/debatt.js" in forside
     side = (site / "bergen/debatt/index.html").read_text()
     assert "Bybanen må til Åsane nå" in side and "Kari Nordmann, lærer, bor i Åsane" in side
