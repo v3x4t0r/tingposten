@@ -974,8 +974,7 @@ main > .sidehode:first-child { padding-top: 38px; }
   border: 1px solid var(--blekk); border-radius: 3px; cursor: pointer; }
 .testpanel.gjennomgang .testpanel-sak:not(.har-funn) { display: none; }
 
-/* === Search (5.11): the menu's Søk link, the search box and its result list === */
-.meny .meny-sok .ikon { width: 0.8em; height: 0.8em; margin-right: 0.35em; vertical-align: -0.05em; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
+/* === Search (5.11): the search box and its result list (Søk sits before Om in the menu) === */
 .sok-skjema { display: flex; gap: 8px; max-width: 40em; margin: 6px 0 10px; }
 .sok-skjema input[type="search"] { flex: 1 1 10em; min-width: 0; padding: 9px 12px; font: 400 1.0625rem/1.45 var(--serif); color: var(--blekk);
   background: var(--papir); border: 1px solid var(--linje-2); border-radius: 2px; -webkit-appearance: none; appearance: none; }

@@ -664,9 +664,9 @@ def test_search_page_and_index(site):
     html = (site_dir / "bergen" / "sok" / "index.html").read_text()
     assert 'data-sok="indeks.json"' in html and "static/sok.js" in html
     assert '<meta name="robots" content="noindex, nofollow">' in html
-    # The menu on every page ends with Søk, after Om.
+    # The menu on every page has Søk right before Om, as plain text (no icon).
     om = (site_dir / "om" / "index.html").read_text()
-    assert om.index(">Om</a>") < om.index("Søk</a>")
+    assert ">Søk</a><a " in om and om.index(">Søk</a>") < om.index(">Om</a>")
     indeks = json.loads((site_dir / "bergen" / "sok" / "indeks.json").read_text())
     assert len(indeks) == stats["saker"]
     for rad in indeks:

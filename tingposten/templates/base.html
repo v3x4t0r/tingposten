@@ -37,12 +37,11 @@
 <symbol id="i-kr" viewBox="0 0 16 16"><rect x="1.5" y="4" width="13" height="8" rx="1.5"/><circle cx="8" cy="8" r="1.9"/></symbol>
 <symbol id="i-bakgrunn" viewBox="0 0 16 16"><rect x="2.5" y="1.8" width="11" height="12.4" rx="1.6"/><path d="M5.2 5.3h5.6M5.2 8h5.6M5.2 10.7h3.4"/></symbol>
 <symbol id="i-dok" viewBox="0 0 16 16"><path d="M4 1.8h5.2l3 3v9.4H4z"/><path d="M9 1.8v3.2h3.2"/></symbol>
-<symbol id="i-sok" viewBox="0 0 16 16"><circle cx="6.8" cy="6.8" r="4.3"/><path d="M10 10l4.2 4.2"/></symbol>
 </svg>
 <a class="hopp" href="#innhold">Hopp til innholdet</a>
 {# "page" on the page itself; "true" on a page inside the section (one meeting under Møter). #}
 {% set meny %}
-<a href="{{ root }}bergen/"{% if side == "forside" %} aria-current="page"{% endif %}>Forside</a><a href="{{ root }}bergen/debatt/"{% if side == "debatt" %} aria-current="page"{% elif side == "innlegg" %} aria-current="true"{% endif %}>Debatt</a><a href="{{ root }}bergen/moter/"{% if side == "moter" %} aria-current="page"{% elif side == "mote" %} aria-current="true"{% endif %}>Møter</a><a href="{{ root }}om/"{% if side == "om" %} aria-current="page"{% endif %}>Om</a><a class="meny-sok" href="{{ root }}bergen/sok/"{% if side == "sok" %} aria-current="page"{% endif %}><svg class="ikon" aria-hidden="true" focusable="false"><use href="#i-sok"/></svg>Søk</a>
+<a href="{{ root }}bergen/"{% if side == "forside" %} aria-current="page"{% endif %}>Forside</a><a href="{{ root }}bergen/debatt/"{% if side == "debatt" %} aria-current="page"{% elif side == "innlegg" %} aria-current="true"{% endif %}>Debatt</a><a href="{{ root }}bergen/moter/"{% if side == "moter" %} aria-current="page"{% elif side == "mote" %} aria-current="true"{% endif %}>Møter</a><a href="{{ root }}bergen/sok/"{% if side == "sok" %} aria-current="page"{% endif %}>Søk</a><a href="{{ root }}om/"{% if side == "om" %} aria-current="page"{% endif %}>Om</a>
 {% endset %}
 {# One masthead on every page, as in a printed paper: the nameplate in a double frame between two ears.
    Narrow screens hide the ears and set the name smaller, so the headline is on the first screen. #}
