@@ -863,6 +863,103 @@ class InnleggKo:
             return 502, {"melding": "E-posten kunne ikke sendes. Prøv igjen."}
 
 
+class LaereTest:
+    """«Kjør test» under the comment list: the editor's labelled examples (laeresett) run
+    through the live moderator (Jev, key from deploy/debatt/debatt.env) in a background
+    thread. The result is scored with testsett.rapport and kept in data/debatt/test/ like a
+    CLI run; the panel shows the score and the examples the model still gets wrong."""
+
+    def __init__(self, debatt: "DebattKo", root: Path = config.ROOT, moderator=None, test_dir: Path | None = None):
+        self.debatt, self.root = debatt, root
+        self._moderator = moderator  # tests: any Moderator; otherwise Jev with the server's key
+        self.test_dir = test_dir or config.DEBATT_DIR / "test"
+        self._traad: threading.Thread | None = None
+        self._feil: str | None = None
+        self._siste: Path | None = None
+
+    def moderator(self):
+        if self._moderator is None:
+            from .debatt.moderering import Jev
+
+            nokkel = debatt_miljo(self.root).get("TYPESAFE_API_KEY") or None
+            self._moderator = Jev(config.DEBATT_JEV_URL, config.DEBATT_JEV_MODELL, nokkel, config.DEBATT_JEV_MODUS)
+        return self._moderator
+
+    def pagar(self) -> bool:
+        return self._traad is not None and self._traad.is_alive()
+
+    def _nyeste(self) -> Path | None:
+        """The newest stored run (this panel's or the CLI's) for the moderator in use."""
+        if self._siste and self._siste.exists():
+            return self._siste
+        navn = self.moderator().name.replace(":", "_").replace("/", "_")
+        filer = sorted(self.test_dir.glob(f"{navn}-*.jsonl")) if self.test_dir.exists() else []
+        return filer[-1] if filer else None
+
+    def status(self) -> dict:
+        from .debatt import testsett
+        from .debatt.regler import REGLER
+
+        t = self.debatt.tjeneste()
+        if t is None:
+            return {"aktiv": False}
+        sett = t.laeresett()
+        fasit = {i["id"]: {"regel": i["forslag"]} for i in sett}
+        ut = {"aktiv": True, "eksempler": len(sett), "pagar": self.pagar(), "feil": self._feil,
+              "modell": self.moderator().name, "har_nokkel": bool(getattr(self.moderator(), "nokkel", True)),
+              "resultat": None}
+        fil = self._nyeste()
+        if fil and sett:
+            resultat = testsett.les_resultat(fil)
+            etter_id = {r["id"]: r for r in resultat}
+            dekket = [i for i in sett if i["id"] in etter_id]
+            r = testsett.rapport(resultat, dekket, fasit)
+            konfig = r["terskler"].get("konfig") or r["terskler"].get("etikett") or {}
+            gale = []
+            for i in dekket:
+                svar = etter_id[i["id"]]
+                if "feil" in svar or svar["regel"] == i["forslag"]:
+                    continue
+                gale.append({"id": int(i["id"][1:]), "tekst": i["tekst"], "redaktor": i["forslag"], "modell": svar["regel"],
+                             "sikkerhet": (svar.get("sannsynligheter") or {}).get(svar["regel"]),
+                             "redaktor_navn": REGLER[i["forslag"]][0], "modell_navn": REGLER.get(svar["regel"], (svar["regel"],))[0]})
+            ut["resultat"] = {
+                "tid": datetime.fromtimestamp(fil.stat().st_mtime, timezone.utc).isoformat(timespec="seconds"),
+                "n": r["n"], "ikke_testet": len(sett) - len(dekket), "feil": r["feil"],
+                "riktig": round(r["regel_treff"] * r["n"]) if r["regel_treff"] is not None and r["n"] else 0,
+                "farlige_slipp": konfig.get("farlige_slipp", 0), "feil_stoppet": konfig.get("feil_stoppet", 0),
+                "til_redaktor": konfig.get("redaktor", 0), "kostnad_usd": round(sum(x.get("kostnad_usd", 0) for x in resultat), 5),
+                "gale": gale, "tabell": testsett.tabell({r["modell"] or fil.stem: r})}
+        return ut
+
+    def handle(self, body: dict) -> tuple[int, dict]:
+        if body.get("handling") != "test":
+            return 400, {"melding": "Ugyldig."}
+        t = self.debatt.tjeneste()
+        if t is None:
+            return 400, {"melding": "Ingen kommentarbase."}
+        if self.pagar():
+            return 409, {"melding": "Testen kjører allerede."}
+        sett = t.laeresett()
+        if not sett:
+            return 400, {"melding": "Ingen eksempler ennå. Merk kommentarer med «OK» eller «Ikke ok» først."}
+        if not getattr(self.moderator(), "nokkel", True) and not getattr(self.moderator(), "lokal", False):
+            return 400, {"melding": "TYPESAFE_API_KEY mangler i deploy/debatt/debatt.env."}
+        self._feil = None
+        self._traad = threading.Thread(target=self._kjor, args=(sett,), name="laeretest", daemon=True)
+        self._traad.start()
+        return 200, {"melding": f"Tester {len(sett)} eksempler …"}
+
+    def _kjor(self, sett: list[dict]) -> None:
+        from .debatt import testsett
+
+        try:
+            self._siste = testsett.kjor(self.moderator(), sett, self.test_dir.parent)
+        except Exception as e:  # shown in the panel; the thread must end cleanly
+            log.exception("laeretest failed")
+            self._feil = f"Testen feilet: {e}"
+
+
 class TestpanelKo:
     """The test panel's testers, invite links, meetings and results (debatt/testpanel.py),
     in the comment server's database. An invite link is shown once, when it is made."""
@@ -934,13 +1031,15 @@ class TestpanelKo:
 def make_server(vert: str = "127.0.0.1", port: int = 8787, passord: str | None = None,
                 kjorer: Kjorer | None = None, site_dir: Path = config.SITE_DIR,
                 idag: date | None = None, debatt: DebattKo | None = None,
-                innlegg: InnleggKo | None = None, testpanel: TestpanelKo | None = None) -> ThreadingHTTPServer:
+                innlegg: InnleggKo | None = None, testpanel: TestpanelKo | None = None,
+                laeretest: LaereTest | None = None) -> ThreadingHTTPServer:
     if not passord and not _loopback(vert):
         raise ValueError(f"set {PASSORD_ENV} in .env before the panel listens on {vert}")
     kjorer = kjorer or Kjorer()
     debatt = debatt or DebattKo()
     innlegg = innlegg or InnleggKo(debatt, kjorer)
     testpanel = testpanel or TestpanelKo(debatt)
+    laeretest = laeretest or LaereTest(debatt)
     page = SIDE.read_bytes()
     expected = passord.encode() if passord else b""
 
@@ -958,6 +1057,8 @@ def make_server(vert: str = "127.0.0.1", port: int = 8787, passord: str | None =
             elif path == "/debatt-alle.json":
                 q = parse_qs(urlsplit(self.path).query)
                 self._json(200, debatt.alle((q.get("status") or [None])[0], (q.get("sok") or [None])[0]))
+            elif path == "/laeretest.json":
+                self._json(200, laeretest.status())
             elif path == "/innlegg.json":
                 self._json(200, innlegg.status())
             elif path == "/testpanel.json":
@@ -977,7 +1078,7 @@ def make_server(vert: str = "127.0.0.1", port: int = 8787, passord: str | None =
                     origin and urlsplit(origin).netloc != self.headers.get("Host")):
                 return self._json(403, {"melding": "Avvist."})
             sti = urlsplit(self.path).path
-            if sti not in ("/start", "/debatt", "/innlegg", "/testpanel"):
+            if sti not in ("/start", "/debatt", "/innlegg", "/testpanel", "/laeretest"):
                 return self._json(404, {"melding": "Finnes ikke."})
             try:
                 length = int(self.headers.get("Content-Length") or 0)
@@ -994,6 +1095,9 @@ def make_server(vert: str = "127.0.0.1", port: int = 8787, passord: str | None =
                 return self._json(code, svar)
             if sti == "/testpanel":
                 code, svar = testpanel.handle(body)
+                return self._json(code, svar)
+            if sti == "/laeretest":
+                code, svar = laeretest.handle(body)
                 return self._json(code, svar)
             modus = body.get("modus")
             if modus not in MODUSER:

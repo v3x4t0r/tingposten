@@ -202,6 +202,19 @@ footer { padding: 0 var(--gutter) 30px; font: 13px/1.4 var(--sans); color: var(-
         <p class="smaa" id="debatt-alle-antall"></p>
         <ul class="debatt-ko" id="debatt-alle"></ul>
       </details>
+      <details id="laeretest-boks">
+        <summary id="laeretest-tittel">Test modereringen mot eksemplene</summary>
+        <p class="smaa">Kjører eksemplene fra læresettet gjennom moderatoren (Jev, TypeSafe) og viser hvor ofte den
+          lander på samme regel som deg. Hvert eksempel koster en brøkdel av et øre av testbudsjettet.</p>
+        <p class="plan" id="laeretest-plan"></p>
+        <p class="melding" id="laeretest-melding" aria-live="polite"></p>
+        <div class="knapper"><button type="button" class="liten" id="laeretest-kjor">Kjør test</button></div>
+        <ul class="debatt-ko" id="laeretest-gale"></ul>
+        <details id="laeretest-tabell-boks" hidden>
+          <summary>Hele tabellen</summary>
+          <pre class="logg" id="laeretest-tabell"></pre>
+        </details>
+      </details>
     </section>
 
     <section class="blokk" aria-labelledby="innlegg-tittel" id="innlegg" hidden>
@@ -626,6 +639,68 @@ $("debatt-filter").addEventListener("change", () => { alleSist = ""; lastAlle();
 let sokTimer;
 $("debatt-sok").addEventListener("input", () => { clearTimeout(sokTimer); sokTimer = setTimeout(() => { alleSist = ""; lastAlle(); }, 300); });
 
+/* «Kjør test»: the examples through the moderator, in a thread on the Pi (admin.LaereTest) */
+let laeretestTimer;
+async function lastLaeretest() {
+  if (!$("laeretest-boks").open) return;
+  try {
+    const r = await fetch("/laeretest.json", {cache: "no-store"});
+    if (!r.ok) return;
+    tegnLaeretest(await r.json());
+  } catch (e) { /* the panel works without comments */ }
+}
+function tegnLaeretest(d) {
+  if (!d.aktiv) return;
+  const res = d.resultat;
+  const knapp = $("laeretest-kjor");
+  knapp.disabled = d.pagar || !d.eksempler || !d.har_nokkel;
+  knapp.textContent = d.pagar ? "Tester …" : `Kjør test (${antall(d.eksempler, "eksempel", "eksempler")})`;
+  let plan = antall(d.eksempler, "eksempel i læresettet", "eksempler i læresettet") + ` · moderator ${d.modell}`;
+  if (!d.har_nokkel) plan += " · TYPESAFE_API_KEY mangler i debatt.env";
+  if (res) {
+    plan += ` · siste test ${tid(res.tid)}: ${res.riktig} av ${res.n} riktige`;
+    if (res.farlige_slipp) plan += `, ${antall(res.farlige_slipp, "farlig slipp", "farlige slipp")}`;
+    if (res.feil_stoppet) plan += `, ${res.feil_stoppet} lovlige stoppet`;
+    if (res.til_redaktor) plan += `, ${res.til_redaktor} til deg`;
+    if (res.feil) plan += `, ${res.feil} uten svar`;
+    if (res.ikke_testet) plan += ` · ${antall(res.ikke_testet, "nytt eksempel", "nye eksempler")} siden sist`;
+    plan += ` · kostet $${res.kostnad_usd}`;
+  }
+  $("laeretest-plan").textContent = plan;
+  const m = $("laeretest-melding");
+  if (d.feil) { m.textContent = d.feil; m.classList.add("feil"); }
+  else if (!d.pagar && m.textContent.startsWith("Tester")) m.textContent = "Ferdig.";
+  const liste = $("laeretest-gale");
+  liste.replaceChildren();
+  for (const g of (res || {}).gale || []) {
+    liste.append(el("li", null,
+      el("p", {class: "hvem"}, `Du: ${g.redaktor_navn} · modellen: ${g.modell_navn}` +
+         (g.sikkerhet != null ? ` ${Math.round(g.sikkerhet * 100)} %` : "")),
+      el("p", {class: "tekst"}, g.tekst)));
+  }
+  if (res && !res.gale.length && res.n) liste.append(el("li", null, el("p", {class: "hvem"}, "Modellen traff på alle eksemplene.")));
+  $("laeretest-tabell-boks").hidden = !res;
+  if (res) $("laeretest-tabell").textContent = res.tabell;
+  clearTimeout(laeretestTimer);
+  if (d.pagar) laeretestTimer = setTimeout(lastLaeretest, 3000);
+}
+$("laeretest-boks").addEventListener("toggle", lastLaeretest);
+$("laeretest-kjor").addEventListener("click", async () => {
+  const m = $("laeretest-melding");
+  m.classList.remove("feil");
+  try {
+    const r = await fetch("/laeretest", {method: "POST", headers: {"Content-Type": "application/json", "X-Tingposten": "admin"},
+      body: JSON.stringify({handling: "test"})});
+    const svar = await r.json().catch(() => ({}));
+    m.textContent = svar.melding || `Feil (HTTP ${r.status})`;
+    m.classList.toggle("feil", !r.ok);
+  } catch (e) {
+    m.textContent = "Fikk ikke kontakt med Pi-en: " + e.message;
+    m.classList.add("feil");
+  }
+  lastLaeretest();
+});
+
 async function avgjor(id, handling, regel, tekst) {
   const m = $("debatt-melding");
   try {
@@ -641,6 +716,7 @@ async function avgjor(id, handling, regel, tekst) {
   lastDebatt();
   alleSist = "";
   lastAlle();
+  lastLaeretest();
 }
 const KATEGORI = {debattinnlegg: "debattinnlegg", henvendelse: "henvendelse til redaksjonen", spam: "spam", reklame: "reklame",
                   tull: "uforståelig", test: "test", hets_eller_trusler: "hets eller trusler", annet: "annet"};

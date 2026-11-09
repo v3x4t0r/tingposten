@@ -169,3 +169,71 @@ def test_debatt_test_can_score_the_editors_examples(oppsett, tmp_path, monkeypat
     assert [i["id"] for i in sett] == ["t001", f"k{k['id']}"] and sett[1]["sak_ingress"] == "Linje 2."
     assert fasit[f"k{k['id']}"]["regel"] == "trakassering" and testsett.fasit_for(sett[1], fasit) == ("trakassering", True)
     assert testsett.med_laerte([], {}, tmp_path / "ingen") == ([], {})
+
+
+def test_the_panel_runs_the_examples_through_the_moderator(tmp_path, monkeypatch):
+    """«Kjør test»: the labelled examples go through the moderator in a thread; the panel
+    shows the score, the examples the model gets wrong, and the run is kept on disk."""
+    monkeypatch.setattr(tj, "KOMMENTAR_PAUSE_S", 0)
+    db_path = tmp_path / "debatt.db"
+    sendt = []
+    t = tj.Tjeneste(Db(db_path), m.Kjede([Usikker()], m.Grenser.jevn(0.85)), {SAK: {"tittel": "Bybanen"}},
+                    lambda e, lenke: sendt.append(lenke), "https://tingposten.no/", umiddelbar_moderering=True)
+    t.be_om_lenke("ola@b.no")
+    okt = t.bekreft(sendt[-1].split("#t=")[1])["okt"]
+    with t.db.tx() as c:
+        c.execute("UPDATE brukere SET navn = 'Ola', quiz = ?", (REGLER_VERSJON,))
+    ola = t.bruker(okt)
+    k1 = t.ny_kommentar(ola, SAK, "Helt grei kommentar")
+    k2 = t.ny_kommentar(ola, SAK, "Du er en idiot")
+    t.laer(k1["id"], "ok")
+    t.laer(k2["id"], "trakassering")
+    debatt = admin.DebattKo(db_path)
+
+    class AlltidTrakassering(m.Moderator):  # so k1 ("ok") comes out wrong
+        name = "fake:test"
+
+        def _vurder(self, tekst, sak, forelder):
+            return m.Vurdering("trakassering", {k: (0.9 if k == "trakassering" else 0.02) for k in REGLER}, self.name, 1,
+                               kostnad_usd=0.00001)
+
+    lt = admin.LaereTest(debatt, root=tmp_path, moderator=AlltidTrakassering(), test_dir=tmp_path / "test")
+    srv = admin.make_server("127.0.0.1", 0, passord="hemmelig", kjorer=admin.Kjorer(root=tmp_path, data_dir=tmp_path),
+                            site_dir=tmp_path / "site", debatt=debatt, laeretest=lt)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{srv.server_address[1]}"
+    try:
+        d = json.loads(call(base + "/laeretest.json")[1])
+        assert d["aktiv"] and d["eksempler"] == 2 and d["resultat"] is None and not d["pagar"] and d["har_nokkel"]
+        assert call(base + "/laeretest", {"handling": "test"})[0] == 403  # needs the panel header
+        assert call(base + "/laeretest", {"handling": "tull"}, X_Tingposten="admin")[0] == 400
+        code, body = call(base + "/laeretest", {"handling": "test"}, X_Tingposten="admin")
+        assert code == 200 and "2 eksempler" in json.loads(body)["melding"]
+        lt._traad.join(10)
+        code, body = call(base + "/laeretest.json")
+        d = json.loads(body)
+        r = d["resultat"]
+        assert r["n"] == 2 and r["riktig"] == 1 and r["ikke_testet"] == 0 and not d["pagar"] and d["feil"] is None
+        assert r["gale"] == [{"id": k1["id"], "tekst": "Helt grei kommentar", "redaktor": "ok", "modell": "trakassering",
+                              "sikkerhet": 0.9, "redaktor_navn": "Innenfor reglene", "modell_navn": "Trakassering"}]
+        assert "fake:test" in r["tabell"] and r["feil_stoppet"] == 1 and r["kostnad_usd"] == 0.00002
+        assert len(list((tmp_path / "test").glob("fake_test-*.jsonl"))) == 1
+        assert b"ola@b.no" not in body
+        # A new example since the run shows as not yet tested.
+        k3 = t.ny_kommentar(ola, SAK, "Tredje")
+        t.laer(k3["id"], "ok")
+        assert json.loads(call(base + "/laeretest.json")[1])["resultat"]["ikke_testet"] == 1
+        # No examples at all: nothing to run.
+        for kid in (k1["id"], k2["id"], k3["id"]):
+            t.glem(kid)
+        assert call(base + "/laeretest", {"handling": "test"}, X_Tingposten="admin")[0] == 400
+    finally:
+        srv.shutdown()
+
+
+def test_the_test_needs_a_key_for_jev(tmp_path):
+    db_path = tmp_path / "debatt.db"
+    Db(db_path)
+    lt = admin.LaereTest(admin.DebattKo(db_path), root=tmp_path)  # no debatt.env → no key
+    assert lt.moderator().name.startswith("jev:") and lt.status()["har_nokkel"] is False
+    assert lt.handle({"handling": "test"})[0] == 400
