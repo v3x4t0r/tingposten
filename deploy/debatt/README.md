@@ -16,7 +16,10 @@ uv run --extra debatt tingposten debatt-test --moderator cpu        # llama.cpp 
 uv run --extra debatt tingposten debatt-test --moderator claude     # trenger TINGPOSTEN_ANTHROPIC_API_KEY
 uv run --extra debatt tingposten debatt-test --moderator jev        # trenger TYPESAFE_API_KEY
 uv run --extra debatt tingposten debatt-test --rapport              # tabellen for de nyeste kjøringene
+uv run --extra debatt tingposten debatt-test --laert --moderator jev # pluss redaktørens eksempler fra kommentarbasen
 ```
+
+**Læresettet** vokser mens kommentarfeltet er i drift. I kontrollpanelet, under «Alle kommentarer», ser du hele kommentarfeltet med filter og søk. Er en kommentar ikke ok, velger du regelen og trykker «Ikke ok»: kommentaren fjernes, og teksten og regelen lagres som eksempel i tabellen `laeresett` i `debatt.db`. «OK» lagrer det motsatte eksempelet (og publiserer en stoppet kommentar). `debatt-test --laert` scorer moderatoren mot disse ekte eksemplene i tillegg til testsettet, og de er treningsdata for en lokal modell senere. Eksemplene ligger bare i databasen: sletter forfatteren kommentaren eller kontoen, forsvinner eksempelet også.
 
 Det viktigste i tabellen er **farlige slipp** (trussel, hets, privatperson eller beskyldning som ble publisert; skal være 0), **feil stoppet** (lovlige meninger som ble stoppet; nøytralitetsmålet) og hvor mange som havner hos deg. Sett så `DEBATT_MODERATOR` og `DEBATT_TERSKEL` i `tingposten/config.py`. Moderatorene spørres i rekkefølge; den neste spørres bare når den forrige er usikker, og er alle usikre, venter kommentaren på deg.
 

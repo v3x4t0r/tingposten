@@ -52,6 +52,23 @@ def les_fasit(d: Path | None = None) -> dict[str, dict]:
     return json.loads(path.read_text()) if path.exists() else {}
 
 
+def med_laerte(sett: list[dict], fasit: dict[str, dict], d: Path | None = None) -> tuple[list[dict], dict[str, dict]]:
+    """The test set plus the editor's labelled examples from the comment database
+    (tjeneste.laeresett): real comments with the editor's rule as fasit. Nothing is
+    copied to disk; a run's result file holds only ids and probabilities."""
+    db_path = (d or config.DEBATT_DIR) / "debatt.db"
+    if not db_path.exists():
+        return sett, fasit
+    from .db import Db
+    from .tjeneste import Tjeneste
+
+    saker_path = db_path.with_name("saker.json")
+    saker = json.loads(saker_path.read_text()) if saker_path.exists() else {}
+    laerte = Tjeneste(Db(db_path), None, saker, None, "https://tingposten.no/").laeresett()
+    fasit = {**fasit, **{i["id"]: {"regel": i["forslag"], "merknad": i["merknad"]} for i in laerte}}
+    return sett + laerte, fasit
+
+
 def fasit_for(item: dict, fasit: dict[str, dict]) -> tuple[str, bool]:
     """(the label, whether the owner set it)."""
     if item["id"] in fasit:

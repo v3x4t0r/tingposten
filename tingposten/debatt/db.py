@@ -135,6 +135,16 @@ CREATE TABLE IF NOT EXISTS rapporter (
   behandlet INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (kommentar, bruker)
 );
+-- The editor's labelled examples (the control panel's comment list): the text as the
+-- editor judged it and the rule it broke (ok = within the rules). This is the training
+-- set for calibrating the limits and, later, a local model. It lives only here, so
+-- deleting a comment or an account removes the example too.
+CREATE TABLE IF NOT EXISTS laeresett (
+  kommentar INTEGER PRIMARY KEY REFERENCES kommentarer(id) ON DELETE CASCADE,
+  regel TEXT NOT NULL,
+  tekst TEXT NOT NULL,
+  tid TEXT NOT NULL
+);
 """
 
 
@@ -207,6 +217,7 @@ class Db:
                 c.execute("DELETE FROM innlogging WHERE epost = ?", (rad["epost"],))
             c.execute("UPDATE vurderinger SET data = '{}' WHERE kommentar IN "
                       "(SELECT id FROM kommentarer WHERE bruker = ?)", (bruker,))
+            c.execute("DELETE FROM laeresett WHERE kommentar IN (SELECT id FROM kommentarer WHERE bruker = ?)", (bruker,))
             for (kid,) in c.execute("SELECT kommentar FROM stemmer WHERE bruker = ?", (bruker,)).fetchall():
                 c.execute("DELETE FROM stemmer WHERE bruker = ? AND kommentar = ?", (bruker, kid))
                 self._tell_stemmer(c, kid)
@@ -231,6 +242,12 @@ class Db:
             "debattinnlegg": [dict(r) for r in self.les(
                 "SELECT id, navn, om, tittel, tekst, sak, status, red_tittel, red_tekst, opprettet, endret "
                 "FROM innsendt WHERE bruker = ? ORDER BY id", bruker)],
+            "laeresett": [dict(r) for r in self.les(
+                "SELECT l.kommentar, l.regel, l.tid FROM laeresett l JOIN kommentarer k ON k.id = l.kommentar "
+                "WHERE k.bruker = ? ORDER BY l.kommentar", bruker)],
+            "laeresett": [dict(r) for r in self.les(
+                "SELECT l.kommentar, l.regel, l.tid FROM laeresett l JOIN kommentarer k ON k.id = l.kommentar "
+                "WHERE k.bruker = ? ORDER BY l.kommentar", bruker)],
             "vurderinger": [dict(r) for r in self.les(
                 "SELECT v.kommentar, v.tid, v.utfall, v.regel, v.hvem, v.data FROM vurderinger v "
                 "JOIN kommentarer k ON k.id = v.kommentar WHERE k.bruker = ? ORDER BY v.id", bruker)],

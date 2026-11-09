@@ -32,7 +32,7 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 from pypdf import PdfReader
 
@@ -624,10 +624,11 @@ class DebattKo:
     moderator was unsure about (or a reader asked about) and reported ones. The panel
     shows the author's display name, never the e-mail address."""
 
-    HANDLINGER = ("publiser", "fjern", "sperr")
+    HANDLINGER = ("publiser", "fjern", "sperr", "laer", "glem")
 
-    def __init__(self, db_path: Path | None = None):
+    def __init__(self, db_path: Path | None = None, saker_path: Path | None = None):
         self.path = db_path or config.DEBATT_DIR / "debatt.db"
+        self.saker_path = saker_path or self.path.with_name("saker.json")
         self._tjeneste = None
 
     def tjeneste(self):
@@ -635,8 +636,22 @@ class DebattKo:
             from .debatt.db import Db
             from .debatt.tjeneste import Tjeneste
 
-            self._tjeneste = Tjeneste(Db(self.path), None, {}, None, config.SITE_URL)
+            saker = json.loads(self.saker_path.read_text()) if self.saker_path.exists() else {}
+            self._tjeneste = Tjeneste(Db(self.path), None, saker, None, config.SITE_URL)
         return self._tjeneste
+
+    def alle(self, status: str | None = None, sok: str | None = None) -> dict:
+        """The full comment list for moderation: every comment (filtered by state or a
+        search word), newest first, plus the count per state and of labelled examples."""
+        t = self.tjeneste()
+        if t is None:
+            return {"aktiv": False, "kommentarer": [], "antall": {}}
+        if status not in t.STATUSER:
+            status = None
+        from .debatt.regler import REGLER
+
+        return {"aktiv": True, "kommentarer": [self._rad(r) for r in t.alle_kommentarer(status, (sok or "")[:100] or None)],
+                "antall": t.antall_kommentarer(), "regler": {k: navn for k, (navn, _) in REGLER.items()}}
 
     def status(self) -> dict:
         t = self.tjeneste()
@@ -645,8 +660,7 @@ class DebattKo:
         return {"aktiv": True, "ko": [self._rad(r) for r in t.redaktor_ko()],
                 "stoppet": [self._rad(r) for r in t.nylig_stoppet()]}
 
-    @staticmethod
-    def _rad(r: dict) -> dict:
+    def _rad(self, r: dict) -> dict:
         """One comment for the panel: the moderators' last verdict, the link, no e-mail."""
         r = dict(r)
         data = json.loads(r.pop("vurdering", None) or "{}")
@@ -655,7 +669,9 @@ class DebattKo:
                              "begrunnelse": v.get("begrunnelse") or ""} for v in data.get("vurderinger", [])]
         r["feil"] = data.get("feil", [])
         r.setdefault("grunner", [])
-        r["lenke"] = f"{config.SITE_URL}bergen/sak/{r['sak']}/#k{r['id']}"
+        info = (self._tjeneste.saker if self._tjeneste else {}).get(r["sak"]) or {}
+        r["tittel"] = info.get("tittel", "")
+        r["lenke"] = f"{info.get('lenke') or config.SITE_URL + 'bergen/sak/' + r['sak'] + '/'}#k{r['id']}"
         return r
 
     def handle(self, body: dict) -> tuple[int, dict]:
@@ -670,13 +686,32 @@ class DebattKo:
             if handling == "publiser":
                 # Only the text the panel showed: an edit since then gives 409, never a blind publish.
                 t.redaktor_avgjor(kid, "publiser", tekst=body.get("tekst"))
+            elif handling == "laer":
+                # The comment list: the editor's label becomes a training example, and the comment
+                # follows the label. "ok" publishes a stopped comment (same text check); a rule removes it.
+                if not regel:
+                    return 400, {"melding": "Velg en regel."}
+                t.laer(kid, regel)
+                rad = t.db.en("SELECT status FROM kommentarer WHERE id = ?", kid)
+                if regel == "ok" and rad["status"] in ("til_redaktor", "fjernet", "avvist"):
+                    t.redaktor_avgjor(kid, "publiser", tekst=body.get("tekst"))
+                elif regel != "ok" and rad["status"] != "fjernet":
+                    t.redaktor_avgjor(kid, "fjern", regel)
+            elif handling == "glem":
+                t.glem(kid)
             else:
                 t.redaktor_avgjor(kid, "fjern", regel or None)
                 if handling == "sperr":
                     t.sperr(kid)
         except Feil as e:
             return e.kode, {"melding": e.melding}
-        return 200, {"melding": {"publiser": "Publisert.", "fjern": "Fjernet.", "sperr": "Fjernet, og forfatteren er sperret."}[handling]}
+        if handling == "laer":
+            melding = ("Lagret som eksempel: innenfor reglene. Kommentaren er publisert." if regel == "ok"
+                       else f"Lagret som eksempel ({REGLER[regel][0].lower()}). Kommentaren er fjernet.")
+        else:
+            melding = {"publiser": "Publisert.", "fjern": "Fjernet.", "sperr": "Fjernet, og forfatteren er sperret.",
+                       "glem": "Eksempelet er fjernet."}[handling]
+        return 200, {"melding": melding}
 
 
 def debatt_miljo(root: Path = config.ROOT) -> dict:
@@ -920,6 +955,9 @@ def make_server(vert: str = "127.0.0.1", port: int = 8787, passord: str | None =
                 self._json(200, status(kjorer, site_dir, idag))
             elif path == "/debatt.json":
                 self._json(200, debatt.status())
+            elif path == "/debatt-alle.json":
+                q = parse_qs(urlsplit(self.path).query)
+                self._json(200, debatt.alle((q.get("status") or [None])[0], (q.get("sok") or [None])[0]))
             elif path == "/innlegg.json":
                 self._json(200, innlegg.status())
             elif path == "/testpanel.json":

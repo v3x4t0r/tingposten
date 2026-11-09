@@ -326,6 +326,7 @@ class Tjeneste:
         self._egen(b, kid)
         with self.db.tx() as c:
             c.execute("UPDATE kommentarer SET tekst = '', status = 'slettet', endret = ? WHERE id = ?", (iso(na()), kid))
+            c.execute("DELETE FROM laeresett WHERE kommentar = ?", (kid,))  # the example holds the text
 
     def be_om_manuell(self, b: Bruker, kid) -> dict:
         """A stopped comment's author asks the editor to look at it."""
@@ -570,6 +571,71 @@ class Tjeneste:
                 raise Feil(409, "Kommentaren er endret eller slettet siden du så den. Last inn på nytt.")
             c.execute("UPDATE rapporter SET behandlet = 1 WHERE kommentar = ?", (kid,))
             self.db.logg_vurdering(c, kid, utfall, regel, "redaktør", {})
+
+    STATUSER = ("venter", "publisert", "avvist", "til_redaktor", "slettet", "fjernet")
+
+    def alle_kommentarer(self, status: str | None = None, sok: str | None = None, antall: int = 200) -> list[dict]:
+        """Every comment, newest first, for the editor's list: name, text, state, votes, open
+        reports, the moderators' last verdict and the editor's label (laeresett), if any."""
+        vilkar, args = [], []
+        if status:
+            vilkar.append("k.status = ?")
+            args.append(status)
+        if sok:
+            vilkar.append("(k.tekst LIKE ? OR u.navn LIKE ? OR k.sak LIKE ?)")
+            args += [f"%{sok}%"] * 3
+        hvor = ("WHERE " + " AND ".join(vilkar)) if vilkar else ""
+        rader = self.db.les(
+            "SELECT k.id, k.sak, k.forelder, k.tekst, k.status, k.regel, k.opprettet, k.endret, k.opp, k.ned, u.navn, "
+            "(SELECT COUNT(*) FROM rapporter r WHERE r.kommentar = k.id AND r.behandlet = 0) AS rapporter, "
+            "(SELECT data FROM vurderinger v WHERE v.kommentar = k.id AND v.hvem NOT IN ('leseren', 'redaktør') "
+            " ORDER BY v.id DESC LIMIT 1) AS vurdering, "
+            "l.regel AS laert "
+            f"FROM kommentarer k LEFT JOIN brukere u ON u.id = k.bruker LEFT JOIN laeresett l ON l.kommentar = k.id "
+            f"{hvor} ORDER BY k.id DESC LIMIT ?", *args, max(1, min(int(antall), 1000)))
+        return [dict(r) for r in rader]
+
+    def antall_kommentarer(self) -> dict[str, int]:
+        """How many comments there are per state, and how many labelled examples."""
+        ut = {r["status"]: r["n"] for r in self.db.les("SELECT status, COUNT(*) AS n FROM kommentarer GROUP BY status")}
+        ut["laert"] = self.db.en("SELECT COUNT(*) AS n FROM laeresett")["n"]
+        return ut
+
+    def laer(self, kid: int, regel: str) -> None:
+        """The editor labels a comment as an example: the rule it breaks, or ok. The text as
+        it stands now is kept with the label, so a later edit does not change the lesson.
+        A deleted comment has no text to learn from."""
+        if regel not in REGLER:
+            raise Feil(400, "Ugyldig regel.")
+        with self.db.tx() as c:
+            rad = c.execute("SELECT tekst, status FROM kommentarer WHERE id = ?", (kid,)).fetchone()
+            if rad is None:
+                raise Feil(404, "Fant ikke kommentaren.")
+            if rad["status"] == "slettet" or not rad["tekst"]:
+                raise Feil(400, "Kommentaren er slettet, så det er ingen tekst å lære av.")
+            c.execute("INSERT OR REPLACE INTO laeresett (kommentar, regel, tekst, tid) VALUES (?, ?, ?, ?)",
+                      (kid, regel, rad["tekst"], iso(na())))
+
+    def glem(self, kid: int) -> None:
+        """The editor takes a label back."""
+        with self.db.tx() as c:
+            c.execute("DELETE FROM laeresett WHERE kommentar = ?", (kid,))
+
+    def laeresett(self) -> list[dict]:
+        """The labelled examples in the test set's shape (testsett.py): id k<nr>, the case's
+        title and ingress (from saker, if known), the comment it answers, the text and the
+        editor's rule as `forslag`. Read by `debatt-test --laert`; nothing is written to disk."""
+        rader = self.db.les(
+            "SELECT l.kommentar, l.regel, l.tekst, l.tid, k.sak, "
+            "(SELECT f.tekst FROM kommentarer f WHERE f.id = k.forelder) AS forelder "
+            "FROM laeresett l JOIN kommentarer k ON k.id = l.kommentar ORDER BY l.kommentar")
+        ut = []
+        for r in rader:
+            info = self.saker.get(r["sak"]) or {}
+            ut.append({"id": f"k{r['kommentar']}", "sak": r["sak"], "sak_tittel": info.get("tittel", ""),
+                       "sak_ingress": info.get("ingress", ""), "forelder": r["forelder"] or None,
+                       "tekst": r["tekst"], "forslag": r["regel"], "merknad": f"redaktøren {r['tid'][:10]}"})
+        return ut
 
     def sperr(self, kid: int) -> None:
         """Block the author of a comment: no login, no new comments, their sessions end,

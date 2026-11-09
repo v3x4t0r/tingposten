@@ -76,7 +76,16 @@ button:disabled { opacity: .45; cursor: default; }
 .debatt-ko .hvem { font: 13px/1.4 var(--sans); color: var(--dempet); margin: 0; }
 .debatt-ko .tekst { white-space: pre-wrap; margin: 6px 0; }
 .debatt-ko .modell { font: 13px/1.4 var(--sans); color: var(--dempet); margin: 0 0 6px; }
-.debatt-ko .knapper { margin: 6px 0 0; }
+.debatt-ko .knapper { margin: 6px 0 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.debatt-ko .knapper select { font: 15px/1.2 var(--sans); padding: 8px; min-height: 40px; border: 1px solid var(--blekk-2);
+  border-radius: 4px; background: var(--papir); color: var(--blekk); }
+.debatt-ko .merke { font: 600 12px/1.2 var(--sans); padding: 2px 6px; border-radius: 3px; background: var(--boks); color: var(--blekk-2); }
+.debatt-ko .merke.laert { background: var(--vent-flate, #eee); color: var(--vent, inherit); }
+.debatt-ko .merke.fjernet, .debatt-ko .merke.avvist { color: var(--feil); }
+.filter { display: flex; flex-wrap: wrap; gap: 12px 20px; margin: 10px 0; font: 14px/1.4 var(--sans); color: var(--dempet); }
+.filter label { display: flex; gap: 8px; align-items: center; }
+.filter select, .filter input { font: 15px/1.2 var(--sans); padding: 8px; min-height: 40px; border: 1px solid var(--blekk-2);
+  border-radius: 4px; background: var(--papir); color: var(--blekk); }
 .innlegg-felt { display: grid; gap: 6px; margin: 8px 0; font: 14px/1.4 var(--sans); }
 .innlegg-felt input, .innlegg-felt textarea { font: 16px/1.5 var(--serif, Georgia, serif); padding: 8px 10px; border: 1px solid var(--blekk-2);
   border-radius: 4px; background: var(--papir); color: var(--blekk); width: 100%; box-sizing: border-box; }
@@ -171,6 +180,27 @@ footer { padding: 0 var(--gutter) 30px; font: 13px/1.4 var(--sans); color: var(-
         <summary id="debatt-stoppet-tittel">Nylig fjernet og stoppet</summary>
         <p class="smaa">Kommentarer du har fjernet, og som modellen har stoppet, de siste 7 dagene. Var det feil, kan du publisere dem likevel.</p>
         <ul class="debatt-ko" id="debatt-stoppet"></ul>
+      </details>
+      <details id="debatt-alle-boks">
+        <summary id="debatt-alle-tittel">Alle kommentarer</summary>
+        <p class="smaa">Hele kommentarfeltet, nyeste først. Er en kommentar ikke ok, velg regelen den bryter og trykk
+          «Ikke ok»: kommentaren fjernes, og den lagres som eksempel i læresettet, slik at modereringen lærer av
+          avgjørelsen din (<code>tingposten debatt-test --laert</code>). «OK» lagrer motsatt eksempel og publiserer
+          en stoppet kommentar.</p>
+        <div class="filter">
+          <label>Vis <select id="debatt-filter">
+            <option value="">alle</option>
+            <option value="publisert">publiserte</option>
+            <option value="til_redaktor">venter på deg</option>
+            <option value="avvist">stoppet av modellen</option>
+            <option value="fjernet">fjernet av deg</option>
+            <option value="venter">venter på modellen</option>
+            <option value="slettet">slettet av forfatteren</option>
+          </select></label>
+          <label>Søk <input type="search" id="debatt-sok" placeholder="tekst, navn eller sak" autocomplete="off"></label>
+        </div>
+        <p class="smaa" id="debatt-alle-antall"></p>
+        <ul class="debatt-ko" id="debatt-alle"></ul>
       </details>
     </section>
 
@@ -477,8 +507,9 @@ $("kjor").addEventListener("click", () => {
 $("sjekk").addEventListener("click", () => start("sjekk"));
 
 /* Debatt: the comments waiting for the editor and the reported ones. Reader text is set as text, never HTML. */
-const REGELNAVN = {ok: "innenfor", trussel: "trussel", hets: "hets", personangrep: "personangrep", privatperson: "privatperson",
-                   beskyldning: "udokumentert beskyldning", salg: "kjøp og salg", spam: "spam", utenfor: "utenfor saken"};
+const REGELNAVN = {ok: "innenfor", trussel: "trussel", hets: "hets", trakassering: "trakassering", personangrep: "personangrep",
+                   privatperson: "privatperson", beskyldning: "udokumentert beskyldning", salg: "kjøp og salg", spam: "spam",
+                   utenfor: "utenfor saken"};  // old keys stay so old decisions still read
 async function lastDebatt() {
   try {
     const r = await fetch("/debatt.json", {cache: "no-store"});
@@ -534,6 +565,67 @@ function tegnDebatt(d) {
       el("div", {class: "knapper"}, b)));
   }
 }
+/* Every comment, for moderation: filter by state, search, label as an example (laer) */
+const STATUSNAVN = {venter: "venter på modellen", publisert: "publisert", avvist: "stoppet av modellen", til_redaktor: "venter på deg",
+                    slettet: "slettet av forfatteren", fjernet: "fjernet av deg"};
+let alleSist = "";
+async function lastAlle() {
+  if (!$("debatt-alle-boks").open) return;
+  const q = new URLSearchParams();
+  if ($("debatt-filter").value) q.set("status", $("debatt-filter").value);
+  if ($("debatt-sok").value.trim()) q.set("sok", $("debatt-sok").value.trim());
+  try {
+    const r = await fetch("/debatt-alle.json?" + q, {cache: "no-store"});
+    if (!r.ok) return;
+    const tekst = await r.text();
+    if (tekst === alleSist) return;  // keep the editor's open menus when nothing changed
+    alleSist = tekst;
+    tegnAlle(JSON.parse(tekst));
+  } catch (e) { /* the panel works without comments */ }
+}
+function tegnAlle(d) {
+  const a = d.antall || {}, sum = Object.entries(a).filter(([k]) => k !== "laert").reduce((s, [, n]) => s + n, 0);
+  $("debatt-alle-tittel").textContent = `Alle kommentarer (${sum})`;
+  $("debatt-alle-antall").textContent = Object.entries(STATUSNAVN).filter(([k]) => a[k]).map(([k, n]) => `${a[k]} ${n}`)
+    .concat([antall(a.laert || 0, "eksempel i læresettet", "eksempler i læresettet")]).join(" · ") +
+    (d.kommentarer.length === 200 ? " · viser de 200 nyeste" : "");
+  const liste = $("debatt-alle");
+  liste.replaceChildren();
+  for (const k of d.kommentarer) {
+    const modell = k.vurderinger.map(v => `${v.modell}: ${REGELNAVN[v.regel] || v.regel}` +
+      (v.sikkerhet != null ? ` ${Math.round(v.sikkerhet * 100)} %` : "")).join(" · ");
+    const velg = el("select", {"aria-label": "regel"});
+    for (const [r, navn] of Object.entries(d.regler || {})) if (r !== "ok") velg.append(el("option", {value: r}, navn));  // the current rules
+    const forslag = k.regel || (k.vurderinger.at(-1) || {}).regel;  // the rule it was stopped for, or the model's best guess
+    if (forslag && forslag !== "ok") velg.value = forslag;
+    const ikkeOk = el("button", {type: "button", class: "liten"}, "Ikke ok");
+    ikkeOk.addEventListener("click", () => avgjor(k.id, "laer", velg.value, k.tekst));
+    const ok = el("button", {type: "button", class: "liten"}, "OK");
+    ok.addEventListener("click", () => avgjor(k.id, "laer", "ok", k.tekst));
+    const knapper = el("div", {class: "knapper"});
+    if (k.status !== "slettet") knapper.append(ok, velg, ikkeOk);
+    if (k.laert) {
+      const glem = el("button", {type: "button", class: "liten"}, "Glem eksempelet");
+      glem.addEventListener("click", () => avgjor(k.id, "glem", null, k.tekst));
+      knapper.append(glem);
+    }
+    const merker = [el("span", {class: "merke " + k.status}, STATUSNAVN[k.status] || k.status)];
+    if (k.status === "avvist" || k.status === "fjernet") merker.push(" ", el("span", {class: "merke"}, REGELNAVN[k.regel] || k.regel || "regel"));
+    if (k.laert) merker.push(" ", el("span", {class: "merke laert"}, "lært: " + (REGELNAVN[k.laert] || k.laert)));
+    liste.append(el("li", null,
+      el("p", {class: "hvem"}, `${k.navn || "(slettet konto)"} · ${tid(k.opprettet)}` + (k.forelder ? " · svar" : "") +
+         ` · ${k.opp} opp, ${k.ned} ned` + (k.rapporter ? ` · ${antall(k.rapporter, "rapport", "rapporter")}` : "") + " · ",
+         el("a", {href: k.lenke}, k.tittel || "saken"), " · ", ...merker),
+      el("p", {class: "tekst"}, k.status === "slettet" ? "[slettet]" : k.tekst),
+      modell ? el("p", {class: "modell"}, modell) : null,
+      knapper));
+  }
+}
+$("debatt-alle-boks").addEventListener("toggle", () => { alleSist = ""; lastAlle(); });
+$("debatt-filter").addEventListener("change", () => { alleSist = ""; lastAlle(); });
+let sokTimer;
+$("debatt-sok").addEventListener("input", () => { clearTimeout(sokTimer); sokTimer = setTimeout(() => { alleSist = ""; lastAlle(); }, 300); });
+
 async function avgjor(id, handling, regel, tekst) {
   const m = $("debatt-melding");
   try {
@@ -547,6 +639,8 @@ async function avgjor(id, handling, regel, tekst) {
     m.classList.add("feil");
   }
   lastDebatt();
+  alleSist = "";
+  lastAlle();
 }
 const KATEGORI = {debattinnlegg: "debattinnlegg", henvendelse: "henvendelse til redaksjonen", spam: "spam", reklame: "reklame",
                   tull: "uforståelig", test: "test", hets_eller_trusler: "hets eller trusler", annet: "annet"};
@@ -709,6 +803,7 @@ lastInnlegg();
 setInterval(lastInnlegg, 60000);
 lastDebatt();
 setInterval(lastDebatt, 60000);
+setInterval(lastAlle, 60000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) last(); });
 last();
 </script>
