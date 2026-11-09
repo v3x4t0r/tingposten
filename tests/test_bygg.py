@@ -675,3 +675,13 @@ def test_search_page_and_index(site):
     assert [r["d"] for r in indeks] == sorted((r["d"] for r in indeks), reverse=True)
     sitemap = site_dir / "sitemap.xml"
     assert not sitemap.exists() or "bergen/sok/" not in sitemap.read_text()
+
+
+def test_utvalg_er_med_og_har_egne_kortadresser():
+    # Owner, 9.11.2026: the four deciding utvalg are followed; their saker get their own
+    # short-address series so a number never collides with bystyret's or byrådet's.
+    for uid in ("573969", "573732", "573968", "573966"):
+        assert uid in config.TIER1 and uid not in config.INNSTILLENDE
+        assert uid in bygg.ORGAN_KORT and uid in bygg.KORT_ORGAN
+    assert bygg.kort_id({"utvalg": "573969", "nr": "150/26", "nr_etikett": "Sak 150/26"}) == "umb-150-26"
+    assert len({bygg.KORT_ORGAN[u] for u in config.TIER1}) == len(config.TIER1)

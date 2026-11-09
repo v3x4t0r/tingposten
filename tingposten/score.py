@@ -70,6 +70,9 @@ ENDELIGHET = {
     "571424": 1.0,  # Bergen bystyre
     "900102": 0.8,  # Byrådet – saker avgjort av byrådet (final, but within delegated limits)
     "900101": 0.4,  # Byrådet – innstilling til bystyret (bystyret decides later)
+    # The utvalg decide delegated matters (klagesaker, smaller plans) for good, but
+    # a klagesak can still go on to Statsforvalteren.
+    "573969": 0.7, "573732": 0.7, "573968": 0.7, "573966": 0.7,
 }
 
 BYDELER = ("Arna", "Bergenhus", "Fana", "Fyllingsdalen", "Laksevåg", "Ytrebygda", "Årstad", "Åsane")

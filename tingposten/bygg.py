@@ -67,13 +67,16 @@ STANDARD_ANDEL = 0.5  # the standard meeting holds at least this share of the st
 RELATED = 6         # "Fra samme møte" on a sak page
 BYSTYRET = "571424"
 # Short organ names for kickers and breadcrumbs.
-ORGAN_KORT = {BYSTYRET: "Bystyret", "900101": "Byrådet (innstilling)", "900102": "Byrådet"}
+ORGAN_KORT = {BYSTYRET: "Bystyret", "900101": "Byrådet (innstilling)", "900102": "Byrådet",
+              "573969": "Utvalg for miljø og byutvikling", "573732": "Utvalg for finans, kultur og næring",
+              "573968": "Utvalg for helse og sosial", "573966": "Utvalg for barnehage, skole og idrett"}
 # Short addresses for print (utgave.py): tingposten.no/s/bs-266-26 → the sak page,
 # a 301 rule in _redirects. Bystyret and byrådet number their saker in separate
 # series, so the organ is part of the address; interpellasjoner have a series of
 # their own that reuses the saker's numbers ("Interpellasjon 28/26" is not "Sak
 # 28/26"), so they get an "i" before the number: bs-i28-26.
-KORT_ORGAN = {BYSTYRET: "bs", "900102": "br", "900101": "bi"}
+KORT_ORGAN = {BYSTYRET: "bs", "900102": "br", "900101": "bi",
+              "573969": "umb", "573732": "ufk", "573968": "uhs", "573966": "ubs"}
 KORT_STI = "s/"
 # The meeting page's outcome line ("26 vedtatt · 3 tatt til orientering …"), in this
 # order. Keys are status codes (status.LABELS); "innstilling_falt" is a sak that was

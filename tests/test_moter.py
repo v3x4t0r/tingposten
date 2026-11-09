@@ -111,7 +111,7 @@ def test_meeting_waiting_for_its_protokoll_says_so(site):
 
 def test_list_of_meetings(site):
     page = (site / "bergen/moter/index.html").read_text()
-    assert "Alle møter i bystyret og byrådet, nyeste først." in page
+    assert "Alle møter i bystyret, byrådet og utvalgene, nyeste først." in page
     assert '<p class="kicker">' not in page          # no kicker repeating the h1
     assert "tirsdag 29. september" in page and "onsdag 23. september" in page  # with the weekday
     assert page.index(VENTER) < page.index(MOTE)
