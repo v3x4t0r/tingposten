@@ -63,7 +63,8 @@ def _organer() -> list[str]:
 
 
 def _items(data_dir: Path, uid: str) -> list[dict]:
-    return list((read_json(data_dir / "agendapunkter" / f"{uid}.json") or {}).values())
+    """The organ's agenda items, from its start date (config.ORGAN_FRA) on."""
+    return [i for i in (read_json(data_dir / "agendapunkter" / f"{uid}.json") or {}).values() if config.innenfor(i)]
 
 
 def _dag(d: date) -> str:

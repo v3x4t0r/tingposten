@@ -373,7 +373,7 @@ def load(data_dir: Path) -> list[dict]:
         if uid in config.INNSTILLENDE or not path.exists():
             continue
         items = [i for i in json.loads(path.read_text()).values()
-                 if i.get("vedtakFilId") and i.get("moteDato") and not pdf.is_noise(i)]
+                 if i.get("vedtakFilId") and i.get("moteDato") and not pdf.is_noise(i) and config.innenfor(i)]
         by_meeting = defaultdict(list)
         for i in items:
             by_meeting[i["moteDato"]].append(i)
