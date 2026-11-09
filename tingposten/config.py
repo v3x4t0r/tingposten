@@ -190,3 +190,13 @@ TIER1 = {
     "573968": "Utvalg for helse og sosial",
     "573966": "Utvalg for barnehage, skole og idrett",
 }
+# Organs followed from a date: meetings before it are neither fetched for PDFs, written
+# nor shown (owner, 9.11.2026: the utvalg start with their November meetings, not the
+# 280 saker of the whole window). Absent = the whole TILBAKE_DAGER window.
+ORGAN_FRA = {uid: "2026-11-01" for uid in ("573969", "573732", "573968", "573966")}
+
+
+def innenfor(item: dict) -> bool:
+    """False for a sak from before its organ's start date (ORGAN_FRA)."""
+    fra = ORGAN_FRA.get(str(item.get("utvalgId")))
+    return not fra or (item.get("moteDato") or "") >= fra

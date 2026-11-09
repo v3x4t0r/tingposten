@@ -59,7 +59,7 @@ def saker(data_dir: Path = config.DATA_DIR, utvalg: str | None = None, dato: str
         out += [
             i for i in json.loads(path.read_text()).values()
             if i.get("vedtakFilId") and not pdf.is_noise(i) and (not dato or i.get("moteDato") == dato)
-            and (not fra or (i.get("moteDato") or "") >= fra)
+            and (not fra or (i.get("moteDato") or "") >= fra) and config.innenfor(i)
         ]
     return sorted(out, key=lambda i: (i["utvalgId"], i["moteDato"], i.get("seq") or 0))
 

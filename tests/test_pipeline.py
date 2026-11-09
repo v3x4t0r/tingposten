@@ -4,7 +4,7 @@ import time
 
 import pytest
 
-from tingposten import pipeline
+from tingposten import config, pipeline
 
 
 @pytest.fixture(autouse=True)
@@ -46,6 +46,17 @@ def test_saker_skips_recommendations_noise_and_undecided(tmp_path):
     ])
     assert [i["referansenr"] for i in pipeline.saker(tmp_path)] == ["1/26", "5/26"]
     assert [i["referansenr"] for i in pipeline.saker(tmp_path, utvalg="900102")] == ["5/26"]
+
+
+def test_saker_start_at_the_organs_start_date(tmp_path, monkeypatch):
+    # Owner, 9.11.2026: the utvalg begin with their November meetings; older saker are
+    # neither fetched, written nor shown.
+    monkeypatch.setattr(config, "ORGAN_FRA", {"573969": "2026-11-01"})
+    old = {**item("1/26", uid="573969"), "moteDato": "2026-10-15"}
+    new = {**item("2/26", uid="573969"), "moteDato": "2026-11-05"}
+    store(tmp_path, [old, new])
+    assert [i["referansenr"] for i in pipeline.saker(tmp_path, utvalg="573969")] == ["2/26"]
+    assert config.innenfor(item("3/26")) and not config.innenfor(old)
 
 
 def test_todo_follows_inputs_and_staleness(tmp_path):
