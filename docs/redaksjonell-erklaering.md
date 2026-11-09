@@ -8,7 +8,7 @@ Tingposten er en gratis og ikke-kommersiell nettside som viser hva Bergen kommun
 
 ## Hva som dekkes
 
-Tingposten dekker sakene som behandles i Bergen bystyre og i byrådet. Alle sakene fra disse organene vises. Poengsummen bestemmer bare rekkefølgen og hvilke saker som løftes fram, ikke hvilke saker som er med. Rene formalia, som godkjenning av protokoll, vises ikke som egne saker. Hver møteside viser alle sakene fra møtet og hvordan de endte.
+Tingposten dekker sakene som behandles i Bergen bystyre, i byrådet og i de fire utvalgene som avgjør saker selv: utvalg for miljø og byutvikling, utvalg for finans, kultur og næring, utvalg for helse og sosial og utvalg for barnehage, skole og idrett. Alle sakene fra disse organene vises. Poengsummen bestemmer bare rekkefølgen og hvilke saker som løftes fram, ikke hvilke saker som er med. Rene formalia, som godkjenning av protokoll, vises ikke som egne saker. Hver møteside viser alle sakene fra møtet og hvordan de endte.
 
 Sammendrag skrives for saker fra de siste tre månedene. Eldre saker vises med kommunens egen tittel og lenke til dokumentene.
 

@@ -157,6 +157,8 @@ def test_innstilling_fell_whole_vs_partly():
 def test_endelighet_by_organ():
     assert sig()["endelighet"] == 1.0
     assert sig(utvalgId="900101")["endelighet"] < sig(utvalgId="900102")["endelighet"] < 1.0
+    # The utvalg decide for good within their delegation; a notch below byrådet.
+    assert sig(utvalgId="900101")["endelighet"] < sig(utvalgId="573969")["endelighet"] < sig(utvalgId="900102")["endelighet"]
 
 
 # --- score ---------------------------------------------------------------------

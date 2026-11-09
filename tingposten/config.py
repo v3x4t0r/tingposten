@@ -178,9 +178,15 @@ FAKTASJEKKER_RESERVE_EFFORT = "low"
 # Their cases show up on the site when the deciding organ has decided.
 INNSTILLENDE = {"900101"}
 
-# Tier 1: the organs whose decisions are final or go straight to bystyret.
+# Tier 1: the organs whose decisions are final or go straight to bystyret, and
+# (owner, 9.11.2026) the four utvalg that decide delegated matters themselves:
+# klagesaker, smaller plans and grants end there and never reach bystyret.
 TIER1 = {
     "571424": "Bergen bystyre",
     "900101": "Byrådet – saker med innstilling til bystyret",
     "900102": "Byrådet – saker avgjort av byrådet",
+    "573969": "Utvalg for miljø og byutvikling",
+    "573732": "Utvalg for finans, kultur og næring",
+    "573968": "Utvalg for helse og sosial",
+    "573966": "Utvalg for barnehage, skole og idrett",
 }
