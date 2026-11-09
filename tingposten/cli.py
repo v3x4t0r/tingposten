@@ -134,6 +134,8 @@ def main(argv: list[str] | None = None) -> int:
     dtest.add_argument("--bare", type=int, help="bare de første N kommentarene (prøvekjøring)")
     dtest.add_argument("--rapport", nargs="*", type=Path, metavar="KJØRING",
                        help="lag tabellen fra disse kjøringene (uten filer: den nyeste per moderator)")
+    dtest.add_argument("--laert", action="store_true",
+                       help="ta med redaktørens eksempler fra kommentardatabasen (kontrollpanelet, «Alle kommentarer»)")
     dtest.add_argument("--stol-pa-etikett", action="store_true",
                        help="regn et svar uten sannsynligheter (hailo) som sikkert")
 
@@ -351,9 +353,15 @@ def _debatt_test(args) -> int:
     try:
         sett = testsett.les_sett()
     except FileNotFoundError as e:
-        logging.error("%s", e)
-        return 1
+        if not args.laert:  # with --laert the editor's examples alone are a set
+            logging.error("%s", e)
+            return 1
+        sett = []
     fasit = testsett.les_fasit()
+    if args.laert:
+        n = len(sett)
+        sett, fasit = testsett.med_laerte(sett, fasit)
+        logging.info("debatt-test: %d eksempler fra redaktøren lagt til", len(sett) - n)
     if args.rapport is not None:
         filer = args.rapport or list(testsett.nyeste_kjoringer().values())
     else:
