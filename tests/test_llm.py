@@ -161,3 +161,19 @@ def test_without_reserve_the_error_stands():
     sjekk = llm.MedReserve(llm.FakeLLM([llm.LLMError("x"), llm.LLMError("x")], "codex"), None)
     with pytest.raises(llm.LLMError):
         sjekk.ask("p", SCHEMA)
+
+
+def test_reserves_are_tried_in_order():
+    feil = llm.LLMError("out of tokens")
+    codex = llm.FakeLLM([feil, feil], "codex")
+    fable = llm.FakeLLM([feil, feil], "claude:fable")
+    opus = llm.FakeLLM([GOOD, GOOD], "claude:claude-opus-5-5")
+    sjekk = llm.med_reserver(codex, [fable, opus])
+    assert sjekk.ask("p", SCHEMA) == GOOD and sjekk.name == "claude:claude-opus-5-5"
+    assert sjekk.ask("p2", SCHEMA) == GOOD
+    assert opus.prompts == ["p", "p2"] and len(fable.prompts) == 2  # neither earlier one is tried again
+
+
+def test_without_reserves_the_first_stands_alone():
+    codex = llm.FakeLLM([GOOD], "codex")
+    assert llm.med_reserver(codex, []) is codex

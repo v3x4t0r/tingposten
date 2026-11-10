@@ -33,7 +33,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from . import config, faktasjekker, klassifiserer, pdf, protokoll, redaktor, score, skribent, status, vedlegg
-from .llm import ClaudeCLI, CodexCLI, MedReserve, read_json
+from .llm import ClaudeCLI, CodexCLI, med_reserver, read_json
 
 log = logging.getLogger(__name__)
 
@@ -238,10 +238,9 @@ def kjor(data_dir: Path = config.DATA_DIR, utvalg: str | None = None, dato: str 
     llms = llms or {
         "vedlegg": ClaudeCLI(config.MODELL_VEDLEGG, config.VEDLEGG_EFFORT),
         "skriv": ClaudeCLI(config.MODELL_SKRIBENT),
-        # Codex checks; when it can't answer, Claude (config.FAKTASJEKKER_RESERVE) does.
-        "sjekk": MedReserve(CodexCLI(config.MODELL_FAKTASJEKKER),
-                            ClaudeCLI(config.FAKTASJEKKER_RESERVE, config.FAKTASJEKKER_RESERVE_EFFORT)
-                            if config.FAKTASJEKKER_RESERVE else None),
+        # Codex checks; when it can't answer, the Claude reserves (config.FAKTASJEKKER_RESERVER) do.
+        "sjekk": med_reserver(CodexCLI(config.MODELL_FAKTASJEKKER),
+                              [ClaudeCLI(m, e) for m, e in config.FAKTASJEKKER_RESERVER]),
         "klassifiser": ClaudeCLI(config.MODELL_KLASSIFISERER),
     }
     llm = {**llms, "artikkel": llms.get("artikkel", llms.get("skriv")),

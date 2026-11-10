@@ -145,6 +145,13 @@ class MedReserve(_Backend):
         return svar
 
 
+def med_reserver(forste: _Backend, reserver: list[_Backend]) -> _Backend:
+    """`forste`, then each reserve in turn: MedReserve(a, MedReserve(b, c))."""
+    if not reserver:
+        return forste
+    return MedReserve(forste, med_reserver(reserver[0], reserver[1:]))
+
+
 class FakeLLM(_Backend):
     """For tests: returns the given responses in order (an Exception is raised)."""
 

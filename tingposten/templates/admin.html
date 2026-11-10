@@ -466,13 +466,15 @@ function tegn() {
     ["Sist sjekket hos kommunen", tid(d.sist_hentet)],
   ]);
   const m = d.maskin;
-  const innsats = m.reserve_innsats ? `, ${INNSATS[m.reserve_innsats] || m.reserve_innsats} innsats` : "";
+  const MODELLNAVN = {fable: "Fable", "claude-opus-5-5": "Opus 5.5", opus: "Opus", sonnet: "Sonnet", haiku: "Haiku"};
+  const reserver = (m.reserver || []).map(r => `${MODELLNAVN[r.modell] || r.modell}` +
+    (r.innsats ? ` (${INNSATS[r.innsats] || r.innsats} innsats)` : "")).join(", så ");
   fakta("maskin", [
     ["Ledig disk", `${tall(m.disk_ledig_gb)} GB (${m.disk_brukt} % brukt)`, m.disk_ledig_gb < 2 ? "nei" : ""],
     ["Skribent", m.claude ? "Claude" : "Claude mangler", m.claude ? "ok" : "nei"],
-    ["Faktasjekk", m.codex ? (m.reserve ? `Codex, med Claude (${m.reserve}${innsats}) som reserve` : "Codex")
-                           : m.reserve ? `${m.reserve[0].toUpperCase() + m.reserve.slice(1)} (Claude${innsats}), Codex mangler` : "Codex mangler",
-     m.codex || m.reserve ? "ok" : "nei"],
+    ["Faktasjekk", m.codex ? (reserver ? `Codex, med Claude som reserve: ${reserver}` : "Codex")
+                           : reserver ? `Claude: ${reserver}. Codex mangler` : "Codex mangler",
+     m.codex || reserver ? "ok" : "nei"],
     s ? ["Siste kjøring", `${MODUSNAVN[s.modus] || s.modus}, ${tid(s.startet)}`] : null,
   ]);
 }

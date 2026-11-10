@@ -169,10 +169,12 @@ VEDLEGG_EFFORT = "low"
 VEDLEGG_FRA = "2026-11-01"
 # When Codex can't answer (not installed, out of quota), Claude with this model
 # fact-checks instead, for the rest of that run; the check records which model did
-# it. Owner, 30.10.2026: Codex out of tokens, Fable as the backup reviewer. None = no reserve.
-FAKTASJEKKER_RESERVE = "fable"
-# Owner, 31.10.2026: the reserve runs at low effort so it doesn't use up the subscription.
-FAKTASJEKKER_RESERVE_EFFORT = "low"
+# it. Reserves are tried in order, each taking over when the one before can't answer.
+# Owner, 30.10.2026: Codex out of tokens, Fable as the backup reviewer.
+# Owner, 31.10.2026: Fable runs at low effort so it doesn't use up the subscription.
+# Owner, 10.11.2026: Opus 5.5 at high effort when Fable is out of tokens too.
+# (model, effort); an empty list = no reserve.
+FAKTASJEKKER_RESERVER = [("fable", "low"), ("claude-opus-5-5", "high")]
 
 # Organs whose items are recommendations to another organ, not decisions.
 # Their cases show up on the site when the deciding organ has decided.
