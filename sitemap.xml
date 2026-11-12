@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://tingposten.no/bergen/</loc><lastmod>2026-11-11</lastmod></url>
+  <url><loc>https://tingposten.no/bergen/</loc><lastmod>2026-11-12</lastmod></url>
   <url><loc>https://tingposten.no/bergen/alle/</loc></url>
   <url><loc>https://tingposten.no/bergen/tema/byutvikling/</loc></url>
-  <url><loc>https://tingposten.no/bergen/tema/helse/</loc></url>
   <url><loc>https://tingposten.no/bergen/tema/styring/</loc></url>
+  <url><loc>https://tingposten.no/bergen/tema/helse/</loc></url>
   <url><loc>https://tingposten.no/bergen/tema/kultur/</loc></url>
   <url><loc>https://tingposten.no/bergen/tema/okonomi/</loc></url>
   <url><loc>https://tingposten.no/bergen/tema/samferdsel/</loc></url>
   <url><loc>https://tingposten.no/bergen/tema/miljo/</loc></url>
   <url><loc>https://tingposten.no/bergen/tema/skole/</loc></url>
   <url><loc>https://tingposten.no/bergen/tema/annet/</loc></url>
-  <url><loc>https://tingposten.no/bergen/30-dager/</loc><lastmod>2026-11-11</lastmod></url>
+  <url><loc>https://tingposten.no/bergen/30-dager/</loc><lastmod>2026-11-12</lastmod></url>
   <url><loc>https://tingposten.no/bergen/30-dager/alle/</loc></url>
   <url><loc>https://tingposten.no/bergen/30-dager/tema/byutvikling/</loc></url>
   <url><loc>https://tingposten.no/bergen/30-dager/tema/styring/</loc></url>
@@ -22,7 +22,7 @@
   <url><loc>https://tingposten.no/bergen/30-dager/tema/okonomi/</loc></url>
   <url><loc>https://tingposten.no/bergen/30-dager/tema/kultur/</loc></url>
   <url><loc>https://tingposten.no/bergen/30-dager/tema/annet/</loc></url>
-  <url><loc>https://tingposten.no/bergen/i-ar/</loc><lastmod>2026-11-11</lastmod></url>
+  <url><loc>https://tingposten.no/bergen/i-ar/</loc><lastmod>2026-11-12</lastmod></url>
   <url><loc>https://tingposten.no/bergen/i-ar/alle/</loc></url>
   <url><loc>https://tingposten.no/bergen/i-ar/tema/styring/</loc></url>
   <url><loc>https://tingposten.no/bergen/i-ar/tema/byutvikling/</loc></url>
@@ -34,6 +34,7 @@
   <url><loc>https://tingposten.no/bergen/i-ar/tema/kultur/</loc></url>
   <url><loc>https://tingposten.no/bergen/i-ar/tema/annet/</loc></url>
   <url><loc>https://tingposten.no/bergen/moter/</loc></url>
+  <url><loc>https://tingposten.no/bergen/mote/900102-2026-11-11/</loc></url>
   <url><loc>https://tingposten.no/bergen/mote/573969-2026-11-05/</loc></url>
   <url><loc>https://tingposten.no/bergen/mote/900102-2026-11-05/</loc></url>
   <url><loc>https://tingposten.no/bergen/mote/573968-2026-11-04/</loc></url>
