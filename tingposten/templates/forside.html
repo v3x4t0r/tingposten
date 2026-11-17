@@ -10,11 +10,23 @@
 </nav>
 {% endblock %}
 {% block hovedklasse %}forside{% endblock %}
+{# The best saker from the weeks before, when the period itself has few (bygg.front_page). #}
+{% macro fortsatt_aktuelt() %}
+{% if fortsatt %}
+<section class="seksjon flere" aria-labelledby="fortsatt-tittel">
+  <div class="seksjon-hode"><h2 id="fortsatt-tittel">Fortsatt aktuelt</h2><p>Viktige vedtak fra ukene før</p></div>
+  <ul class="rader">
+    {% for s in fortsatt %}{{ rad(s, root, vis_mote=True) }}{% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% endmacro %}
 {% block main %}
 {% set std = standard.slug if standard else none %}
 <h1 class="vh">Vedtak i Bergen kommune, {{ periode|lower }}</h1>
 {% if not lead %}
 <p class="tomt">Ingen vedtak i perioden. Se <a href="{{ root }}bergen/moter/">alle møter</a>.</p>
+{{ fortsatt_aktuelt() }}
 {% else %}
 <div class="toppsone">
 {{ lead_story(lead, root) }}
@@ -49,6 +61,7 @@
 {% if ns.kart %}<p class="fire-kilde">Kart: © OpenStreetMap (ODbL)</p>{% endif %}
 </section>
 {% endif %}
+{{ fortsatt_aktuelt() }}
 {% if liste %}
 <section class="seksjon flere" aria-labelledby="flere-tittel">
   <div class="seksjon-hode"><h2 id="flere-tittel">I korthet</h2><p>{{ liste|length }} {{ "sak" if liste|length == 1 else "saker" }} til fra perioden</p></div>

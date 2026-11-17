@@ -90,6 +90,10 @@ def test_reach_by_number_of_bydeler():
     ("Oppheving av eldre mindre reguleringsplaner", "opprydding i planer"),
     ("Opsjonsavtale om salg av tomter", "eierskap/salg"),
     ("Interpellasjon nr. 9 om parkering", "interpellasjon"),
+    ("Klagesak. Fana, gnr. 93 bnr. 245, Svartefjorden 130. Klage på avslag. Søknad om dispensasjon", "klagesak"),
+    # a statement on someone else's forskrift or budget is not a forskrift or a budget
+    ("Høringsuttalelse til forslag til forskrift om deling av taushetsbelagte opplysninger", "høringsuttalelse"),
+    ("Skriftlige innspill til UFKN ang. Bergen kommunes budsjett for 2027", "høringsuttalelse"),
 ])
 def test_case_type_from_title(tittel, label):
     assert sig(tittel)["sakstype"] == label
@@ -368,3 +372,23 @@ def test_orientering_ranks_like_not_decided():
     noted, reasons = score.score({**s, "status": "orientering"})
     assert noted == round(full * score.IKKE_AVGJORT_FAKTOR) or abs(noted - full * score.IKKE_AVGJORT_FAKTOR) <= 1
     assert reasons[0] == "ingen ny beslutning"
+
+
+def test_klagesak_gets_nothing_for_a_close_vote():
+    # the owner's call (17.11): a neighbour dispute isn't news because the utvalg split 9–8
+    p = prot("Klagen tas til følge.", votes=[vote("Alternativforslag", "vedtatt", 9), vote("Innstillingen", "falt", 8)])
+    p["innstilling_falt"] = True
+    klage = sig("Klagesak. Bergenhus, gnr. 166 bnr. 319, Lille Øvregaten 12. Klage på rammetillatelse", p)
+    parts = score._parts(klage)
+    assert parts["uenighet"] == parts["innstilling_falt"] == parts["debatt"] == 0.0
+    annen = score._parts(sig("Bergenhus, gnr. 166 bnr. 319, Lille Øvregaten 12. Rammetillatelse", p))
+    assert annen["uenighet"] > 0 and annen["innstilling_falt"] == 1.0 and annen["debatt"] > 0
+    assert score.score(klage)[0] < score.score({**klage, "sakstype": "annet"})[0]
+
+
+def test_a_hearing_in_the_meeting_is_no_decision():
+    s = sig("Skriftlige innspill til UFKN ang. Bergen kommunes budsjett for 2027",
+            prot("Følgende organisasjoner holdt innlegg i møtet: • Eldrerådet • Bergen kunsthall", votes=[]))
+    assert not s["vedtak_fattet"] and not s["hele_byen"]
+    parts = score._parts(s)
+    assert parts["juridisk_vekt"] == parts["rekkevidde"] == parts["endelighet"] == 0.0

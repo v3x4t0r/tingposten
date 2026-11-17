@@ -86,6 +86,11 @@ SAKSTYPER = (
     (r"\beventuelt\b", "eventuelt", 0.2, 0.3),
     (r"lovlighetskontroll", "lovlighetskontroll", 0.2, 0.3),
     (r"innbyggerforslag", "innbyggerforslag", 0.2, 0.3),
+    # A complaint over one decision (a building permit, a dispensation): it settles that case only.
+    (r"\bklagesak\b|\bklage (?:på|over)\b", "klagesak", 0.2, 0.2),
+    # What the kommune says about someone else's proposal, before "forskrift" and
+    # "budsjett": a statement on a forskrift isn't one.
+    (r"høringsuttalelse|\binnspill til\b", "høringsuttalelse", 0.3, 0.2),
     (r"oppheving av (eldre|gamle)", "opprydding i planer", 0.3, 0.5),
     (r"\bkommuneplan\b|\bøkonomiplan\b|\bbudsjett\b|\bforskrift\b|\bvedtekter\b", "budsjett/forskrift", 1.0, 1.0),
     (r"kommunedelplan|valg av trasé|områderegulering", "kommunedelplan", 0.8, 1.0),
@@ -94,7 +99,6 @@ SAKSTYPER = (
     (r"opsjonsavtale|\bsalg\b|aksje|eierskap(?!skontroll)", "eierskap/salg", 0.5, 0.9),
     (r"avtale", "avtale", 0.5, 0.8),
     (r"gjennomføringsvedtak|investeringsramme|totalrehabilitering", "investering", 0.5, 0.6),
-    (r"høringsuttalelse", "høringsuttalelse", 0.3, 0.2),
     (r"forvaltningsrevisjon|eierskapskontroll|sluttmelding|økonomiske perspektiver|rullering", "rapport", 0.3, 0.2),
     (r"tilskudd|bevilgning", "tilskudd", 0.4, 0.3),
 )
@@ -105,7 +109,8 @@ WHOLE_CITY = re.compile(r"hele byen|hele bergen|alle bydeler|byomfattende|bergen
 # matters (property, procurement): kommune-wide, but not the same as city-wide.
 WHOLE_KOMMUNE = re.compile(r"bergen kommune", re.I)
 NARROW = re.compile(r"\bgnr\.?\s*\d+.*\bbnr\b", re.I)
-NO_DECISION = re.compile(r"ikke fattet vedtak|ikke behandlet", re.I)
+# "Følgende organisasjoner holdt innlegg i møtet: …" records a hearing, not a decision.
+NO_DECISION = re.compile(r"ikke fattet vedtak|ikke behandlet|^følgende \w+ holdt innlegg", re.I)
 MERKNAD = re.compile(r"^\s*merknad(er)?\b", re.I | re.M)
 
 
@@ -298,15 +303,18 @@ def _parts(sig: dict) -> dict:
         n = len(sig.get("bydeler", []))
         reach = (0.0, 0.35, 0.5, 0.6, 0.65, 0.75, 0.8, 0.85, 1.0)[n] if sig.get("vedtak_fattet") else 0.0
     falt = 1.0 if sig.get("innstilling_falt") else 0.6 if sig.get("innstilling_delvis_falt") else 0.0
+    # The owner's call (17.11): a close vote in a klagesak is a dispute over one
+    # property, not over the city's policy, so the disagreement signals don't count there.
+    strid = sig.get("sakstype") != "klagesak"
     return {
         "belop": min(1.0, max(0.0, math.log10(kr / 1e6) / 3)) if kr else 0.0,
         "rekkevidde": reach,
         "juridisk_vekt": sig.get("juridisk_vekt", 0.0),
-        "uenighet": sig.get("uenighet", 0.0),
-        "innstilling_falt": falt,
+        "uenighet": sig.get("uenighet", 0.0) if strid else 0.0,
+        "innstilling_falt": falt if strid else 0.0,
         "varighet": sig.get("varighet", 0.0),
         "endelighet": sig.get("endelighet", 0.5) if sig.get("vedtak_fattet") else 0.0,
-        "debatt": _debatt(sig),
+        "debatt": _debatt(sig) if strid else 0.0,
         "angar": (sig["angar"] - 1) / 4 if sig.get("angar") else None,
         "konkret": (sig["konkret"] - 1) / 4 if sig.get("konkret") else None,
     }

@@ -54,6 +54,9 @@ SENDT_TILBAKE = re.compile(
 )
 UTSATT = re.compile(r"\butsettes\b|\bvert utsett\b|\butsetjast\b", re.I)
 ORIENTERING = re.compile(r"til orientering", re.I)
+# "Utvalg for finans, kultur og næring innstiller i saken til bystyret." says where
+# the sak goes next, in an utvalg that only took it til orientering.
+VIDERE = re.compile(r"\binnstiller i saken\b", re.I)
 MERKNAD = re.compile(r"\bMerknad(?:er)?(?:\s+\d+)?\s+(?=fra\b|frå\b|[A-ZÆØÅ])")
 # "Daniel Hägglund (FRP) fremsatte på vegne av FRP følgende protokolltilførsel: …"
 TILFORSEL = re.compile(r"(?:[A-ZÆØÅ][\wæøåÆØÅ'\-]*\s+){1,6}\([^)]*\)\s+fremsatte\b", re.S)
@@ -122,7 +125,7 @@ def _only_orientering(binding: str) -> bool:
     points = [x for x in re.split(r"(?:^|\s)\d+\.\s+", binding) if x.strip()]
     if len(points) <= 1:
         points = [x for x in re.split(r"(?<=[.!?])\s+(?=[A-ZÆØÅ])", binding) if x.strip()]
-    return all(ORIENTERING.search(x) for x in points)
+    return all(ORIENTERING.search(x) or VIDERE.search(x) for x in points)
 
 
 def _status(kode: str) -> dict:
