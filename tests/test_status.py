@@ -121,3 +121,12 @@ def test_protokoll_from_an_earlier_meeting_is_not_the_outcome():
     assert status.vedtaksstatus(sak, p) == {"kode": "venter_protokoll", "tekst": "Venter på protokoll"}
     assert status.vedtaksstatus({**sak, "moteDato": "2026-06-17"}, p)["kode"] == "utsatt"
     assert status.protokoll_klar(sak, {"motedato": ""})  # unknown date → trust it
+
+
+def test_orientering_in_an_utvalg_that_passes_the_sak_on():
+    # 102/26 in utvalg for barnehage, skole og idrett: the second sentence only says who recommends
+    v = ("Utvalg for barnehage, skole og idrett tok saken til orientering. Utvalg for finans, kultur og næring "
+         "innstiller i saken til bystyret. Merknad Leseferdighetene hos skolebarna i Bergen faller.")
+    assert kode("2. tertialrapport 2026", v, votes=[]) == "orientering"
+    assert kode("2. tertialrapport 2026", "Utvalget tok saken til orientering. Byrådet bes legge fram en ny plan.",
+                votes=[]) == "vedtatt"

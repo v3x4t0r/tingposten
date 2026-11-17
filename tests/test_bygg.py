@@ -572,7 +572,7 @@ def test_organ_and_date_only_off_the_standard_meeting(monkeypatch, tmp_path, dat
     red = data_dir / "redigert" / BYSTYRET / "2026-09-30"
     red.mkdir(parents=True)
     (red / "250-26.json").write_text(json.dumps({**CARD, "nr": "250/26", "overskrift": "Ekstra sak fra et annet møte"}))
-    monkeypatch.setitem(SCORES, "250/26", 50)
+    monkeypatch.setitem(SCORES, "250/26", 20)  # a week newer, but low enough not to lead (bygg.vekt)
     site = tmp_path / "site-std"
     bygg.build(site, data_dir, idag=date(2026, 10, 1))
     forside = (site / "bergen/index.html").read_text()

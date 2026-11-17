@@ -139,3 +139,71 @@ def test_standard_line_follows_the_stories(tmp_path, data_dir):
     aar = (site / "bergen/i-ar/index.html").read_text()
     assert "Fra bystyret 23. september 2026 der ikke annet står" in aar
     assert 'faktum-mote"><span>Bystyret, <time datetime="2026-01-28">' in aar
+
+
+# --- the newest front page ages its stories (owner, 17.11) --------------------
+
+def fersk(i, score_, dato, **kw):
+    return fake_sak(i, score_, mote=mote(dato), **kw)
+
+
+def nr(saker):
+    return [s["nr"] for s in saker]
+
+
+def test_newest_view_ages_the_score_and_the_longer_views_do_not():
+    gammel, ny = fersk(1, 65, "2026-10-27"), fersk(2, 45, "2026-11-05")
+    idag = date(2026, 11, 6)
+    assert bygg.vekt(gammel, idag) == 65 / 4 and bygg.vekt(ny, idag) == 45 * 0.5 ** 0.2  # 10 days and 1 day old
+    assert bygg.front_page([gammel, ny], idag)["lead"] is ny
+    assert bygg.front_page([gammel, ny])["lead"] is gammel
+    # a sak counts from the day it came on the site, not from its meeting
+    gammel["fersk_fra"] = date(2026, 11, 5)
+    assert bygg.front_page([gammel, ny], idag)["lead"] is gammel
+
+
+def test_lead_changes_after_four_days_when_another_fremhevet_sak_can_take_over():
+    saker = [fersk(1, 65, "2026-10-27"), fersk(2, 64, "2026-10-27"), fersk(3, 56, "2026-10-27"),
+             fersk(4, 39, "2026-10-27")]       # under the threshold: never takes over
+    leads = []
+    for n in range(14):
+        idag = date(2026, 10, 27) + bygg.timedelta(days=n)
+        front = bygg.front_page(bygg._window(saker, idag, 14), idag, bygg.leder_dager(saker, idag, 14))
+        leads.append(front["lead"]["nr"])
+        # the story that gave up the lead is still on the page, first in the row of four
+        assert nr([front["lead"], *front["sekundaer"]]) == [leads[-1]] + [x for x in nr(saker) if x != leads[-1]]
+    assert leads == ["1/26"] * 4 + ["2/26"] * 4 + ["3/26"] * 4 + ["1/26"] * 2  # all have had their days: the best again
+
+
+def test_fortsatt_aktuelt_fills_up_a_thin_period():
+    idag = date(2026, 11, 17)
+    window = [fersk(1, 45, "2026-11-10"), fersk(2, 30, "2026-11-10")]                  # one fremhevet sak
+    eldre = [fersk(10 + i, 70 - i, "2026-10-27") for i in range(8)] + [fersk(20, 90, "2026-10-27", sammendrag=False),
+                                                                       fersk(21, 39, "2026-10-27")]
+    front = bygg.front_page(window, idag, {}, eldre)
+    assert nr(front["fortsatt"]) == ["10/26", "11/26", "12/26", "13/26"]               # 1 + 4 = FORTSATT
+    assert front["lead"]["nr"] == "1/26" and front["andre"] == 0                       # the period's own saker still lead
+    full = [fersk(i, 50, "2026-11-10") for i in range(5)]
+    assert bygg.front_page(full, idag, {}, eldre)["fortsatt"] == []
+    assert bygg.front_page(window, None, None, eldre)["fortsatt"] == []                # never on the longer views
+
+
+def test_card_date_from_the_editors_log(tmp_path):
+    (tmp_path / "metrikk.jsonl").write_text(
+        '{"tid": "2026-10-29T18:38:21+00:00", "type": "kort", "key": "a/2026-10-27/1-26", "avvist": true}\n'
+        '{"tid": "2026-10-30T07:00:00+00:00", "type": "kort", "key": "a/2026-10-27/1-26", "avvist": false}\n'
+        '{"tid": "2026-11-02T07:00:00+00:00", "type": "kort", "key": "a/2026-10-27/1-26", "avvist": false}\n'
+        '{"tid": "2026-10-30T07:00:00+00:00", "type": "artikkel", "key": "a/2026-10-27/2-26", "avvist": false}\n'
+        'not json\n')
+    assert bygg._skrevet(tmp_path) == {"a/2026-10-27/1-26": date(2026, 10, 30)}
+    assert bygg._skrevet(tmp_path / "mangler") == {}
+
+
+def test_fortsatt_aktuelt_is_rendered_also_when_the_period_is_empty(tmp_path, data_dir):
+    site = tmp_path / "site-fortsatt"
+    bygg.build(site, data_dir, idag=date(2026, 10, 15))   # the meeting of 23.9 is 22 days back
+    forside = (site / "bergen/index.html").read_text()
+    assert "Ingen vedtak i perioden" in forside
+    seksjon = re.search(r'<section class="seksjon flere" aria-labelledby="fortsatt-tittel">.*?</section>', forside, re.S).group(0)
+    assert "Klarsignal til å bygge Eksempelhallen" in seksjon and "23. sep" in seksjon
+    assert "Fortsatt aktuelt" not in (site / "bergen/30-dager/index.html").read_text()

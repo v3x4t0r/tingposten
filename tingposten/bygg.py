@@ -61,6 +61,12 @@ WEEKDAYS = ("mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag", "søn
 SECONDARY = 4       # the row of four under the lead
 LISTE = 10          # "Flere vedtak": the two-column list after the four (1 + 4 + 10 = 15 stories)
 FLIS = 3            # headlines per topic tile ("Alle temaer")
+# The newest front page (FERSK) ages its stories, so it changes between the big meetings.
+FERSK = ""          # the view (a key in VIEWS) that does
+HALVERINGSTID = 5   # days on the site before a sak's score counts half as much there
+LEDER_DAGER = 4     # a sak leads at most this many days; then the next fremhevede story takes over
+FORTSATT = 5        # "Fortsatt aktuelt": the stories and these hold at least this many fremhevede saker
+FORTSATT_DAGER = 30  # how far back "Fortsatt aktuelt" reaches
 PANEL_MOTER = 4     # meetings listed in "Perioden i tall" before "og N møter til"
 PANEL_TEMAER = 6    # temaer with a bar in "Perioden i tall" before "og N temaer til"
 STANDARD_ANDEL = 0.5  # the standard meeting holds at least this share of the stories
@@ -195,7 +201,12 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
     write("index.html", "landing.html", side="landing", idag_tekst=idag_tekst)
     for slug, (days, label) in VIEWS.items():
         window = _window(saker, idag, days)
-        front = front_page(window)
+        if slug == FERSK:
+            eldre = [s_ for s_ in _window(saker, idag, FORTSATT_DAGER) if s_["dato"] < idag - timedelta(days=days)]
+            front = front_page(window, idag, leder_dager(saker, idag, days), eldre)
+        else:
+            # The longer views are the period's biggest saker, whatever their age.
+            front = front_page(window)
         write(f"bergen/{slug}index.html", "forside.html", side="forside", visning=slug, periode=label,
               idag_tekst=idag_tekst, endret=idag, **front)
         # The year's lists are long: month subheads and headlines only.
@@ -220,7 +231,8 @@ def build(site_dir: Path = config.SITE_DIR, data_dir: Path = config.DATA_DIR, id
         # A sak with only the kommune's title and links stays out of search until it has a summary.
         write(s_["side"] + "index.html", "sak.html", side="sak", s=s_, mote=meeting,
               relaterte=related(s_, meeting), noindex=not s_["har_sammendrag"], endret=s_["endret"])
-    write("om/index.html", "om.html", side="om", signaler=_weights(), terskel=_terskel())
+    write("om/index.html", "om.html", side="om", signaler=_weights(), terskel=_terskel(),
+          halveringstid=HALVERINGSTID, leder_dager=LEDER_DAGER)
     # Debatt: the editor's published debattinnlegg (data/bergen/innlegg) and the page that lists them.
     innlegg = innlegg_mod.last(data_dir)
     sak_etter_key = {s_["key"]: s_ for s_ in saker}
@@ -365,6 +377,7 @@ def skriv_testpanel(saker: list[dict], debatt_dir: Path, idag: date) -> Path:
 def load(data_dir: Path) -> list[dict]:
     """Every decided sak from the Tier 1 organs, with its card and score."""
     parsers = _Parsers()
+    skrevet = _skrevet(data_dir)
     saker = []
     for uid in config.TIER1:
         path = data_dir / "agendapunkter" / f"{uid}.json"
@@ -383,7 +396,7 @@ def load(data_dir: Path) -> list[dict]:
                                                        parse_protokoll=parsers.protokoll,
                                                        parse_saksframlegg=parsers.saksframlegg)}
             for item in meeting:
-                saker.append(_sak(item, ranked.get(_nr(item), {}), data_dir, parsers))
+                saker.append(_sak(item, ranked.get(_nr(item), {}), data_dir, parsers, skrevet))
     kortlenker(saker)
     return saker
 
@@ -503,7 +516,26 @@ def figur(sak: dict, kind: str) -> dict | None:
     return next((f for f in sak["figurer"] if f.get("type") == kind), None)
 
 
-def _sak(item: dict, ranked: dict, data_dir: Path, parsers: "_Parsers | None" = None) -> dict:
+def _skrevet(data_dir: Path) -> dict[str, date]:
+    """The day each sak's card was first written and kept (the editor's log,
+    metrikk.jsonl), by sak key. The pipeline publishes after it writes, so
+    this is the day the sak came on the site with a summary."""
+    path, out = data_dir / "metrikk.jsonl", {}
+    if not path.exists():
+        return out
+    for line in path.read_text().splitlines():
+        try:
+            m = json.loads(line)
+            if m.get("type", "kort") != "kort" or m.get("avvist") or m["key"] in out:
+                continue
+            out[m["key"]] = datetime.fromisoformat(m["tid"]).astimezone().date()
+        except (ValueError, KeyError, TypeError):
+            continue
+    return out
+
+
+def _sak(item: dict, ranked: dict, data_dir: Path, parsers: "_Parsers | None" = None,
+         skrevet: dict | None = None) -> dict:
     parsers = parsers or _Parsers()
     card_path = data_dir / "redigert" / f"{pdf.key(item)}.json"
     card = json.loads(card_path.read_text()) if card_path.exists() else None
@@ -571,6 +603,8 @@ def _sak(item: dict, ranked: dict, data_dir: Path, parsers: "_Parsers | None" = 
         "rettet": sorted({n["felt"] for n in notes if n["brukt"]}),
     }
     sak["har_artikkel"] = bool(sak["artikkel"])
+    # The day the sak came on the site, for the front page's ageing: when its card was written.
+    sak["fersk_fra"] = max(dato, skrevet.get(pdf.key(item), dato)) if skrevet else dato
     # When the page last changed, for the sitemap and dateModified: the card, the article, a correction.
     filer = [p for p in (card_path, data_dir / "artikler-redigert" / f"{pdf.key(item)}.json") if p.exists()]
     sak["endret"] = max([dato] + [date.fromtimestamp(p.stat().st_mtime) for p in filer]
@@ -846,24 +880,68 @@ def forste_setning(dek: str) -> str:
     return split_first_sentence(dek, years=True)[0]
 
 
-def front_page(window: list[dict]) -> dict:
+def vekt(s: dict, dag: date | None) -> float:
+    """The sak's score as it counts on the newest front page on `dag`: halved
+    for every HALVERINGSTID days since the sak came on the site. Without a
+    day, the score itself."""
+    if dag is None:
+        return s["score"]
+    return s["score"] * 0.5 ** (max(0, (dag - s.get("fersk_fra", s["dato"])).days) / HALVERINGSTID)
+
+
+def _historier(window: list[dict], dag: date | None) -> tuple[list[dict], list[dict]]:
+    """(the window by weight, the up to 15 stories among them): the best saker
+    with a summary (a sak whose card isn't ready never leads with "Sammendrag
+    kommer"). Saker scoring 0 (valg, fritak) are never stories."""
+    ordered = sorted(window, key=lambda s: (-vekt(s, dag), -s["score"], -s["dato"].toordinal(), s["seq"]))
+    stories = [s for s in ordered if s["score"] > 0 and s["har_sammendrag"]][:1 + SECONDARY + LISTE]
+    return ordered, stories or ordered[:1]
+
+
+def _leder(stories: list[dict], ledet: dict) -> int:
+    """Which story leads: the first that hasn't led for LEDER_DAGER days
+    already. Only a fremhevet sak takes over, so a thin period keeps its best
+    sak on top; when every such story has had its days, the first leads again."""
+    for i, s in enumerate(stories):
+        if ledet.get(id(s), 0) < LEDER_DAGER and (i == 0 or s["fremhevet"]):
+            return i
+    return 0
+
+
+def leder_dager(saker: list[dict], idag: date, days: int) -> dict:
+    """How many of the `days` days before `idag` each sak (by id()) led the
+    newest front page. Replayed from today's data, so nothing is stored
+    between builds: a sak counts from the day it came on the site."""
+    ledet: dict = defaultdict(int)
+    for n in range(days, 0, -1):
+        dag = idag - timedelta(days=n)
+        window = [s for s in _window(saker, dag, days) if s.get("fersk_fra", s["dato"]) <= dag]
+        stories = _historier(window, dag)[1]
+        if stories:
+            ledet[id(stories[_leder(stories, ledet)])] += 1
+    return ledet
+
+
+def front_page(window: list[dict], idag: date | None = None, ledet: dict | None = None,
+               eldre: list[dict] = ()) -> dict:
     """Lead, the row of four, the list of ten, a tile per tema with saker
     left over, and the rest.
 
-    The 15 stories are the fremhevede saker that have a summary, by score;
-    when fewer than 15 are over the threshold, the next best saker with a
-    summary fill up (a fremhevet sak whose card isn't ready never leads with
-    "Sammendrag kommer"). Saker scoring 0 (valg, fritak) are never stories.
+    The 15 stories are the best saker that have a summary (_historier). With
+    `idag` (the newest view) they are ordered by aged score (vekt), the lead
+    changes after LEDER_DAGER days (`ledet`, from leder_dager), and when fewer
+    than FORTSATT of the stories are fremhevet, the best fremhevede saker from
+    the weeks before (`eldre`) fill up to that number under "Fortsatt aktuelt".
     Each tile shows the tema's best saker not already among the stories,
     those with a summary first. A tema whose saker are all among the stories
     gets no tile, only a link in one line under the tiles ("ogsa").
     """
-    ordered = sorted(window, key=lambda s: (-s["score"], -s["dato"].toordinal(), s["seq"]))
-    antall = 1 + SECONDARY + LISTE
-    stories = [s for s in ordered if s["fremhevet"] and s["har_sammendrag"]][:antall]
-    stories += [s for s in ordered if s["score"] > 0 and s["har_sammendrag"] and s not in stories][:antall - len(stories)]
-    if not stories:
-        stories = ordered[:1]
+    ordered, stories = _historier(window, idag)
+    if idag and stories:
+        stories.insert(0, stories.pop(_leder(stories, ledet or {})))
+    mangler = FORTSATT - sum(s["fremhevet"] for s in stories) if idag else 0
+    fortsatt = sorted((s for s in eldre if s["fremhevet"] and s["har_sammendrag"]),
+                      key=lambda s: (-s["score"], -s["dato"].toordinal(), s["seq"]))[:max(0, mangler)]
     shown = {id(s) for s in stories}
     moter = _meetings(window)
     standard = standard_mote(stories, moter)
@@ -881,6 +959,7 @@ def front_page(window: list[dict]) -> dict:
         "lead": stories[0] if stories else None,
         "sekundaer": stories[1:1 + SECONDARY],
         "liste": stories[1 + SECONDARY:],
+        "fortsatt": fortsatt,
         "fliser": fliser,
         "ogsa": ogsa,
         "temaer": temaer,
