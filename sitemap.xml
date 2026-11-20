@@ -2,18 +2,17 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://tingposten.no/bergen/</loc><lastmod>2026-11-20</lastmod></url>
   <url><loc>https://tingposten.no/bergen/alle/</loc></url>
+  <url><loc>https://tingposten.no/bergen/tema/skole/</loc></url>
   <url><loc>https://tingposten.no/bergen/tema/styring/</loc></url>
   <url><loc>https://tingposten.no/bergen/tema/byutvikling/</loc></url>
-  <url><loc>https://tingposten.no/bergen/tema/skole/</loc></url>
   <url><loc>https://tingposten.no/bergen/tema/samferdsel/</loc></url>
-  <url><loc>https://tingposten.no/bergen/tema/annet/</loc></url>
   <url><loc>https://tingposten.no/bergen/30-dager/</loc><lastmod>2026-11-20</lastmod></url>
   <url><loc>https://tingposten.no/bergen/30-dager/alle/</loc></url>
   <url><loc>https://tingposten.no/bergen/30-dager/tema/byutvikling/</loc></url>
   <url><loc>https://tingposten.no/bergen/30-dager/tema/styring/</loc></url>
   <url><loc>https://tingposten.no/bergen/30-dager/tema/samferdsel/</loc></url>
-  <url><loc>https://tingposten.no/bergen/30-dager/tema/miljo/</loc></url>
   <url><loc>https://tingposten.no/bergen/30-dager/tema/skole/</loc></url>
+  <url><loc>https://tingposten.no/bergen/30-dager/tema/miljo/</loc></url>
   <url><loc>https://tingposten.no/bergen/30-dager/tema/helse/</loc></url>
   <url><loc>https://tingposten.no/bergen/30-dager/tema/okonomi/</loc></url>
   <url><loc>https://tingposten.no/bergen/30-dager/tema/kultur/</loc></url>
@@ -342,6 +341,10 @@
   <url><loc>https://tingposten.no/bergen/sak/900102/2026-11-05/1190-26/</loc><lastmod>2026-11-05</lastmod></url>
   <url><loc>https://tingposten.no/bergen/sak/900102/2026-11-11/1191-26/</loc><lastmod>2026-11-12</lastmod></url>
   <url><loc>https://tingposten.no/bergen/sak/900102/2026-11-11/1192-26/</loc><lastmod>2026-11-12</lastmod></url>
+  <url><loc>https://tingposten.no/bergen/sak/900102/2026-11-19/1193-26/</loc><lastmod>2026-11-20</lastmod></url>
+  <url><loc>https://tingposten.no/bergen/sak/900102/2026-11-19/1194-26/</loc><lastmod>2026-11-20</lastmod></url>
+  <url><loc>https://tingposten.no/bergen/sak/900102/2026-11-19/1195-26/</loc><lastmod>2026-11-20</lastmod></url>
+  <url><loc>https://tingposten.no/bergen/sak/900102/2026-11-19/1196-26/</loc><lastmod>2026-11-20</lastmod></url>
   <url><loc>https://tingposten.no/bergen/sak/573969/2026-11-05/372-26/</loc><lastmod>2026-11-09</lastmod></url>
   <url><loc>https://tingposten.no/bergen/sak/573969/2026-11-05/376-26/</loc><lastmod>2026-11-09</lastmod></url>
   <url><loc>https://tingposten.no/bergen/sak/573969/2026-11-05/378-26/</loc><lastmod>2026-11-09</lastmod></url>
