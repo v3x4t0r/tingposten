@@ -55,7 +55,7 @@ from urllib.parse import urlsplit
 from jinja2 import Environment, FileSystemLoader
 from markupsafe import Markup
 
-from . import bygg, config
+from . import bygg, config, grafikk
 
 log = logging.getLogger(__name__)
 
@@ -80,6 +80,11 @@ FARGER = {
     "--tp-fg": "#000000",
     "--tp-muted": "#000000",
 }
+# The party colours of the vote bar become a grey ramp in print, one step per
+# party in the order the protokoll lists them, so neighbours differ and the
+# chips under the bar still name them.
+FARGER.update({f"--tp-p-{p.lower()}": "#{0:02x}{0:02x}{0:02x}".format(0x22 + i * 0x0c)
+               for i, p in enumerate(sorted(grafikk.PARTY_COLOUR))})
 
 
 @dataclass(frozen=True)
@@ -356,7 +361,7 @@ def figur_svg(svg: str) -> Markup:
     font, which print shops' preflight rejects. The caption names the bydeler."""
     def bytt(m):
         return FARGER.get(m.group(1), "#000000")
-    svg = re.sub(r"var\((--tp-[a-z]+)(?:,\s*[^)]*)?\)", bytt, svg)
+    svg = re.sub(r"var\((--tp-[a-z-]+)(?:,\s*[^)]*)?\)", bytt, svg)
     font = _etikettfont()
     svg = re.sub(r"<text\b([^>]*\bstroke=[^>]*)>(.*?)</text>", lambda m: _etikett_som_sti(m, font), svg, flags=re.S)
     return Markup(svg)
