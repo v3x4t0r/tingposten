@@ -509,3 +509,44 @@ def test_importance_words_allowed_when_reported_in_articles():
     assert banned("SV mente forslaget var viktig.", "status").startswith("viktighetsord")
     # "V" only counts as the party when capitalised as a subject
     assert banned("Vedtaket er viktig.", "artikkel").startswith("viktighetsord")
+
+
+# --- vote counts against the protokoll ------------------------------------------
+
+def test_vote_count_not_in_protokoll_deletes_the_sentence():
+    card, check = make({**BASE, "status": ["Alternativforslaget fra SV fikk 14 stemmer og falt.", "Innstillingen ble vedtatt med 36 stemmer."]})
+    r = redaktor.edit(card, check, tall={36, 31, 7})
+    assert [d["grunn"] for d in r["slettet"]] == ["stemmetall ikke i protokollen: 14"]
+    assert r["felt"]["status"] == "Innstillingen ble vedtatt med 36 stemmer."
+    assert not r["avvist"]
+    # nothing checked without counted votes
+    assert redaktor.edit(card, check, tall=None)["slettet"] == []
+
+
+@pytest.mark.parametrize("sentence, wrong", [
+    ("Forslaget ble vedtatt med 36 mot 31 stemmer.", None),
+    ("Forslaget ble vedtatt 36–31.", None),
+    ("Forslaget fikk 36 stemmer mot 30.", "30"),
+    ("Planen gjelder fra 2027, og 14 boliger får 31 parkeringsplasser.", None),  # numbers not tied to votes
+    ("Ett forslag fikk 1 stemme.", "1"),
+])
+def test_vote_count_patterns(sentence, wrong):
+    hit = redaktor.stemmetall_feil(sentence, {36, 31})
+    assert hit == (f"stemmetall ikke i protokollen: {wrong}" if wrong else None)
+
+
+def test_counts_from_the_protokoll_include_those_who_did_not_vote_for():
+    p = {"voteringer": [{"stemmer": 54, "resultat": "vedtatt"}, {"stemmer": 14, "resultat": "falt"}, {"stemmer": None, "enstemmig": True}],
+         "til_stede": 66}
+    assert redaktor.stemmetall(p) == {54, 14, 66, 12, 52}
+    assert redaktor.stemmetall({"voteringer": [{"stemmer": None}]}) is None
+    assert redaktor.stemmetall(None) is None
+
+
+def test_article_sentence_with_wrong_count_is_deleted():
+    art = {"nr": "1/26", "avsnitt": [{"tekst": "SV ville utsette saken. Forslaget fikk 14 stemmer.", "rolle": "avstemning", "kilder": []}]}
+    check = {"nr": "1/26", "personvern": [], "blocked": "", "roller": [], "setninger": [
+        {"avsnitt": 1, "setning": "SV ville utsette saken.", "stottet": True, "gjentar_kortet": False},
+        {"avsnitt": 1, "setning": "Forslaget fikk 14 stemmer.", "stottet": True, "gjentar_kortet": False}]}
+    r = redaktor.rediger_artikkel(art, check, tall={7, 60})
+    assert [d["grunn"] for d in r["slettet"]] == ["stemmetall ikke i protokollen: 14"]

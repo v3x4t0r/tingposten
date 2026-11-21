@@ -55,8 +55,12 @@ def test_split_bar_says_for_and_against_with_parties():
     t = texts(grafikk.stemmediagram(SPLIT)["svg"])
     assert t[0] == "Vedtatt: Alternativforslag fra H, FrP og BL"
     assert t[1:3] == ["36", "31"]
-    assert t[3] == "For: BL, FrP, H, INP, KrF, PP og Sp"
-    assert " ".join(t[4:]) == "Mot: Ap, MDG, R, SV, én uavhengig og V (stemte for innstillingen)"
+    # the parties as colour chips, in protokoll order, independents counted last
+    assert t[3:11] == ["For:", "BL", "FrP", "H", "INP", "KrF", "PP", "Sp"]
+    assert t[11:] == ["Mot:", "Ap", "MDG", "R", "SV", "V", "én uavhengig", "(stemte for innstillingen)"]
+    svg = grafikk.stemmediagram(SPLIT)["svg"]
+    assert 'fill="var(--tp-p-h, #4aa8df)"' in svg and 'fill="var(--tp-p-ap, #da4b0d)"' in svg
+    assert "url(" not in svg  # no clipPath: the ends are shaped paths
     # the innstilling is the against-side of the bar, not a bar of its own
     assert not any(x.startswith("Falt:") for x in t)
     joined = " ".join(t)
@@ -68,7 +72,7 @@ def test_split_bar_says_for_and_against_with_parties():
 def test_against_is_attendance_minus_for_when_stated():
     p = prot(vote("Innstillingen", "vedtatt", 37, ["H", "FRP"]), til_stede=67)
     f = grafikk.stemmediagram(p)
-    assert texts(f["svg"]) == ["Vedtatt: Innstillingen", "37", "30", "For: H og FrP", "Mot: partiene er ikke oppgitt i protokollen"]
+    assert texts(f["svg"]) == ["Vedtatt: Innstillingen", "37", "30", "For:", "H", "FrP", "Mot: partiene er ikke oppgitt i protokollen"]
     assert f["stemmer"] == {"for": 37, "mot": 30} and f["alt"].startswith("Avstemning i Bergen bystyre: 37 mot 30. ")
 
 
@@ -77,20 +81,31 @@ def test_sequential_votes_are_not_paired():
     p = prot(vote("Alternativforslag", "falt", 26, ["AP", "SV"], fra=["AP"]), vote("Innstillingen", "vedtatt", 58, ["H", "FRP"]))
     f = grafikk.stemmediagram(p)
     t = texts(f["svg"])
-    assert t[:4] == ["Vedtatt: Innstillingen", "58", "For: H og FrP", "Mot: antallet er ikke oppgitt i protokollen"]
+    assert t[:6] == ["Vedtatt: Innstillingen", "58", "For:", "H", "FrP", "Mot: antallet er ikke oppgitt i protokollen"]
     assert "Falt: Alternativforslag fra Ap" in t and "26" in t
     assert f["stemmer"] == {"for": 58, "mot": None} and " mot " not in f["alt"]
     # a pair that fills the house is one vote: the fallen side is named as against
     p = prot(vote("Innstillingen", "vedtatt", 36, ["H"]), vote("Alternativforslag", "falt", 31, ["AP"], fra=["AP"]))
     t = texts(grafikk.stemmediagram(p)["svg"])
-    assert t == ["Vedtatt: Innstillingen", "36", "31", "For: H", "Mot: Ap (stemte for alternativforslag fra Ap)"]
+    assert t == ["Vedtatt: Innstillingen", "36", "31", "For:", "H", "Mot:", "Ap", "(stemte for alternativforslag fra Ap)"]
 
 
 def test_rest_of_a_party_counted_in_part():
     p = prot(vote("Alternativforslag", "falt", 26, ["AP", "3V", "SV"], fra=["AP"]),
              vote("Innstillingen", "vedtatt", 41, ["H", "FRP", "V", "KRF"]), til_stede=67)
     t = " ".join(texts(grafikk.stemmediagram(p)["svg"]))
-    assert "For: H, FrP, resten av V og KrF" in t and "Mot: Ap, 3 fra V og SV (stemte for alternativforslag fra Ap)" in t
+    assert "For: H FrP resten av V KrF" in t and "Mot: Ap 3 fra V SV (stemte for alternativforslag fra Ap)" in t
+
+
+def test_party_segments_follow_seats_or_the_stated_number():
+    assert grafikk._segments(["H", "3V", "UAV A", "UAV B", "X"], {"V": 3}) == \
+        [("H", "H", 18), ("3 fra V", "V", 3), ("X", "X", 1), ("to uavhengige", "UAV", 2)]
+    assert grafikk._segments(["REST V", "KRF"], {"V": 1}) == [("resten av V", "V", 2), ("KrF", "KRF", 2)]
+    assert sum(grafikk.SEATS.values()) == 67
+    # the for-side of SPLIT: H's segment is 18/37 of the side, with a 2 px paper gap to its neighbours
+    svg = grafikk.stemmediagram(SPLIT)["svg"]
+    ws = [float(m) for m in re.findall(r'<path d="M[\d.]+,[\d.]+h([\d.]+)v18h', svg)]
+    assert len(ws) >= 5 and max(ws) == pytest.approx((36 / 67 * grafikk.W - 1) * 18 / 37 - 2, abs=0.2)  # 36+31 fill the house: 1 px to the paper gap
 
 
 def test_no_figure_for_unanimous_or_single_vote():
@@ -188,7 +203,7 @@ def test_fallen_proposals_always_get_bars():
     assert "Falt: Utsettelsesforslag fra MDG" in got
     assert got[-1] == "Falt: Tilleggsforslag fra R"
     # five adopted votes with distinct counts and three that fell: the split bar, then one adopted and two fallen
-    many = prot(*[vote(f"Innstillingens punkt {n}", "vedtatt", c, ["H", str(n)]) for n, c in enumerate((60, 55, 50, 45, 40))],
+    many = prot(*[vote(f"Innstillingens punkt {n}", "vedtatt", c, ["H", f"P{n}"]) for n, c in enumerate((60, 55, 50, 45, 40))],
                 *[vote("Alternativforslag", "falt", c, ["R"], fra=[p]) for c, p in ((20, "R"), (12, "SV"), (9, "MDG"))])
     t = texts(grafikk.stemmediagram(many)["svg"])
     assert {x for x in t if x.isdigit()} == {"60", "55", "20", "12"}
@@ -275,8 +290,9 @@ def test_innstilling_in_a_run_in_sentence_still_counts():
     p = prot(vote("Innstillingen fikk ingen stemmer, og var dermed falt. Alternativforslag punkt 1-3", "vedtatt", 53, ["H"], fra=["H"]),
              vote("Alternativforslag", "falt", 14, ["SV"], fra=["SV"]), vote("Tilleggsforslag", "falt", 32, ["AP"], fra=["AP"]))
     t = texts(grafikk.stemmediagram(p)["svg"])
-    assert t[:5] == ["Vedtatt: Alternativforslag punkt 1–3 fra H", "53", "14", "For: H", "Mot: SV (stemte for alternativforslag fra SV)"]
-    assert t[5:7] == ["TILLEGGSFORSLAG", "Falt: Tilleggsforslag fra Ap"]
+    assert t[:8] == ["Vedtatt: Alternativforslag punkt 1–3 fra H", "53", "14", "For:", "H", "Mot:", "SV",
+                     "(stemte for alternativforslag fra SV)"]
+    assert t[8:10] == ["TILLEGGSFORSLAG", "Falt: Tilleggsforslag fra Ap"]
 
 
 def test_vote_text_is_at_least_12_px_and_fits():

@@ -1,7 +1,8 @@
 """Redaktør: the plan's deletion-only editor (pipeline step 5).
 
 Takes a draft card and its fact-check and may only remove whole sentences:
-the ones the checker found unsupported and the ones on the forbudsliste.
+the ones the checker found unsupported, the ones on the forbudsliste, and the
+ones with a vote count ("14 stemmer") that no vote in the parsed protokoll has.
 It cannot add or rewrite, so it cannot inflate the text — that is the point.
 Hard limits are not trimmed: a card over a limit is rejected (avvist) and
 goes back to the writer. Anything not fully fact-checked, or with a privacy
@@ -26,7 +27,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import config, pdf
+from . import config, pdf, protokoll as protokoll_mod
 
 log = logging.getLogger(__name__)
 
@@ -112,6 +113,49 @@ def banned(sentence: str, felt: str) -> str | None:
     return None
 
 
+# A vote count in prose: "36 stemmer", "36 mot 31", "36–31 stemmer". Years and
+# other numbers are not touched: only numbers tied to the word stemmer/mot.
+_VOTE_COUNT = re.compile(r"\b(\d{1,3})\s+(?:stemmer|stemme\b)(?:\s+mot\s+(\d{1,3})\b)?"
+                         r"|\b(\d{1,3})\s+mot\s+(\d{1,3})\s+stemmer\b"
+                         r"|\b(?:vedtatt|falt|med)\s+(\d{1,3})\s*[–-]\s*(\d{1,3})\b")
+
+
+def stemmetall_feil(sentence: str, tall: set[int] | None) -> str | None:
+    """A vote count in the sentence that no vote in the protokoll has, or None.
+    `tall` is every count the protokoll states (and the attendance less each
+    adopted count, which is how many did not vote for); None means no
+    protokoll with counted votes, so nothing is checked."""
+    if not tall:
+        return None
+    for m in _VOTE_COUNT.finditer(sentence):
+        wrong = [n for n in (int(x) for x in m.groups() if x) if n not in tall]
+        if wrong:
+            return "stemmetall ikke i protokollen: " + ", ".join(str(n) for n in wrong)
+    return None
+
+
+def stemmetall(p: dict | None) -> set[int] | None:
+    """The counts a card may use, from the parsed protokoll; None without counted votes."""
+    votes = [v for v in (p or {}).get("voteringer") or [] if v.get("stemmer")]
+    if not votes:
+        return None
+    out = {v["stemmer"] for v in votes}
+    if til_stede := p.get("til_stede"):
+        out |= {til_stede} | {til_stede - n for n in out if til_stede > n}
+    return out
+
+
+def _stemmetall_for(item: dict, data_dir: Path) -> set[int] | None:
+    path = data_dir / "pdf" / pdf.filename(item, "protokoll")
+    if not path.exists():
+        return None
+    try:
+        return stemmetall(protokoll_mod.parse_pdf(path))
+    except Exception:
+        log.exception("protokoll unreadable for the vote-count check: %s", path)
+        return None
+
+
 def _segment(text: str, sentences: list[str]) -> list[str] | None:
     """The check's sentences located in text, in order; None unless they
     cover the text exactly (only whitespace may sit between them)."""
@@ -171,8 +215,9 @@ def omskrivbar(result: dict, tillatt: set[str] = OMSKRIVBARE) -> bool:
     return bool(result.get("avvist")) and "personvern" not in koder and bool(koder & tillatt)
 
 
-def edit(card: dict, check: dict | None) -> dict:
-    """Delete unsupported and forbidden sentences; reject what can't be published."""
+def edit(card: dict, check: dict | None, tall: set[int] | None = None) -> dict:
+    """Delete unsupported and forbidden sentences, and sentences with a vote
+    count the protokoll doesn't have (`tall`); reject what can't be published."""
     reasons = _Reasons()
     slettet: list[dict] = []
     checked = _check_gate(check, reasons)
@@ -214,6 +259,8 @@ def edit(card: dict, check: dict | None) -> dict:
                 why = "ikke støttet av kilden" + (f": {s['begrunnelse'].strip()}" if (s.get("begrunnelse") or "").strip() else "")
             elif hit := banned(original, f):
                 why = f"forbudsliste: {hit}"
+            elif hit := stemmetall_feil(original, tall):
+                why = hit
             else:
                 kept.append(original)
                 continue
@@ -306,7 +353,7 @@ def run(items: list[dict], data_dir: Path = config.DATA_DIR) -> dict:
             continue
         # A check older than the draft was made for another text: unchecked.
         fresh = check_path.exists() and check_path.stat().st_mtime >= card_path.stat().st_mtime
-        result = edit(json.loads(card_path.read_text()), _read(check_path) if fresh else None)
+        result = edit(json.loads(card_path.read_text()), _read(check_path) if fresh else None, _stemmetall_for(item, data_dir))
         counts["redigert"] += 1
         counts["avvist" if result["avvist"] else "publiserbar"] += 1
         counts["slettet"] += len(result["slettet"])
@@ -339,8 +386,9 @@ def _venter_pa_sjekk(draft: Path, check: Path, published: Path) -> bool:
 
 # --- articles -------------------------------------------------------------------
 
-def rediger_artikkel(article: dict, check: dict | None) -> dict:
-    """Delete-only editing of an article against its check (see module docstring)."""
+def rediger_artikkel(article: dict, check: dict | None, tall: set[int] | None = None) -> dict:
+    """Delete-only editing of an article against its check (see module docstring);
+    `tall` as in edit()."""
     reasons = _Reasons()
     slettet: list[dict] = []
     checked = _check_gate(check, reasons)
@@ -379,6 +427,8 @@ def rediger_artikkel(article: dict, check: dict | None) -> dict:
                 why = "gjentar kortet"
             elif hit := banned(original, "artikkel"):
                 why = f"forbudsliste: {hit}"
+            elif hit := stemmetall_feil(original, tall):
+                why = hit
             else:
                 kept.append(original)
                 if repeats:
@@ -472,7 +522,8 @@ def run_artikler(items: list[dict], data_dir: Path = config.DATA_DIR) -> dict:
             continue
         # A check older than the article was made for another text.
         fresh = check_path.exists() and check_path.stat().st_mtime >= art_path.stat().st_mtime
-        result = rediger_artikkel(json.loads(art_path.read_text()), _read(check_path) if fresh else None)
+        result = rediger_artikkel(json.loads(art_path.read_text()), _read(check_path) if fresh else None,
+                                  _stemmetall_for(item, data_dir))
         counts["redigert"] += 1
         counts["avvist" if result["avvist"] else "publiserbar"] += 1
         counts["slettet"] += len(result["slettet"])

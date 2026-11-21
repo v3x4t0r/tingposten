@@ -43,6 +43,24 @@ PARTY = {
     "AP": "Ap", "FRP": "FrP", "KRF": "KrF", "SP": "Sp", "H": "H", "SV": "SV",
     "V": "V", "MDG": "MDG", "R": "R", "INP": "INP", "BL": "BL", "PP": "PP",
 }
+# Seats per party in Bergen bystyre 2023–2027 as elected (kommunevalget 2023; 67
+# in all). The one number in the figures that is not read from the documents:
+# it only sets how wide each party's part of a bar is, never a count drawn or
+# written. A party counted in part by the protokoll ("3V") takes that number,
+# and "resten av V" the seats less it; an independent counts as one seat.
+SEATS = {"H": 18, "AP": 13, "FRP": 7, "SV": 7, "MDG": 4, "BL": 4, "V": 3, "INP": 3, "R": 3, "KRF": 2, "SP": 2, "PP": 1}
+# Party colours (owner 21.11: the vote bar is coloured by party; the rest of the
+# site stays in ink). CSS tokens --tp-p-<party> with light-mode fallbacks; both
+# sets pass the dataviz validator (lightness band, chroma, CVD and normal-vision
+# separation of neighbours in the alphabetical order the protokoll lists them).
+PARTY_COLOUR = {
+    "AP": "#da4b0d", "BL": "#be58dd", "FRP": "#2942ca", "H": "#4aa8df", "INP": "#a1442e", "KRF": "#b7a326",
+    "MDG": "#3b660d", "PP": "#1692cc", "R": "#a41642", "SP": "#89882a", "SV": "#c5479c", "V": "#097b4b",
+}
+PARTY_COLOUR_DARK = {
+    "AP": "#ed5522", "BL": "#b860be", "FRP": "#4c49d9", "H": "#3e97c9", "INP": "#ba3000", "KRF": "#ac8f29",
+    "MDG": "#187830", "PP": "#009dde", "R": "#b04e58", "SP": "#9d9114", "SV": "#b51c99", "V": "#338e63",
+}
 MAX_BARS = 4
 MAX_ADOPTED = 2  # bars for adopted votes; the rest of the budget always goes to proposals that fell
 
@@ -100,6 +118,8 @@ def stemmediagram(protokoll: dict) -> dict | None:
     organ = protokoll.get("organ") or "bystyret"
     groups = _groups(main_votes)
     split = _split(groups, protokoll.get("til_stede"), HOUSE.get(organ))
+    if split:
+        split["numbered"] = _numbered(main_votes)
     if (not split or not split["mot"]) and len(main_votes) + len(tillegg) < 2:
         return None
     counts = [v["stemmer"] for v in main_votes + tillegg]
@@ -153,10 +173,15 @@ def _line(parts: list[str], text: str, y: float) -> float:
 _NUMBERED = re.compile(r"(\d+)\s*([A-ZÆØÅ]+)")
 
 
+def _numbered(votes: list[dict]) -> dict[str, int]:
+    """Parties the protokoll counts in part, with the number: {"V": 3}."""
+    return {m[2]: int(m[1]) for v in votes for t in v["partier"] if (m := _NUMBERED.fullmatch(t.strip()))}
+
+
 def _rest_of_party(votes: list[dict]) -> list[dict]:
     """"3V" in one vote and a bare "V" in another: the bare one is the rest of
     V, which is how the protokoll means it. Marked "REST V" for _party."""
-    numbered = {m[2] for v in votes for t in v["partier"] if (m := _NUMBERED.fullmatch(t.strip()))}
+    numbered = set(_numbered(votes))
     if not numbered:
         return votes
     return [{**v, "partier": [f"REST {t.strip()}" if t.strip() in numbered else t for t in v["partier"]]} for v in votes]
@@ -197,8 +222,10 @@ def _is_main(g: dict) -> bool:
 
 def _split_bar(parts: list[str], split: dict, house: int, y: float) -> float:
     """Label, the two counts, one bar (for from the left, against from the
-    right, the gap is the rest of the house), then who voted for and against."""
+    right, the gap is the rest of the house), each side split by party, then
+    who voted for and against as a row of colour chips."""
     g, plot, h = split["main"], W, 18
+    numbered = split.get("numbered") or {}
     for i, line in enumerate(_wrap(f"Vedtatt: {g['navn']}", _chars(LABEL), no_orphan=True)):
         y += LABEL + 4
         parts.append(_text(0, y, line, size=LABEL, lead="Vedtatt:" if i == 0 else None))
@@ -212,28 +239,102 @@ def _split_bar(parts: list[str], split: dict, house: int, y: float) -> float:
     gap = plot - w_for - w_mot
     if w_mot and gap < 2:  # no one between: a hairline of paper keeps the two apart
         w_for, w_mot = w_for - 1 + gap / 2, w_mot - 1 + gap / 2
-    parts.append(f'<rect x="0" y="{y:.1f}" width="{plot}" height="{h}" rx="4" fill="var(--tp-spor, #cde2fb)">'
-                 f"<title>{house} til stede</title></rect>" if split["mot"] or house > split["for"] else "")
-    parts.append(f'<path d="{_bar(0, y, w_for, h)}" fill="var(--tp-for, #2a78d6)">'
-                 f"<title>{escape(_said(g, parties=False))}</title></path>")
+    if split["mot"] or house > split["for"]:
+        parts.append(f'<rect x="0" y="{y:.1f}" width="{plot}" height="{h}" rx="4" fill="var(--tp-spor, #cde2fb)">'
+                     f"<title>{house} til stede</title></rect>")
+    for_parts = _segments(g["partier"], numbered)
+    parts += _party_bar(0, y, w_for, h, for_parts, "var(--tp-for, #2a78d6)", _said(g, parties=False), end="right")
+    mot_parts = _segments(split["partier_mot"], numbered) if split["partier_mot"] is not None else []
     if w_mot:
         mot_title = _said(split["motpart"], parties=False) if split["motpart"] else f"{split['mot']} stemte ikke for"
-        parts.append(f'<path d="{_bar_end(plot - w_mot, y, w_mot, h)}" fill="var(--tp-falt, #898781)">'
-                     f"<title>{escape(mot_title)}</title></path>")
-    y += h + 2
-    for_line = "For: " + _parties(g["partier"])
-    if split["partier_mot"] is not None:
+        parts += _party_bar(plot - w_mot, y, w_mot, h, mot_parts, "var(--tp-falt, #898781)", mot_title, end="left")
+    y += h + 4
+    y = _chips(parts, "For:", for_parts, y)
+    if mot_parts:
         why = f" (stemte for {_lower(split['motpart']['navn'])})" if split["motpart"] else ""
-        mot_line = "Mot: " + _parties(split["partier_mot"]) + why
+        y = _chips(parts, "Mot:", mot_parts, y, tail=why)
     elif split["mot"]:
-        mot_line = "Mot: partiene er ikke oppgitt i protokollen"
+        y = _chip_line(parts, "Mot: partiene er ikke oppgitt i protokollen", y)
     else:
-        mot_line = "Mot: antallet er ikke oppgitt i protokollen"
-    for text, lead in ((for_line, "For:"), (mot_line, "Mot:")):
-        for i, line in enumerate(_wrap(text, _chars(SMALL), no_orphan=True)):
+        y = _chip_line(parts, "Mot: antallet er ikke oppgitt i protokollen", y)
+    return y + 16
+
+
+def _segments(tokens: list[str], numbered: dict[str, int]) -> list[tuple[str, str, float]]:
+    """(label, party key, weight) per party in protokoll order; independents as one item."""
+    out, uav = [], 0
+    for t in tokens:
+        t = t.strip()
+        if not t:
+            continue
+        if t.upper().startswith("UAV"):
+            uav += 1
+        elif t.startswith("REST "):
+            key = t[5:].strip().upper()
+            out.append((f"resten av {PARTY.get(key, key)}", key, max(1, SEATS.get(key, 1) - numbered.get(key, 0))))
+        elif m := _NUMBERED.fullmatch(t):
+            out.append((f"{m[1]} fra {PARTY.get(m[2], m[2])}", m[2], int(m[1])))
+        else:
+            key = t.upper()
+            out.append((PARTY.get(key, t), key, SEATS.get(key, 1)))
+    if uav:
+        out.append(("én uavhengig" if uav == 1 else f"{_COUNT_WORDS.get(uav, uav)} uavhengige", "UAV", uav))
+    return out
+
+
+def _fill(key: str) -> str:
+    if key in PARTY_COLOUR:
+        return f"var(--tp-p-{key.lower()}, {PARTY_COLOUR[key]})"
+    return "var(--tp-falt, #898781)"  # independents and unknown lists
+
+
+def _party_bar(x: float, y: float, w: float, h: float, segs: list, base: str, title: str, end: str) -> list[str]:
+    """One side of the split bar: its parties as segments with a 2 px gap of
+    paper between them, the data-end rounded. Without parties, one ink bar."""
+    shape = _bar if end == "right" else _bar_end
+    if not segs:
+        return [f'<path d="{shape(x, y, w, h)}" fill="{base}"><title>{escape(title)}</title></path>']
+    total = sum(wt for _, _, wt in segs)
+    out, cx = [], x
+    for i, (label, key, wt) in enumerate(segs):
+        sw = w * wt / total
+        x0, x1 = cx + (1 if i else 0), cx + sw - (1 if i < len(segs) - 1 else 0)
+        if (end == "right" and i == len(segs) - 1) or (end == "left" and i == 0):
+            d = shape(x0, y, max(x1 - x0, 1), h)
+        else:
+            d = f"M{x0:.1f},{y:.1f}h{max(x1 - x0, 1):.1f}v{h}h-{max(x1 - x0, 1):.1f}z"
+        out.append(f'<path d="{d}" fill="{_fill(key)}"><title>{escape(label)} – {escape(title)}</title></path>')
+        cx += sw
+    return out
+
+
+def _chips(parts: list[str], lead: str, segs: list, y: float, tail: str = "") -> float:
+    """A wrapped row: the lead word, then a colour swatch and name per party."""
+    sw, pad, x = 10, 6, 0
+    y += SMALL + 4
+    parts.append(_text(0, y, lead, weight=600, size=SMALL, muted=True))
+    x = len(lead) * SMALL * 0.6 + pad
+    for label, key, _ in segs:
+        width = sw + 4 + len(label) * SMALL * 0.56
+        if x + width > W:
+            y += SMALL + 6
+            x = 0
+        parts.append(f'<rect x="{x:.1f}" y="{y - sw + 1:.1f}" width="{sw}" height="{sw}" rx="2" fill="{_fill(key)}"/>')
+        parts.append(_text(x + sw + 4, y, label, size=SMALL, muted=True))
+        x += width + pad + 4
+    if tail:
+        for line in _wrap(tail.strip(), _chars(SMALL)):
             y += SMALL + 4
-            parts.append(_text(0, y, line, muted=True, size=SMALL, lead=lead if i == 0 else None))
-    return y + 20
+            parts.append(_text(0, y, line, size=SMALL, muted=True))
+    return y
+
+
+def _chip_line(parts: list[str], text: str, y: float) -> float:
+    lead = text.split(":")[0] + ":"
+    for i, line in enumerate(_wrap(text, _chars(SMALL), no_orphan=True)):
+        y += SMALL + 4
+        parts.append(_text(0, y, line, muted=True, size=SMALL, lead=lead if i == 0 else None))
+    return y
 
 
 def _bars(parts: list[str], shown: list[dict], house: int, y: float) -> float:
