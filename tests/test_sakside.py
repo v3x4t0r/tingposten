@@ -180,7 +180,7 @@ def test_key_facts_and_status_pill_come_from_fakta(side):
     assert page.index('class="sak-dek"') < page.index("sak-fakta") < page.index('id="kort"')
     assert "faktum-status" not in body(page)  # "Vedtatt" is never a pill
     falt = side(4)
-    assert '<span class="vh">Status: </span>Innstillingen falt</span>' in falt
+    assert '<span class="vh">Status: </span>Innstillingen falt, noe annet ble vedtatt</span>' in falt
 
 
 def test_empty_status_row_is_filled_from_the_protokoll(side):

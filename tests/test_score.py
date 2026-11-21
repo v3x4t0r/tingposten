@@ -138,6 +138,26 @@ def test_split_pairs_competing_main_proposals():
     assert s["uenighet"] > 0.9
 
 
+def test_sequential_alternative_votes_are_not_paired_into_one_vote():
+    # 58 + 26 > 67 seats: the fallen alternativ was voted on separately,
+    # so its count is not the against-side of the adopted innstilling.
+    p = prot(votes=[vote("Innstillingen", "vedtatt", 58), vote("Alternativforslag", "falt", 26)])
+    s = sig(p=p)
+    assert (s["split"], s["stemmer_for"], s["stemmer_mot"]) == ("58 stemmer for", 58, None)
+
+
+def test_main_proposals_are_paired_when_they_add_up_to_the_seats():
+    p = prot(votes=[vote("Innstillingen", "falt", 31), vote("Alternativforslag", "vedtatt", 36)], falt=True)
+    s = sig(p=p)
+    assert (s["split"], s["stemmer_for"], s["stemmer_mot"]) == ("36–31", 36, 31)
+
+
+def test_til_stede_beats_a_fallen_count_that_does_not_add_up():
+    p = prot(votes=[vote("Innstillingen", "vedtatt", 54), vote("Alternativforslag", "falt", 14)], til_stede=66)
+    s = sig(p=p)
+    assert (s["split"], s["stemmer_for"], s["stemmer_mot"]) == ("54–12", 54, 12)
+
+
 def test_tilleggsforslag_counts_are_not_paired_into_one_vote():
     p = prot(votes=[vote("Innstillingen", "vedtatt", enstemmig=True),
                     vote("Tilleggsforslag", "vedtatt", 55), vote("Tilleggsforslag", "falt", 32)])

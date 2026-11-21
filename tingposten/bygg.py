@@ -671,7 +671,7 @@ def fakta(s: dict) -> list[dict]:
     if s["status_klasse"]:
         add("status", "Status", s["status_tekst"])
     elif s["innstilling_falt"]:
-        add("status", "Status", "Innstillingen falt")
+        add("status", "Status", "Innstillingen falt, noe annet ble vedtatt")
     if sted := _sted(s):
         add("sted", "Gjelder", sted)
     st = s["stemmer"]

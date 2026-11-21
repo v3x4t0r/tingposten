@@ -65,32 +65,180 @@ def figurer(item: dict, protokoll: dict, saksframlegg: dict) -> list[dict]:
 # --- vote diagram -------------------------------------------------------------
 
 def stemmediagram(protokoll: dict) -> dict | None:
-    """One bar per proposal in the votes that decided the sak, stated counts only.
+    """The vote that decided the sak as one bar split in for and against, the
+    other proposals as bars under it, tilleggsforslag in their own group,
+    stated counts only.
 
-    Neutral by construction: proposals that fell always get bars (up to
-    MAX_BARS, at most MAX_ADOPTED of them adopted), bars are ordered by their
-    count, and every label has the same weight. Adopted and fallen differ only
-    by the outcome word and the --tp-for/--tp-falt ink step. Adopted parts with
-    the same count and the same parties are one bar ("punkt 1, 2 og 4");
-    proposals from the same proposer that fell with the same count and parties
-    likewise. None when the deciding votes were unanimous, when fewer than two
-    proposals have a stated count, or for Eventuelt (several unrelated
-    proposals in one protokoll).
+    The split bar is the adopted proposal (the main innstilling vote when
+    several points were voted on): the votes for grow from the left on a track
+    the size of the house, the votes against from the right. Against is the
+    attendance minus the votes for when the protokoll states it, else the
+    count of the competing main proposal (innstilling or alternativforslag)
+    that fell when the two counts fill the house — the same reading as the
+    «Avstemning» fact. Alternatives are often voted on in sequence, so any
+    other pair is two votes, and then only the votes for are shown. The
+    parties against are named only when the protokoll names them: when the
+    competing proposal's count is the against-count.
+
+    Neutral by construction: for and against differ only by the --tp-for/
+    --tp-falt ink step, never party colours; proposals that fell always get
+    bars (up to MAX_BARS, at most MAX_ADOPTED adopted), ordered by their count,
+    every label in the same weight. Adopted parts with the same count and the
+    same parties are one bar ("punkt 1, 2 og 4"); proposals from the same
+    proposer that fell with the same count and parties likewise. A party the
+    protokoll counts in part ("3V") is "3 fra V", and a bare "V" in another
+    vote of the same sak is then "resten av V". None when every vote with a
+    count is unanimous or there is only a single count with nothing to set it
+    against, or for Eventuelt (several unrelated proposals in one protokoll).
     """
     if (protokoll.get("tittel") or "").lower().startswith("eventuelt"):
         return None
-    votes = [v for v in _deciding(protokoll.get("voteringer") or []) if not v["enstemmig"] and v["stemmer"]]
-    if len(votes) < 2:
-        return None
-    groups = _groups(votes)
-    shown, hidden = _pick(groups)
-
+    main_votes, tillegg = _deciding(protokoll.get("voteringer") or [])
+    unanimous = [v for v in main_votes if v["enstemmig"]]
+    main_votes = _rest_of_party([v for v in main_votes if not v["enstemmig"] and v["stemmer"]])
+    tillegg = _rest_of_party([v for v in tillegg if not v["enstemmig"] and v["stemmer"]])
     organ = protokoll.get("organ") or "bystyret"
-    house = protokoll.get("til_stede") or HOUSE.get(organ) or max(v["stemmer"] for v in votes)
-    house = max(house, max(v["stemmer"] for v in votes))
-    x0, plot = 0, W - 34  # room for the count at the bar tip
+    groups = _groups(main_votes)
+    split = _split(groups, protokoll.get("til_stede"), HOUSE.get(organ))
+    if (not split or not split["mot"]) and len(main_votes) + len(tillegg) < 2:
+        return None
+    counts = [v["stemmer"] for v in main_votes + tillegg]
+    house = max(protokoll.get("til_stede") or HOUSE.get(organ) or 0, *counts, (split["for"] + (split["mot"] or 0)) if split else 0)
 
-    parts, y = [], 0
+    parts, y, summary = [], 0, ""
+    if split:
+        y = _split_bar(parts, split, house, y)
+        if split["mot"]:
+            summary = f"{split['for']} mot {split['mot']}. "
+        groups = [g for g in groups if g is not split["main"] and g is not split["motpart"]]
+    elif unanimous and tillegg and not main_votes:
+        y = _line(parts, f"{_merged_name(unanimous)} ble enstemmig vedtatt.", y)
+    shown, hidden = _pick(groups, MAX_BARS - (1 if split else 0), MAX_ADOPTED - (1 if split else 0))
+    y = _bar_section(parts, shown, hidden, house, y)
+    if tillegg:
+        y += 4
+        parts.append(_text(0, y + SMALL, "TILLEGGSFORSLAG", weight=700, size=SMALL, spaced=True))
+        y += SMALL + 2
+        y = _bar_section(parts, *_pick(_groups(tillegg), MAX_BARS, MAX_ADOPTED), house, y)
+    y -= 10  # the last gap is the figure's bottom margin
+
+    said = [_said(g) for g in _order(_groups(main_votes))]
+    if tillegg:
+        said.append("tilleggsforslag: " + "; ".join(_said(g) for g in _order(_groups(tillegg))))
+    alt = f"Avstemning i {organ}: {summary}" + "; ".join(said) + "."
+    return {"svg": _svg("Slik ble det stemt", alt, parts, y), "alt": alt, "kilde": "Protokollen, votering",
+            # the same two numbers as data, for the facts under a story
+            "stemmer": {"for": split["for"], "mot": split["mot"]} if split else None}
+
+
+def _bar_section(parts: list[str], shown: list[dict], hidden: list[dict], house: int, y: float) -> float:
+    top = y
+    y = _bars(parts, shown, house, y)
+    if shown:
+        # baseline: one hairline the bars grow from, along the bars and their labels
+        parts.insert(0, f'<line x1="0.5" y1="{top:.0f}" x2="0.5" y2="{y - 12:.0f}" stroke="var(--tp-kart, #e1e0d9)" stroke-width="1"/>')
+    if hidden:
+        y = _line(parts, _rest(hidden), y)
+    return y
+
+
+def _line(parts: list[str], text: str, y: float) -> float:
+    """A muted small-print sentence, wrapped, with the section gap under it."""
+    for line in _wrap(text, _chars(SMALL), no_orphan=True):
+        y += SMALL + 4
+        parts.append(_text(0, y, line, muted=True, size=SMALL))
+    return y + 16
+
+
+_NUMBERED = re.compile(r"(\d+)\s*([A-ZÆØÅ]+)")
+
+
+def _rest_of_party(votes: list[dict]) -> list[dict]:
+    """"3V" in one vote and a bare "V" in another: the bare one is the rest of
+    V, which is how the protokoll means it. Marked "REST V" for _party."""
+    numbered = {m[2] for v in votes for t in v["partier"] if (m := _NUMBERED.fullmatch(t.strip()))}
+    if not numbered:
+        return votes
+    return [{**v, "partier": [f"REST {t.strip()}" if t.strip() in numbered else t for t in v["partier"]]} for v in votes]
+
+
+def _split(groups: list[dict], til_stede: int | None, seats: int | None) -> dict | None:
+    """The deciding vote as for/against: {main, for, mot, motpart, partier_mot}.
+
+    main: the adopted group covering most votes (protokoll order at a tie).
+    mot: attendance minus the votes for when stated, else the largest competing
+    main proposal that fell when the two fill the house (members present must
+    vote; any other pair is two separate votes), else None: only the votes for
+    are known. partier_mot only when that competing proposal's count is the
+    against-count (then the protokoll names them); None otherwise.
+    """
+    adopted = sorted((g for g in groups if g["won"]), key=lambda g: (-len(g["votes"]), g["first"]))
+    if not adopted:
+        return None
+    main = adopted[0]
+    rivals = sorted((g for g in groups if not g["won"] and _is_main(g)), key=lambda g: (-g["stemmer"], g["first"]))
+    rival = rivals[0] if rivals else None
+    if til_stede:
+        mot = til_stede - main["stemmer"]
+        if mot <= 0:
+            return None
+    elif rival and seats and main["stemmer"] + rival["stemmer"] == seats:
+        mot = rival["stemmer"]
+    else:
+        mot = None
+    named = rival if rival and mot and rival["stemmer"] == mot else None
+    return {"main": main, "for": main["stemmer"], "mot": mot, "motpart": named,
+            "partier_mot": named["partier"] if named else None}
+
+
+def _is_main(g: dict) -> bool:
+    return bool(re.match(r"innstilling|alternativ", _name(g["votes"][0]), re.I))
+
+
+def _split_bar(parts: list[str], split: dict, house: int, y: float) -> float:
+    """Label, the two counts, one bar (for from the left, against from the
+    right, the gap is the rest of the house), then who voted for and against."""
+    g, plot, h = split["main"], W, 18
+    for i, line in enumerate(_wrap(f"Vedtatt: {g['navn']}", _chars(LABEL), no_orphan=True)):
+        y += LABEL + 4
+        parts.append(_text(0, y, line, size=LABEL, lead="Vedtatt:" if i == 0 else None))
+    y += 8
+    parts.append(_text(0, y + LABEL, str(split["for"]), weight=600, size=LABEL))
+    if split["mot"]:
+        parts.append(_text(plot, y + LABEL, str(split["mot"]), weight=600, size=LABEL, anchor="end"))
+    y += LABEL + 6
+    w_for = max(4.0, split["for"] / house * plot)
+    w_mot = max(4.0, split["mot"] / house * plot) if split["mot"] else 0
+    gap = plot - w_for - w_mot
+    if w_mot and gap < 2:  # no one between: a hairline of paper keeps the two apart
+        w_for, w_mot = w_for - 1 + gap / 2, w_mot - 1 + gap / 2
+    parts.append(f'<rect x="0" y="{y:.1f}" width="{plot}" height="{h}" rx="4" fill="var(--tp-spor, #cde2fb)">'
+                 f"<title>{house} til stede</title></rect>" if split["mot"] or house > split["for"] else "")
+    parts.append(f'<path d="{_bar(0, y, w_for, h)}" fill="var(--tp-for, #2a78d6)">'
+                 f"<title>{escape(_said(g, parties=False))}</title></path>")
+    if w_mot:
+        mot_title = _said(split["motpart"], parties=False) if split["motpart"] else f"{split['mot']} stemte ikke for"
+        parts.append(f'<path d="{_bar_end(plot - w_mot, y, w_mot, h)}" fill="var(--tp-falt, #898781)">'
+                     f"<title>{escape(mot_title)}</title></path>")
+    y += h + 2
+    for_line = "For: " + _parties(g["partier"])
+    if split["partier_mot"] is not None:
+        why = f" (stemte for {_lower(split['motpart']['navn'])})" if split["motpart"] else ""
+        mot_line = "Mot: " + _parties(split["partier_mot"]) + why
+    elif split["mot"]:
+        mot_line = "Mot: partiene er ikke oppgitt i protokollen"
+    else:
+        mot_line = "Mot: antallet er ikke oppgitt i protokollen"
+    for text, lead in ((for_line, "For:"), (mot_line, "Mot:")):
+        for i, line in enumerate(_wrap(text, _chars(SMALL), no_orphan=True)):
+            y += SMALL + 4
+            parts.append(_text(0, y, line, muted=True, size=SMALL, lead=lead if i == 0 else None))
+    return y + 20
+
+
+def _bars(parts: list[str], shown: list[dict], house: int, y: float) -> float:
+    """One bar per group with its label, count and the parties for."""
+    x0, plot = 0, W - 34  # room for the count at the bar tip
     for g in shown:
         lead = "Vedtatt:" if g["won"] else "Falt:"
         for i, line in enumerate(_wrap(f"{lead} {g['navn']}", _chars(LABEL), no_orphan=True)):
@@ -109,39 +257,28 @@ def stemmediagram(protokoll: dict) -> dict | None:
             y += SMALL + 4
             parts.append(_text(x0, y, line, muted=True, size=SMALL))
         y += 16
-    # baseline: one hairline the bars grow from, along the bars and their labels
-    parts.insert(0, f'<line x1="0.5" y1="0" x2="0.5" y2="{y - 12:.0f}" stroke="var(--tp-kart, #e1e0d9)" stroke-width="1"/>')
-    if hidden:
-        for line in _wrap(_rest(hidden), _chars(SMALL), no_orphan=True):
-            y += SMALL + 4
-            parts.append(_text(x0, y, line, muted=True, size=SMALL))
-        y += 16
-    y -= 10  # the last gap is the figure's bottom margin
-
-    alt = f"Avstemning i {organ}: " + "; ".join(_said(g) for g in _order(groups)) + "."
-    return {"svg": _svg("Slik ble det stemt", alt, parts, y), "alt": alt, "kilde": "Protokollen, votering"}
+    return y
 
 
-def _deciding(votes: list[dict]) -> list[dict]:
-    """Votes on the sak itself: innstilling, alternatives, proposals, postponement.
+def _deciding(votes: list[dict]) -> tuple[list[dict], list[dict]]:
+    """(votes on the sak itself, tilleggsforslag).
 
-    Merknader and protokolltilførsler never count. Tilleggsforslag only count
-    when there is no innstilling at all (interpellasjoner), because there they
-    are the decision.
+    The sak itself: innstilling, alternatives, postponement. Merknader and
+    protokolltilførsler never count. Tilleggsforslag are voted on by
+    themselves and go in their own group — unless there is no innstilling at
+    all (interpellasjoner), where they are the decision.
     """
     # The raw text counts too: "Innstillingen fikk ingen stemmer, og var dermed
     # falt. Alternativforslag …" means there was an innstilling.
     has_innstilling = any(v["forslag"].lower().startswith("innstilling") or _name(v).lower().startswith("innstilling")
                           for v in votes)
-    out = []
+    main, tillegg = [], []
     for v in votes:
         f = _name(v).lower()
         if f.startswith(("merknad", "protokoll")):
             continue
-        if f.startswith("tillegg") and has_innstilling:
-            continue
-        out.append(v)
-    return out
+        (tillegg if f.startswith("tillegg") and has_innstilling else main).append(v)
+    return main, tillegg
 
 
 def _groups(votes: list[dict]) -> list[dict]:
@@ -166,7 +303,7 @@ def _groups(votes: list[dict]) -> list[dict]:
     return groups
 
 
-def _pick(groups: list[dict]) -> tuple[list[dict], list[dict]]:
+def _pick(groups: list[dict], max_bars: int = MAX_BARS, max_adopted: int = MAX_ADOPTED) -> tuple[list[dict], list[dict]]:
     """The groups that get bars (in drawing order), and the votes left for the rest line.
 
     Adopted: the group covering most votes first, then protokoll order (the
@@ -176,8 +313,8 @@ def _pick(groups: list[dict]) -> tuple[list[dict], list[dict]]:
     adopted = sorted((g for g in groups if g["won"]), key=lambda g: (-len(g["votes"]), g["first"]))
     fell = sorted((g for g in groups if not g["won"]),
                   key=lambda g: (-g["stemmer"], _name(g["votes"][0]).lower().startswith("utsettelse"), g["first"]))
-    n_fell = min(len(fell), MAX_BARS - min(len(adopted), MAX_ADOPTED))
-    n_won = min(len(adopted), MAX_BARS - n_fell)
+    n_fell = min(len(fell), max_bars - min(len(adopted), max_adopted))
+    n_won = min(len(adopted), max_bars - n_fell)
     shown = _order(adopted[:n_won] + fell[:n_fell])
     hidden = [v for g in _order(adopted[n_won:] + fell[n_fell:]) for v in g["votes"]]
     return shown, hidden
@@ -195,15 +332,15 @@ def _said(g: dict, parties: bool = True) -> str:
 
 
 def _rest(votes: list[dict]) -> str:
-    """'1 forslag til ble vedtatt (58 stemmer) og 3 falt (14, 11 og 11 stemmer).'"""
-    won = [v["stemmer"] for v in votes if v["resultat"] == "vedtatt"]
-    fell = [v["stemmer"] for v in votes if v["resultat"] != "vedtatt"]
+    """The votes without a bar, each named with its count:
+    'Vedtatt også: innstillingens punkt 4 (58 stemmer). Falt også: alternativforslag fra R (3 stemmer).'"""
+    won = [v for v in votes if v["resultat"] == "vedtatt"]
+    fell = [v for v in votes if v["resultat"] != "vedtatt"]
     said = []
-    if won:
-        said.append(f"{len(won)} forslag til ble vedtatt ({_stemmer(won)})")
-    if fell:
-        said.append(f"{len(fell)} falt ({_stemmer(fell)})" if won else f"{len(fell)} forslag til falt ({_stemmer(fell)})")
-    return " og ".join(said) + "."
+    for lead, vs in (("Vedtatt også: ", won), ("Falt også: ", fell)):
+        if vs:
+            said.append(lead + _join([f"{_lower(_proposal(v))} ({_stemmer([v['stemmer']])})" for v in vs]) + ".")
+    return " ".join(said)
 
 
 def _stemmer(counts: list[int]) -> str:
@@ -267,6 +404,8 @@ def _dashes(s: str) -> str:
 
 def _party(token: str) -> str:
     token = token.strip()
+    if token.startswith("REST "):
+        return "resten av " + _party(token[5:])
     if token.upper().startswith("UAV"):
         return "én uavhengig"
     m = re.fullmatch(r"(\d+)\s*([A-ZÆØÅ]+)", token)
@@ -309,6 +448,13 @@ def _bar(x: float, y: float, w: float, h: float, r: float = 4) -> str:
     r = min(r, w / 2, h / 2)
     return (f"M{x:.1f},{y:.1f}h{w - r:.1f}a{r},{r} 0 0 1 {r},{r}v{h - 2 * r:.1f}"
             f"a{r},{r} 0 0 1 -{r},{r}h-{w - r:.1f}z")
+
+
+def _bar_end(x: float, y: float, w: float, h: float, r: float = 4) -> str:
+    """Mirror of _bar: rounded data-end on the left, square at the right edge."""
+    r = min(r, w / 2, h / 2)
+    return (f"M{x + w:.1f},{y:.1f}h-{w - r:.1f}a{r},{r} 0 0 0 -{r},{r}v{h - 2 * r:.1f}"
+            f"a{r},{r} 0 0 0 {r},{r}h{w - r:.1f}z")
 
 
 # --- bydel map ----------------------------------------------------------------
@@ -465,12 +611,13 @@ def _chars(size: float) -> int:
     return int(W / (size * 0.52))
 
 
-def _text(x, y, s, weight=400, muted=False, size=FONT, anchor="start", halo=False, lead=None) -> str:
-    """One line of text. `lead`: a leading word set in 600 weight ("Vedtatt:")."""
+def _text(x, y, s, weight=400, muted=False, size=FONT, anchor="start", halo=False, lead=None, spaced=False) -> str:
+    """One line of text. `lead`: a leading word set in 600 weight ("Vedtatt:");
+    `spaced`: a small-caps-like section label."""
     fill = "var(--tp-muted, #52514e)" if muted else "var(--tp-fg, currentColor)"
     # paint-order goes in style: the HTML validator rejects it as an attribute.
     extra = (' stroke="var(--tp-flate, #fcfcfb)" stroke-width="3" stroke-linejoin="round" style="paint-order:stroke"'
-             if halo else "")
+             if halo else "") + (' letter-spacing="0.1em"' if spaced else "")
     body = escape(s)
     if lead and s.startswith(lead):
         body = f'<tspan font-weight="600">{escape(lead)}</tspan>{escape(s[len(lead):])}'
