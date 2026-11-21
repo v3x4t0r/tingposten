@@ -484,7 +484,7 @@ def facts(**kw):
 
 def test_fakta_never_say_vedtatt_and_keep_a_fixed_order():
     assert facts() == []  # an ordinary adopted sak: nothing to say
-    assert facts(innstilling_falt=True) == [("status", "Innstillingen falt")]
+    assert facts(innstilling_falt=True) == [("status", "Innstillingen falt, noe annet ble vedtatt")]
     assert facts(status_klasse="apen", status_tekst="Sendt tilbake – ikke avgjort ennå", innstilling_falt=True) == [
         ("status", "Sendt tilbake – ikke avgjort ennå")]
     full = facts(status_klasse="noytral", status_tekst="Tatt til orientering", bydeler=["Fana"],

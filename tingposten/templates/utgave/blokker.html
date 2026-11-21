@@ -42,7 +42,7 @@
 <figure class="figur figur-{{ f.type }}" style="width: {{ '%.1f'|format(bredde) }}mm">
   {% set tit = f.svg|figur_tittel %}
   {% if tit %}<p class="figur-tittel">{{ tit }}</p>{% endif %}
-  {% if f.type == "stemmer" %}<p class="figur-forklaring">Stolpene viser stemmer for hvert forslag. Under hver stolpe står partiene som stemte for.</p>{% endif %}
+  {% if f.type == "stemmer" %}<p class="figur-forklaring">Stolpen viser stemmene for og mot det som ble vedtatt, målt mot hele bystyret; partiene står under. Andre forslag har hver sin stolpe. Forslagene stemmes over etter tur, så et parti kan stå på flere. «3 fra V» og «resten av V» er protokollens egen deling av et parti.</p>{% endif %}
   {{ figur_svg(f.svg) }}
   {% if f.type == "kart" %}
   {% set grunn = (f.kilde or "").split(". ", 1)[1] if ". " in (f.kilde or "") else "" %}

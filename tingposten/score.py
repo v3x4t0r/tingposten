@@ -392,7 +392,15 @@ def _sakstype(tittel: str, vedtak: str) -> tuple[str, float, float]:
 
 def _split(p: dict, seats: int | None = None) -> tuple[str | None, float, int | None, int | None]:
     """Badge, closeness (0..1) and the stated votes for/against of the most
-    contested binding vote. Against is None when only the votes for are stated."""
+    contested binding vote. Against is None when only the votes for are stated.
+
+    Everyone present must vote, so against = present - for. A fallen main
+    proposal's count (innstilling vs alternativ) is read as the against-side
+    of the adopted one only when the two add up to the members present (or,
+    without a stated til_stede, to the organ's seats): the bystyre often votes
+    on alternatives in sequence, and then the count belongs to another vote.
+    Without til_stede, closeness is judged from the seat count, but only
+    numbers the protokoll states are shown ("58 stemmer for")."""
     votes = [v for v in p.get("voteringer", []) if not v["forslag"].lower().startswith("merknad")]
     if not votes or p.get("enstemmig"):
         return None, 0.0, None, None
@@ -407,13 +415,15 @@ def _split(p: dict, seats: int | None = None) -> tuple[str | None, float, int | 
             return None, 0.3, None, None
         return None, 0.2 if lost else 0.0, None, None
     til_stede = p.get("til_stede")
+    total = til_stede or seats
     best = None
     for v in won:
         n = v["stemmer"]
-        if til_stede:
+        paired = [m for m in lost_main if total and n + m == total] if _is_main(v) else []
+        if paired:
+            mot, shown = paired[0], paired[0]
+        elif til_stede:
             mot, shown = til_stede - n, til_stede - n
-        elif lost_main and _is_main(v):
-            mot, shown = max(lost_main), max(lost_main)
         elif seats:
             # Against-votes not stated: judge closeness from the seat count,
             # but show only the stated number.
