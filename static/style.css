@@ -3,7 +3,8 @@
    the only scripts are the visitor count and, when comments are on, the
    comment section (debatt.js). Self-hosted fonts (fonts.css) with system fallbacks. All
    colours are tokens; the figures (grafikk.py) read the --tp-* tokens and
-   stay in ink: no party colours, no colour for winners or losers. */
+   stay in ink, with one exception (owner 21.11): the vote bar is coloured by
+   party (--tp-p-*). No colour for winners or losers. */
 
 :root {
   color-scheme: light dark;
@@ -24,7 +25,7 @@
   --stolpe-spor: #ddd6c4;
   --merket: #e6dcc3;
 
-  /* Read by the SVG figures (grafikk.py). Ink, never party colours. */
+  /* Read by the SVG figures (grafikk.py). Ink, except the party colours. */
   --tp-for: #3a3935;
   --tp-falt: #8a877f;
   --tp-spor: #d3cbb8;
@@ -32,6 +33,9 @@
   --tp-flate: var(--papir);
   --tp-fg: var(--blekk);
   --tp-muted: #55534d;
+  /* Party colours for the vote bar (grafikk.PARTY_COLOUR); validated against the paper in each mode. */
+  --tp-p-ap: #da4b0d; --tp-p-bl: #be58dd; --tp-p-frp: #2942ca; --tp-p-h: #4aa8df; --tp-p-inp: #a1442e; --tp-p-krf: #b7a326;
+  --tp-p-mdg: #3b660d; --tp-p-pp: #1692cc; --tp-p-r: #a41642; --tp-p-sp: #89882a; --tp-p-sv: #c5479c; --tp-p-v: #097b4b;
 
   /* The nameplate: one line to switch it (e.g. to var(--didone)). */
   --navn: "UnifrakturMaguntia", "Old English Text MT", "Didot", serif;
@@ -71,6 +75,8 @@
     --tp-spor: #3e392f;
     --tp-kart: #3c372d;
     --tp-muted: #bbb3a2;
+    --tp-p-ap: #ed5522; --tp-p-bl: #b860be; --tp-p-frp: #4c49d9; --tp-p-h: #3e97c9; --tp-p-inp: #ba3000; --tp-p-krf: #ac8f29;
+    --tp-p-mdg: #187830; --tp-p-pp: #009dde; --tp-p-r: #b04e58; --tp-p-sp: #9d9114; --tp-p-sv: #b51c99; --tp-p-v: #338e63;
   }
 }
 
